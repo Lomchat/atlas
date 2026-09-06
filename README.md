@@ -7,6 +7,7 @@ An interactive French-language Three.js atlas of matter, from familiar objects t
 ## Explore
 
 - Start with a glass of water, a glass of sparkling water or a methane flask. The collection dialog shows the large object in 3D, with a small molecular illustration and the path between them. Browsing and cancelling preserve the current exploration; entering a different material starts at its object.
+- Shared procedural object models use rounded vessel walls, blue/turquoise water and menisci, outlined bubbles, and a cobalt glass flask with a ribbed copper cap and a curved printed label. Scale-independent optical edges keep transparent surfaces readable in the scene and gallery; geometries, materials and label textures are released together.
 - One camera follows object → sampled volume / CO₂ bubble → molecular neighborhood → one molecule → atom → nucleus → nucleon → quark. The reverse path remains available throughout. Surrounding representations fade with the actual camera scale. An anchored marker connects each large level with the next smaller volume.
 - The exploration button inside the scene continues through every scale to the quarks, shares the current named destination and supports rapid repeated clicks. Elementary particles show an explicit endpoint.
 - The two top buttons name their destinations. Repeated clicks immediately update the requested destination, including a reversal during a flight. Macro transitions interpolate distance logarithmically; all button flights last 300 ms with no animation queue. Reduced motion snaps to the destination.

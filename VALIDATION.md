@@ -42,3 +42,15 @@ The full existing navigation suite passed locally, including ray picking, orbit 
 The final build passed TypeScript and Vite checks and was deployed by atomic directory exchange. The previous version is retained at `releases/before-animated-lessons-20260906T111653Z`. The public HTTPS document serves `index-DfeblLVq.js` and `index-D7dE0_ZF.css` successfully.
 
 The full experience suite also passed against the public HTTPS deployment, including the remembered non-default hydrogen/quark branch, seven animated lessons, pause/replay, desktop/mobile/landscape layouts, reduced motion, stable renderer and no page errors.
+
+## Colored procedural objects
+
+The shared macro model factory now builds rounded glass walls with a thick foot and rolled lip, separate blue/turquoise liquid surfaces and menisci, and 46 outlined bubbles for sparkling water. The methane flask uses cobalt glass, a shaped shoulder, a ribbed copper stopper, rear graduations and a curved cream CH₄ label. Coasters have colored enamel edges. The same palette is used by the gallery illustrations. Sample volumes use optical edges and colored reference points; the methane label explicitly identifies the gas as colorless.
+
+The optical shader uses view-space normals so its appearance remains consistent between unit-sized gallery previews and the enlarged main scene. All materials fade with the existing camera-driven layers; opaque labels and coasters stop writing depth during fades. Generated label textures are disposed with each model.
+
+TypeScript and the staged production build passed. The existing picker suite passed locally, covering preview rotation, selection/cancel/resume, focus restoration, cleanup, both themes and desktop/mobile/landscape layouts. The full scales suite passed locally: all three object-to-quark routes and their reverse, manual zoom, persistent renderer, every interaction and phase, gallery and mobile layouts, with no page errors. Final material adjustments were checked with fresh screenshots of all three objects and galleries, with no browser console or shader errors. Screenshots are under `artifacts/models-final-*.png`, `artifacts/scales-*.png` and `artifacts/picker-*.png`.
+
+The final build was deployed by atomic directory exchange. The previous version is retained at `releases/before-colored-objects-20260906T114630Z`. Public HTTPS serves `index-Dj9S9Gxh.js`; the stylesheet is unchanged.
+
+The picker suite also passed against the public HTTPS deployment after release, including both themes, preview rotation, selection and focus preservation, mobile/small/landscape layouts and renderer cleanup.

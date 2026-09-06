@@ -1,13 +1,21 @@
 import * as T from "three";
 import { molecules, elements } from "./data";
 import type { MoleculeId } from "./data";
-import { environments } from "./scales";
+
+/** Shared object palette: the flask is colored glass, not colored methane. */
+export const objectPalette = {
+  water: { body: "#258ec9", edge: "#96dfff", accent: "#2479b5" },
+  co2: { body: "#249bae", edge: "#b0f0f6", accent: "#299baf" },
+  methane: { body: "#254bca", edge: "#7fafff", accent: "#b97447" },
+};
 
 /** A local-coordinate model shared by the gallery and the continuous scene. */
 export function macroModel(id: MoleculeId, portion = false) {
   const group = new T.Group(),
     materials = new Set<T.Material>(),
-    geometries = new Set<T.BufferGeometry>();
+    geometries = new Set<T.BufferGeometry>(),
+    textures = new Set<T.Texture>();
+  const palette = objectPalette[id];
   const add = (
     geo: T.BufferGeometry,
     mat: T.Material,
@@ -19,45 +27,83 @@ export function macroModel(id: MoleculeId, portion = false) {
     parent.add(mesh);
     return mesh;
   };
-  const glass = new T.MeshPhysicalMaterial({
-    color: "#c0d3e2",
-    metalness: 0.08,
-    roughness: 0.12,
-    transparent: true,
-    opacity: 0.12,
-    side: T.DoubleSide,
-    depthWrite: false,
-  });
-  const rim = new T.MeshStandardMaterial({
-    color: "#bfd0df",
-    metalness: 0.45,
-    roughness: 0.21,
-    transparent: true,
-    opacity: 0.55,
-  });
-  const water = new T.MeshPhysicalMaterial({
-    color: environments[id].color,
-    metalness: 0.15,
-    roughness: 0.12,
-    transparent: true,
-    opacity: 0.1,
-    side: T.DoubleSide,
-    depthWrite: false,
-  });
-  const ring = (r: number, y: number) => {
-    const mesh = add(new T.TorusGeometry(r, 0.018, 10, 80), rim);
+  const surface = (
+    color: string,
+    opacity = 1,
+    metalness = 0.15,
+    roughness = 0.24,
+  ) =>
+    new T.MeshPhysicalMaterial({
+      color,
+      opacity,
+      metalness,
+      roughness,
+      transparent: true,
+      depthWrite: opacity === 1,
+      envMapIntensity: 0.45,
+      clearcoat: 0.65,
+      clearcoatRoughness: 0.16,
+    });
+  // A scale-independent optical edge keeps clear vessels readable at both
+  // gallery scale and world scale. Gas interiors remain transparent.
+  const optical = (color: string, edge: string, density: number) =>
+    new T.ShaderMaterial({
+      uniforms: {
+        tint: { value: new T.Color(color) },
+        edge: { value: new T.Color(edge) },
+        density: { value: density },
+        opacity: { value: 1 },
+      },
+      vertexShader: `varying vec3 vNormal; varying vec3 vEye;
+      void main() { vec4 p = modelViewMatrix * vec4(position, 1.0);
+        vNormal = normalize(normalMatrix * normal); vEye = -p.xyz;
+        gl_Position = projectionMatrix * p; }`,
+      fragmentShader: `uniform vec3 tint; uniform vec3 edge; uniform float density;
+      uniform float opacity; varying vec3 vNormal; varying vec3 vEye;
+      void main() { float rim = pow(1.0 - abs(dot(normalize(vNormal), normalize(vEye))), 2.6);
+        gl_FragColor = vec4(mix(tint, edge, rim * 0.7), (density + rim * (0.82-density)) * opacity);
+        #include <tonemapping_fragment>
+        #include <colorspace_fragment>
+      }`,
+      transparent: true,
+      depthWrite: false,
+      side: T.DoubleSide,
+      forceSinglePass: true,
+    });
+  const rim = surface(palette.edge, 0.64, 0.25, 0.16);
+  const ring = (
+    r: number,
+    y: number,
+    material: T.Material = rim,
+    thickness = 0.018,
+  ) => {
+    const mesh = add(new T.TorusGeometry(r, thickness, 12, 96), material);
     mesh.rotation.x = Math.PI / 2;
     mesh.position.y = y;
+    return mesh;
   };
+  const lathe = (profile: number[][], material: T.Material) =>
+    add(
+      new T.LatheGeometry(
+        profile.map(([r, y]) => new T.Vector2(r, y)),
+        96,
+      ),
+      material,
+    );
+
   if (portion) {
-    const shell = add(new T.SphereGeometry(1, 48, 32), water);
-    shell.scale.set(1, 1, 1);
-    if (id !== "co2")
+    add(
+      new T.SphereGeometry(1, 64, 40),
+      optical(palette.body, palette.edge, id === "water" ? 0.16 : 0.035),
+    );
+    if (id !== "co2") {
+      const boundary = surface(palette.edge, 0.26);
       for (let axis = 0; axis < 3; axis++) {
-        const mesh = add(new T.TorusGeometry(1.005, 0.0015, 4, 80), rim);
+        const mesh = add(new T.TorusGeometry(1.005, 0.002, 6, 96), boundary);
         if (axis === 1) mesh.rotation.x = Math.PI / 2;
         if (axis === 2) mesh.rotation.y = Math.PI / 2;
       }
+    }
     const specks = new Float32Array(1200);
     for (let i = 0; i < 400; i++) {
       const a = i * 2.39996,
@@ -72,90 +118,220 @@ export function macroModel(id: MoleculeId, portion = false) {
         i * 3,
       );
     }
-    const speckGeo = new T.BufferGeometry();
-    speckGeo.setAttribute("position", new T.BufferAttribute(specks, 3));
-    const speckMat = new T.PointsMaterial({
-      color: environments[id].color,
+    const geo = new T.BufferGeometry();
+    geo.setAttribute("position", new T.BufferAttribute(specks, 3));
+    const mat = new T.PointsMaterial({
+      color: palette.edge,
       size: 1.5,
       sizeAttenuation: false,
       transparent: true,
-      opacity: 0.35,
+      opacity: 0.4,
       depthWrite: false,
     });
-    group.add(new T.Points(speckGeo, speckMat));
-    geometries.add(speckGeo);
-    materials.add(speckMat);
+    group.add(new T.Points(geo, mat));
+    geometries.add(geo);
+    materials.add(mat);
   } else {
     if (id === "methane") {
-      const profile = [
-        new T.Vector2(0.01, -1.2),
-        new T.Vector2(0.83, -1.2),
-        new T.Vector2(0.93, -1.08),
-        new T.Vector2(0.93, 0.4),
-        new T.Vector2(0.86, 0.66),
-        new T.Vector2(0.35, 1.02),
-        new T.Vector2(0.35, 1.32),
-      ];
-      add(new T.LatheGeometry(profile, 64), glass);
-      ring(0.35, 1.3);
-      ring(0.87, -1.15);
-      const cap = add(
-        new T.CylinderGeometry(0.4, 0.4, 0.14, 48),
-        new T.MeshStandardMaterial({
-          color: "#8e91a9",
-          metalness: 0.6,
-          roughness: 0.32,
-        }),
+      lathe(
+        [
+          [0, -1.2],
+          [0.73, -1.2],
+          [0.83, -1.19],
+          [0.9, -1.15],
+          [0.93, -1.08],
+          [0.93, 0.35],
+          [0.92, 0.47],
+          [0.88, 0.59],
+          [0.81, 0.7],
+          [0.68, 0.82],
+          [0.5, 0.94],
+          [0.38, 1.04],
+          [0.35, 1.12],
+          [0.35, 1.31],
+          [0.31, 1.31],
+          [0.31, 1.12],
+          [0.34, 1.04],
+          [0.46, 0.94],
+          [0.64, 0.82],
+          [0.77, 0.7],
+          [0.84, 0.59],
+          [0.88, 0.47],
+          [0.89, 0.35],
+          [0.89, -1.04],
+          [0.85, -1.1],
+          [0, -1.1],
+        ],
+        optical(palette.body, palette.edge, 0.32),
       );
-      cap.position.y = 1.39;
+      ring(0.87, -1.13, rim, 0.035);
+      ring(0.35, 1.26, surface(palette.accent, 1, 0.65));
+      const copper = surface(palette.accent, 1, 0.65, 0.29);
+      lathe(
+        [
+          [0, 1.29],
+          [0.37, 1.29],
+          [0.4, 1.31],
+          [0.405, 1.43],
+          [0.39, 1.47],
+          [0, 1.47],
+        ],
+        copper,
+      );
+      ring(0.39, 1.32, copper, 0.018);
+      // Fine machined ribs make the stopper readable when rotating the bottle.
+      const ribGeo = new T.CylinderGeometry(0.009, 0.009, 0.105, 5);
+      for (let i = 0; i < 48; i++) {
+        const a = (i / 48) * Math.PI * 2;
+        const rib = add(ribGeo, copper);
+        rib.position.set(Math.sin(a) * 0.405, 1.38, Math.cos(a) * 0.405);
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = 1024;
+      canvas.height = 512;
+      const ctx = canvas.getContext("2d")!;
+      ctx.fillStyle = "#f0e7d5";
+      ctx.fillRect(0, 0, 1024, 512);
+      ctx.fillStyle = "#b97447";
+      ctx.fillRect(0, 0, 1024, 16);
+      ctx.fillRect(0, 496, 1024, 16);
+      ctx.fillStyle = "#26436d";
+      ctx.textAlign = "center";
+      ctx.font = "500 29px sans-serif";
+      ctx.fillText("MATIÈRE  /  COLLECTION", 512, 83);
+      ctx.font = "600 154px sans-serif";
+      ctx.fillText("CH₄", 512, 252);
+      ctx.font = "600 42px sans-serif";
+      ctx.fillText("MÉTHANE", 512, 328);
+      ctx.fillStyle = "#b97447";
+      ctx.fillRect(434, 367, 156, 3);
+      ctx.fillStyle = "#53647a";
+      ctx.font = "28px sans-serif";
+      ctx.fillText("GAZ • INCOLORE", 512, 433);
+      const texture = new T.CanvasTexture(canvas);
+      texture.colorSpace = T.SRGBColorSpace;
+      texture.anisotropy = 4;
+      textures.add(texture);
+      // Printed ink retains its contrast under the bright studio lights.
+      const labelMat = new T.MeshBasicMaterial({
+        map: texture,
+        toneMapped: false,
+      });
       const label = add(
-        new T.CylinderGeometry(
-          0.938,
-          0.938,
-          0.33,
-          64,
-          1,
-          true,
-          Math.PI * 0.07,
-          Math.PI * 0.86,
-        ),
-        new T.MeshStandardMaterial({
-          color: "#a8abc0",
-          transparent: true,
-          opacity: 0.3,
-          side: T.DoubleSide,
-        }),
+        new T.CylinderGeometry(0.942, 0.942, 0.84, 64, 1, true, -1.1, 2.2),
+        labelMat,
       );
-      label.position.y = -0.58;
+      label.position.y = -0.43;
+      // Discreet graduation marks on the opposite side of the laboratory flask.
+      const markings = surface("#b6ceff", 0.7, 0, 0.6);
+      for (let i = 0; i < 7; i++) {
+        const mark = add(
+          new T.CylinderGeometry(
+            0.944,
+            0.944,
+            0.007,
+            12,
+            1,
+            true,
+            2.5,
+            i % 2 ? 0.1 : 0.19,
+          ),
+          markings,
+        );
+        mark.position.y = -0.72 + i * 0.15;
+      }
     } else {
-      add(new T.CylinderGeometry(0.97, 0.78, 2.45, 64, 1, true), glass);
-      ring(0.97, 1.225);
-      ring(0.79, -1.225);
-      const body = add(new T.CylinderGeometry(0.916, 0.775, 1.84, 64), water);
-      body.position.y = -0.29;
-      ring(0.916, 0.63);
+      const glass = optical(palette.body, palette.edge, 0.06);
+      // Closed, rounded wall profile: thick foot, thin walls and a rolled lip.
+      lathe(
+        [
+          [0, -1.25],
+          [0.7, -1.25],
+          [0.77, -1.23],
+          [0.8, -1.19],
+          [0.97, 1.18],
+          [0.976, 1.215],
+          [0.968, 1.234],
+          [0.95, 1.24],
+          [0.932, 1.23],
+          [0.926, 1.212],
+          [0.923, 1.18],
+          [0.763, -1.08],
+          [0.74, -1.12],
+          [0, -1.12],
+        ],
+        glass,
+      );
+      ring(0.951, 1.218, rim, 0.022);
+      ring(0.765, -1.205, rim, 0.035);
+      const waterMat = surface(
+        id === "water" ? "#258bc3" : "#3aafc3",
+        0.36,
+        0.02,
+        0.15,
+      );
+      waterMat.side = T.DoubleSide;
+      const body = add(
+        new T.CylinderGeometry(0.886, 0.766, 1.72, 96, 1, true),
+        waterMat,
+      );
+      body.position.y = -0.25;
+      const top = add(
+        new T.CircleGeometry(0.885, 96),
+        surface(palette.body, 0.49, 0.02, 0.13),
+      );
+      top.rotation.x = -Math.PI / 2;
+      top.position.y = 0.61;
+      top.material.side = T.DoubleSide;
+      ring(0.885, 0.613, surface(palette.edge, 0.54, 0.15, 0.13), 0.009);
+      // Narrow reflections follow the vessel taper, rather than flat white fills.
+      const highlight = surface("#d8f3ff", 0.23, 0, 0.18);
+      for (const a of [-0.74, 2.25]) {
+        const stripe = add(
+          new T.CylinderGeometry(0.958, 0.795, 2.2, 10, 1, true, a, 0.028),
+          highlight,
+        );
+        stripe.position.y = -0.01;
+      }
       if (id === "co2") {
-        for (let i = 0; i < 18; i++) {
-          const mesh = add(new T.SphereGeometry(1, 16, 12), glass);
-          const a = i * 2.399;
-          mesh.scale.setScalar(0.028 + (i % 4) * 0.012);
+        const bubbleGeo = new T.SphereGeometry(1, 20, 16);
+        const bubbleMat = optical("#a0dbe9", "#e0fbff", 0.035);
+        for (let i = 0; i < 46; i++) {
+          const a = i * 2.399,
+            radius = 0.022 + (i % 5) * 0.012;
+          const mesh = add(bubbleGeo, bubbleMat);
+          mesh.scale.setScalar(radius);
           mesh.position.set(
-            Math.cos(a) * (0.22 + (i % 3) * 0.16),
-            -1 + (i / 18) * 1.55,
-            Math.sin(a) * 0.5,
+            Math.cos(a) * (0.2 + (i % 4) * 0.15),
+            -1.01 + (i / 46) * 1.53,
+            Math.sin(a) * (0.28 + (i % 3) * 0.14),
           );
         }
       }
     }
-    const pedestal = add(
-      new T.CylinderGeometry(1.2, 1.25, 0.075, 80),
-      new T.MeshStandardMaterial({
-        color: "#414958",
-        metalness: 0.4,
-        roughness: 0.5,
-      }),
+    // A ceramic coaster with a colored enamel edge grounds the transparent object.
+    const ceramic = surface(
+      id === "methane" ? "#172b51" : "#192e40",
+      1,
+      0.05,
+      0.62,
     );
-    pedestal.position.y = -1.31;
+    ceramic.clearcoat = 0.12;
+    ceramic.envMapIntensity = 0.15;
+    lathe(
+      [
+        [0, -1.39],
+        [1.1, -1.39],
+        [1.17, -1.375],
+        [1.2, -1.34],
+        [1.19, -1.3],
+        [1.15, -1.28],
+        [0, -1.28],
+      ],
+      ceramic,
+    );
+    ring(1.18, -1.325, surface(palette.accent, 1, 0.45, 0.23), 0.022);
+    ring(1.06, -1.278, surface(palette.accent, 0.55, 0.3, 0.3), 0.006);
   }
   const opacities = new Map<T.Material, number>();
   materials.forEach((m) => {
@@ -168,11 +344,18 @@ export function macroModel(id: MoleculeId, portion = false) {
       group.visible = alpha > 0.002;
       materials.forEach((m) => {
         m.opacity = opacities.get(m)! * alpha;
+        if (m instanceof T.ShaderMaterial) m.uniforms.opacity.value = alpha;
+        // Opaque labels and coasters must not occlude the next zoom layer.
+        m.depthWrite =
+          opacities.get(m) === 1 &&
+          !(m instanceof T.ShaderMaterial) &&
+          alpha > 0.98;
       });
     },
     dispose() {
       materials.forEach((m) => m.dispose());
       geometries.forEach((g) => g.dispose());
+      textures.forEach((t) => t.dispose());
     },
   };
 }

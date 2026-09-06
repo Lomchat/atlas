@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { ArrowRight, Check, Rotate3D } from "lucide-react";
 import * as T from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { macroModel } from "./MacroModel";
+import { macroModel, objectPalette } from "./MacroModel";
 import { environments } from "./scales";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { elements, molecules } from "./data";
@@ -75,37 +75,94 @@ function Thumbnail({ id }: { id: MoleculeId }) {
 
 function MacroThumbnail({ id }: { id: MoleculeId }) {
   const uid = useId();
+  const palette = objectPalette[id];
   return (
     <svg viewBox="0 0 140 94" aria-hidden="true">
       <defs>
         <linearGradient id={uid}>
-          <stop stopColor="#dbe9f7" stopOpacity=".4" />
-          <stop offset=".5" stopColor="#bdd2e7" stopOpacity=".04" />
-          <stop offset="1" stopColor="#dbe9f7" stopOpacity=".5" />
+          <stop stopColor={palette.edge} stopOpacity=".7" />
+          <stop offset=".25" stopColor={palette.body} stopOpacity=".35" />
+          <stop
+            offset=".65"
+            stopColor={palette.body}
+            stopOpacity={id === "methane" ? ".8" : ".1"}
+          />
+          <stop offset="1" stopColor={palette.edge} stopOpacity=".65" />
         </linearGradient>
       </defs>
+      <ellipse
+        cx="70"
+        cy="82"
+        rx="34"
+        ry="7"
+        fill="#233b51"
+        stroke={palette.accent}
+        strokeWidth="1.4"
+      />
       {id === "methane" ? (
         <>
           <path
-            d="M59 18 L59 31 Q43 38 43 47 L43 78 Q70 86 97 78 L97 47 Q97 38 81 31 L81 18 Z"
+            d="M59 18 L59 29 Q59 33 52 37 Q43 42 43 49 L43 75 Q43 84 70 84 Q97 84 97 75 L97 49 Q97 42 88 37 Q81 33 81 29 L81 18 Z"
             fill={`url(#${uid})`}
-            stroke="#b5bdd2"
-            strokeWidth="1.4"
+            stroke={palette.edge}
+            strokeWidth="1.2"
           />
-          <rect x="56" y="12" width="28" height="9" rx="2" fill="#9295ae" />
+          <rect
+            x="56"
+            y="11"
+            width="28"
+            height="11"
+            rx="3"
+            fill={palette.accent}
+          />
+          {[0, 1, 2, 3, 4, 5].map((i) => (
+            <path
+              key={i}
+              d={`M${60 + i * 4} 13 v6`}
+              stroke="#e9b07d"
+              strokeOpacity=".6"
+            />
+          ))}
+          <path d="M44 53 Q70 58 96 53 L96 73 Q70 79 44 73 Z" fill="#f0e7d5" />
+          <text
+            x="70"
+            y="69"
+            textAnchor="middle"
+            fill="#26436d"
+            fontSize="13"
+            fontWeight="700"
+          >
+            CH₄
+          </text>
           <path
-            d="M44 57 Q70 64 96 57 L96 68 Q70 75 44 68 Z"
-            fill="#a8abc0"
-            opacity=".3"
+            d="M49 46 L49 51 M49 77 L49 78"
+            stroke="#c1dcff"
+            strokeWidth="2"
+            strokeLinecap="round"
           />
         </>
       ) : (
         <>
           <path
-            d="M44 20 L50 78 Q70 86 90 78 L96 20"
+            d="M44 20 L50 76 Q51 84 70 84 Q89 84 90 76 L96 20"
             fill={`url(#${uid})`}
-            stroke="#b6ccdd"
+            stroke={palette.edge}
             strokeWidth="1.4"
+          />
+          <path
+            d="M47 39 Q70 47 93 39 L90 76 Q70 84 50 76 Z"
+            fill={palette.body}
+            opacity=".48"
+          />
+          <ellipse
+            cx="70"
+            cy="39"
+            rx="23"
+            ry="6"
+            fill={palette.body}
+            opacity=".7"
+            stroke={palette.edge}
+            strokeWidth=".8"
           />
           <ellipse
             cx="70"
@@ -113,31 +170,28 @@ function MacroThumbnail({ id }: { id: MoleculeId }) {
             rx="26"
             ry="7"
             fill="none"
-            stroke="#d0deeb"
+            stroke={palette.edge}
+            strokeWidth="1.6"
           />
           <path
-            d="M47 39 Q70 47 93 39 L90 77 Q70 84 50 77 Z"
-            fill="#9ebdd6"
-            opacity=".28"
-          />
-          <ellipse
-            cx="70"
-            cy="39"
-            rx="23"
-            ry="6"
-            fill="#a9c9e0"
-            opacity=".22"
+            d="M49 26 L53 72"
+            stroke="#dcf6ff"
+            strokeWidth="2"
+            strokeLinecap="round"
+            opacity=".65"
           />
           {id === "co2" &&
-            [0, 1, 2, 3, 4, 5].map((i) => (
+            Array.from({ length: 10 }, (_, i) => (
               <circle
                 key={i}
-                cx={61 + (i % 3) * 9}
-                cy={48 + i * 4}
-                r={1.5 + (i % 2)}
-                fill="none"
-                stroke="#d2e2ef"
-                strokeOpacity=".7"
+                cx={59 + (i % 3) * 10}
+                cy={47 + ((i * 7) % 29)}
+                r={1.3 + (i % 3) * 0.5}
+                fill="#b3edfa"
+                fillOpacity=".12"
+                stroke="#e0fbff"
+                strokeOpacity=".85"
+                strokeWidth=".9"
               />
             ))}
         </>
