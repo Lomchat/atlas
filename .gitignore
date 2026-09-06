@@ -6,3 +6,6 @@ releases/
 site
 
 .next-dist/
+
+# Server configuration stays local.
+/deploy/
