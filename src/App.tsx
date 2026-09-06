@@ -1,10 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Atom,
-  ArrowDown,
   ArrowLeft,
-  ArrowRight,
   ArrowUpRight,
+  Atom,
   Box,
   Check,
   ChevronDown,
@@ -12,7 +10,6 @@ import {
   CircleHelp,
   Crosshair,
   Expand,
-  FlaskConical,
   Layers3,
   Maximize2,
   Minus,
@@ -24,1102 +21,939 @@ import {
   RotateCw,
   Search,
   Share2,
+  Sparkles,
   Sun,
   X,
   Zap,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import Scene from "./Scene";
+import { molecules, particles, sources } from "./data";
+import type { MoleculeId } from "./data";
 import {
-  atomEntry,
-  elementOf,
-  isotopeSymbol,
-  elements,
-  entriesFor,
-  initialState,
-  levels,
-  molecules,
-  nucleusEntry,
-  particles,
-  sources,
-} from "./data";
-import type {
-  BosonId,
-  ElementId,
-  Entry,
-  Level,
-  ModelState,
-  MoleculeId,
-} from "./data";
-const icons: LucideIcon[] = [FlaskConical, Atom, Crosshair, Box, Zap];
-function readInitial(): ModelState {
-  const p = new URLSearchParams(location.search);
-  const s = { ...initialState };
-  if (levels.some((l) => l.id === p.get("level")))
-    s.level = p.get("level") as Level;
+  ancestors,
+  createGraph,
+  defaultState,
+  descendants,
+  expansion,
+  kindNames,
+  openBranch,
+} from "./continuum";
+import type { ExplorerState, MatterNode } from "./continuum";
+function initial(): ExplorerState {
+  const p = new URLSearchParams(location.search),
+    s: ExplorerState = { ...defaultState, overrides: {} };
   if (p.get("molecule") && Object.hasOwn(molecules, p.get("molecule")!))
     s.molecule = p.get("molecule") as MoleculeId;
-  if (p.get("element") && Object.hasOwn(elements, p.get("element")!))
-    s.element = p.get("element") as ElementId;
-  if (p.get("boson") && ["photon", "gluon", "higgs"].includes(p.get("boson")!))
-    s.boson = p.get("boson") as BosonId;
-  if (p.get("nucleon") === "neutron") s.nucleon = "neutron";
+  const old = p.get("level"),
+    d = p.get("depth")
+      ? Number(p.get("depth"))
+      : old === "atom"
+        ? 50
+        : old === "nucleus"
+          ? 78
+          : old === "quarks"
+            ? 100
+            : 0;
+  s.depth = Number.isFinite(d) ? Math.max(0, Math.min(100, d)) : 0;
+  const g = createGraph(s.molecule);
+  for (const [key, value] of [
+    ["open", 1],
+    ["closed", 0],
+  ] as const)
+    for (const id of (p.get(key) || "").split(",").slice(0, 180))
+      if (g.nodes.get(id)?.children.length) s.overrides[id] = value;
+  if (g.nodes.has(p.get("node") || "")) s.selected = p.get("node");
+  if (g.nodes.has(p.get("focus") || "")) s.focus = p.get("focus");
   try {
     s.light = localStorage.getItem("atlas-theme") === "light";
   } catch {}
   return s;
 }
-function Toggle({
-  label,
-  checked,
-  onChange,
-}: {
-  label: string;
-  checked: boolean;
-  onChange: () => void;
-}) {
-  return (
-    <button
-      className="toggle-row"
-      role="switch"
-      aria-checked={checked}
-      onClick={onChange}
-    >
-      <span>{label}</span>
-      <span className={"switch " + (checked ? "on" : "")}>
-        <i />
-      </span>
-    </button>
-  );
-}
 function IconButton({
   label,
-  Icon,
+  icon: Icon,
   onClick,
   active = false,
 }: {
   label: string;
-  Icon: LucideIcon;
+  icon: LucideIcon;
   onClick: () => void;
   active?: boolean;
 }) {
   return (
     <button
       className={"icon-button " + (active ? "active" : "")}
+      onClick={onClick}
       title={label}
       aria-label={label}
-      onClick={onClick}
     >
       <Icon size={17} strokeWidth={1.5} />
     </button>
   );
 }
+function Switch({
+  label,
+  value,
+  toggle,
+}: {
+  label: string;
+  value: boolean;
+  toggle: () => void;
+}) {
+  return (
+    <button
+      className="toggle"
+      role="switch"
+      aria-checked={value}
+      onClick={toggle}
+    >
+      <span>{label}</span>
+      <span className={"switch " + (value ? "on" : "")}>
+        <i />
+      </span>
+    </button>
+  );
+}
 export default function App() {
-  const [state, setState] = useState<ModelState>(readInitial),
-    [leftOpen, setLeftOpen] = useState(false),
-    [mobileDetails, setMobileDetails] = useState(false),
-    [detailVisible, setDetailVisible] = useState(true),
-    [modal, setModal] = useState<"search" | "about" | null>(null),
+  const [state, setState] = useState<ExplorerState>(initial),
+    [panel, setPanel] = useState<"tree" | "details" | null>(null),
+    [inspector, setInspector] = useState(true),
+    [modal, setModal] = useState<"about" | "search" | null>(null),
     [query, setQuery] = useState(""),
-    [toast, setToast] = useState(""),
-    [phase, setPhase] = useState(0),
-    [ready, setReady] = useState(false),
-    [fullscreen, setFullscreen] = useState(false);
+    [message, setMessage] = useState(""),
+    [eventText, setEventText] = useState(""),
+    [automatic, setAutomatic] = useState(false);
+  const graph = useMemo(() => createGraph(state.molecule), [state.molecule]),
+    mol = molecules[state.molecule],
+    node = graph.nodes.get(state.selected || graph.root)!,
+    path = ancestors(graph, node.id),
+    isOpen = expansion(node, state) > 0.5,
+    local = Object.keys(state.overrides).length > 0;
   const dialog = useRef<HTMLDialogElement>(null),
-    searchInput = useRef<HTMLInputElement>(null),
-    toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const mol = molecules[state.molecule],
-    el = elements[state.element],
-    levelIndex = levels.findIndex((l) => l.id === state.level),
-    level = levels[levelIndex],
-    entries = entriesFor(state),
-    chosen = entries.find((e) => e.id === state.selected);
-  function update(patch: Partial<ModelState>) {
+    searchRef = useRef<HTMLInputElement>(null),
+    noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const update = (patch: Partial<ExplorerState>) =>
     setState((s) => ({ ...s, ...patch }));
-  }
-  function go(id: Level, patch: Partial<ModelState> = {}) {
+  function inspect(id: string, open = true) {
+    const n = graph.nodes.get(id);
+    if (!n) return;
+    setAutomatic(false);
+    setInspector(true);
+    setPanel(n.children.length ? null : "details");
     setState((s) => ({
       ...s,
-      level: id,
-      selected: null,
-      isolated: false,
-      explode: 0,
-      rotate: false,
-      playing: false,
-      play: s.play + 1,
-      reset: s.reset + 1,
-      zoom: 0,
-      ...patch,
+      selected: id,
+      focus:
+        s.focus && id !== s.focus && !id.startsWith(s.focus + "/")
+          ? id === graph.root
+            ? null
+            : id
+          : s.focus,
+      overrides:
+        open && n.children.length ? openBranch(graph, s, id) : s.overrides,
     }));
-    setLeftOpen(false);
-    setMobileDetails(false);
-    setDetailVisible(true);
-    setPhase(0);
   }
-  function choose(id: string) {
-    setDetailVisible(true);
-    update({ selected: id, isolated: false });
-    setMobileDetails(true);
-    setLeftOpen(false);
+  function toggleNode(id: string) {
+    setAutomatic(false);
+    const n = graph.nodes.get(id)!;
+    setState((s) => {
+      const overrides = { ...s.overrides };
+      if (expansion(n, s) > 0.5) {
+        overrides[id] = 0;
+        return {
+          ...s,
+          overrides,
+          selected: id,
+          focus:
+            s.focus && descendants(graph, id).includes(s.focus) ? id : s.focus,
+        };
+      }
+      return { ...s, selected: id, overrides: openBranch(graph, s, id) };
+    });
   }
-  function next(entry?: Entry) {
-    if (entry?.id.startsWith("neutron")) go("quarks", { nucleon: "neutron" });
-    else if (entry?.id.startsWith("proton"))
-      go("quarks", { nucleon: "proton" });
-    else if (entry?.next)
-      go(entry.next, entry.element ? { element: entry.element } : {});
-    else if (state.level === "molecule")
-      go("atom", { element: mol.atoms[0].element });
-    else if (state.level === "atom") go("nucleus");
-    else if (state.level === "nucleus") go("quarks", { nucleon: "proton" });
-    else if (state.level === "quarks") go("interaction");
+  function approach(id: string) {
+    setInspector(true);
+    setPanel(null);
+    if (id === graph.root) {
+      update({ focus: null, selected: null, zoom: 0 });
+      return;
+    }
+    const n = graph.nodes.get(id)!;
+    setState((s) => ({
+      ...s,
+      focus: id,
+      selected: id,
+      zoom: 0,
+      overrides: n.parent ? openBranch(graph, s, n.parent) : s.overrides,
+    }));
+  }
+  function overview() {
+    update({ focus: null, selected: null, zoom: 0, reset: state.reset + 1 });
+    setPanel(null);
   }
   function reset() {
+    setAutomatic(false);
+    setEventText("");
+    setState((s) => ({
+      ...defaultState,
+      molecule: s.molecule,
+      light: s.light,
+      reset: s.reset + 1,
+    }));
+    setPanel(null);
+  }
+  function changeMolecule(id: MoleculeId) {
+    setAutomatic(false);
+    setEventText("");
+    setState((s) => ({
+      ...defaultState,
+      molecule: id,
+      light: s.light,
+      reset: s.reset + 1,
+    }));
+    setPanel(null);
+  }
+  function globalDepth(depth: number) {
+    setAutomatic(false);
+    update({ depth, overrides: {}, focus: null, zoom: 0 });
+  }
+  function photon() {
+    const target =
+      node.atom >= 0
+        ? graph.atoms[node.atom]
+        : graph.atoms.find((id) => graph.nodes.get(id)!.element === "H") ||
+          graph.atoms[0];
+    setAutomatic(false);
     setState((s) => ({
       ...s,
-      explode: 0,
-      selected: null,
-      isolated: false,
-      rotate: false,
-      reset: s.reset + 1,
+      selected: target,
+      focus: target,
       zoom: 0,
-      playing: false,
-      play: s.play + 1,
+      overrides: openBranch(graph, s, target),
+      photon: s.photon + 1,
     }));
-    setPhase(0);
-    setMobileDetails(false);
+    setEventText("Photon incident");
   }
-  function notify(message: string) {
-    setToast(message);
-    if (toastTimer.current) clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => setToast(""), 3200);
+  function notify(text: string) {
+    setMessage(text);
+    if (noticeTimer.current) clearTimeout(noticeTimer.current);
+    noticeTimer.current = setTimeout(() => setMessage(""), 3000);
   }
   async function share() {
     try {
       await navigator.clipboard.writeText(location.href);
-      notify("Lien de cette vue copié");
+      notify("Lien de cette exploration copié");
     } catch {
-      notify("Le lien de cette vue est dans la barre d’adresse");
+      notify("Cette exploration est conservée dans l’adresse de la page");
     }
   }
-  async function toggleFullscreen() {
+  async function fullscreen() {
     try {
       if (document.fullscreenElement) await document.exitFullscreen();
       else await document.documentElement.requestFullscreen();
     } catch {
-      notify("Le plein écran est indisponible sur ce navigateur");
+      notify("Plein écran indisponible sur ce navigateur");
     }
   }
-  useEffect(() => {
-    const onChange = () => setFullscreen(!!document.fullscreenElement);
-    document.addEventListener("fullscreenchange", onChange);
-    return () => document.removeEventListener("fullscreenchange", onChange);
-  }, []);
   useEffect(() => {
     document.documentElement.dataset.theme = state.light ? "light" : "dark";
     document
       .querySelector('meta[name="theme-color"]')
-      ?.setAttribute("content", state.light ? "#e9ece7" : "#101413");
+      ?.setAttribute("content", state.light ? "#edf0f5" : "#111318");
     try {
       localStorage.setItem("atlas-theme", state.light ? "light" : "dark");
     } catch {}
   }, [state.light]);
   useEffect(() => {
     const p = new URLSearchParams();
-    if (state.level !== "molecule") p.set("level", state.level);
     if (state.molecule !== "water") p.set("molecule", state.molecule);
-    if (state.element !== "O") p.set("element", state.element);
-    if (state.nucleon !== "proton") p.set("nucleon", state.nucleon);
-    if (state.boson !== "photon") p.set("boson", state.boson);
+    if (state.depth) p.set("depth", String(Math.round(state.depth)));
+    const open = Object.entries(state.overrides)
+        .filter(([, v]) => v === 1)
+        .map(([k]) => k),
+      closed = Object.entries(state.overrides)
+        .filter(([, v]) => v === 0)
+        .map(([k]) => k);
+    if (open.length) p.set("open", open.join(","));
+    if (closed.length) p.set("closed", closed.join(","));
+    if (state.selected) p.set("node", state.selected);
+    if (state.focus) p.set("focus", state.focus);
     history.replaceState(
       null,
       "",
       location.pathname + (p.size ? "?" + p.toString() : ""),
     );
-  }, [state.level, state.molecule, state.element, state.nucleon, state.boson]);
+  }, [
+    state.molecule,
+    state.depth,
+    state.overrides,
+    state.selected,
+    state.focus,
+  ]);
   useEffect(() => {
-    const d = dialog.current;
-    if (modal && !d?.open) {
-      d?.showModal();
-      if (modal === "search")
-        setTimeout(() => searchInput.current?.focus(), 50);
-    } else if (!modal && d?.open) d.close();
+    if (modal) {
+      dialog.current?.showModal();
+      if (modal === "search") setTimeout(() => searchRef.current?.focus(), 50);
+    } else dialog.current?.close();
   }, [modal]);
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
+    if (!automatic) return;
+    let frame = 0,
+      last = performance.now();
+    const run = (now: number) => {
+      if (now - last > 30) {
+        const dt = Math.max(0, Math.min((now - last) / 1000, 0.1));
+        last = now;
+        setState((s) => ({
+          ...s,
+          depth: Math.min(100, s.depth + dt * 9),
+          overrides: {},
+          focus: null,
+        }));
+      }
+      frame = requestAnimationFrame(run);
+    };
+    frame = requestAnimationFrame(run);
+    return () => cancelAnimationFrame(frame);
+  }, [automatic]);
+  useEffect(() => {
+    if (automatic && state.depth >= 100) setAutomatic(false);
+  }, [state.depth, automatic]);
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
       if (
+        modal ||
         e.target instanceof HTMLInputElement ||
-        e.target instanceof HTMLSelectElement ||
-        e.target instanceof HTMLTextAreaElement
+        e.target instanceof HTMLSelectElement
       )
         return;
-      if (modal) return;
       if (e.key === "/") {
         e.preventDefault();
         setQuery("");
         setModal("search");
       }
       if (e.key.toLowerCase() === "r") reset();
-      if (e.key.toLowerCase() === "l")
-        setState((s) => ({ ...s, labels: !s.labels }));
-      if (["1", "2", "3", "4", "5"].includes(e.key))
-        go(levels[Number(e.key) - 1].id);
+      if (e.key.toLowerCase() === "l") update({ labels: !state.labels });
       if (e.key === "Escape") {
-        update({ selected: null, isolated: false });
-        setLeftOpen(false);
-        setMobileDetails(false);
+        overview();
+        setPanel(null);
+      }
+      if (e.key === " ") {
+        e.preventDefault();
+        setAutomatic((a) => !a);
       }
     };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
   });
   useEffect(
     () => () => {
-      if (toastTimer.current) clearTimeout(toastTimer.current);
+      if (noticeTimer.current) clearTimeout(noticeTimer.current);
     },
     [],
   );
-  function onPhase(n: number) {
-    setPhase(n);
-    if (n === 4) setState((s) => ({ ...s, playing: false }));
+  const visibleCount = [...graph.nodes.values()].filter(
+    (n) =>
+      n.kind !== "molecule" &&
+      ancestors(graph, n.id)
+        .slice(1, -1)
+        .every((a) => expansion(a, state) > 0.35),
+  ).length;
+  function row(n: MatterNode, depth = 0): React.ReactNode {
+    const expanded = n.kind === "molecule" || expansion(n, state) > 0.25;
+    return (
+      <div key={n.id} className="tree-branch">
+        <div
+          className={"tree-row " + (state.selected === n.id ? "selected" : "")}
+          style={{ "--indent": Math.min(depth, 4) } as React.CSSProperties}
+          data-tree-node={n.id}
+        >
+          <button
+            className={"tree-caret " + (expanded ? "expanded" : "")}
+            onClick={() =>
+              n.children.length ? toggleNode(n.id) : inspect(n.id, false)
+            }
+            aria-label={`${expanded ? "Refermer" : "Ouvrir"} ${n.entry.name}`}
+            disabled={!n.children.length}
+          >
+            {n.children.length ? <ChevronRight size={12} /> : <span />}
+          </button>
+          <button className="tree-name" onClick={() => inspect(n.id)}>
+            <span
+              className="particle-dot"
+              style={{ background: n.entry.color }}
+            />
+            <span>{n.entry.name}</span>
+            <small>{n.entry.symbol}</small>
+          </button>
+        </div>
+        {expanded &&
+          n.children.map((id) => row(graph.nodes.get(id)!, depth + 1))}
+      </div>
+    );
   }
-  const overview: Entry =
-    state.level === "molecule"
-      ? {
-          id: "overview",
-          name: mol.name,
-          symbol: mol.formula,
-          category: "STRUCTURE MOLÉCULAIRE",
-          color: "#a5bfa9",
-          description:
-            state.molecule === "water"
-              ? "Deux atomes d’hydrogène liés à un atome d’oxygène. Une structure simple, à l’origine d’une substance essentielle à la vie."
-              : state.molecule === "co2"
-                ? "Un atome de carbone lié à deux atomes d’oxygène. Ses deux doubles liaisons s’alignent pour former une molécule linéaire."
-                : "Quatre atomes d’hydrogène entourent un carbone. Leur disposition en tétraèdre révèle toute la dimension spatiale de la chimie.",
-          note: "Les sphères et les liaisons sont une représentation conventionnelle. La décomposition permet d’inspecter les constituants ; elle ne simule pas une réaction chimique.",
-          facts: mol.facts,
-          source: mol.source,
-          next: "atom",
-        }
-      : state.level === "atom"
-        ? { ...atomEntry(state.element), next: "nucleus" }
-        : state.level === "nucleus"
-          ? { ...nucleusEntry(state.element), next: "quarks" }
-          : state.level === "quarks"
-            ? { ...particles[state.nucleon], next: "interaction" }
-            : particles[state.boson];
-  const detail = chosen || overview;
-  const heroSymbol =
-    state.level === "molecule"
-      ? mol.formula
-      : state.level === "atom"
-        ? state.element
-        : state.level === "nucleus"
-          ? isotopeSymbol(state.element)
-          : state.level === "quarks"
-            ? state.nucleon === "proton"
-              ? "uud"
-              : "udd"
-            : particles[state.boson].symbol;
-  const heroName =
-    state.level === "molecule"
-      ? mol.name
-      : state.level === "atom"
-        ? `Atome ${elementOf(state.element)}`
-        : state.level === "nucleus"
-          ? `Noyau ${elementOf(state.element)}`
-          : state.level === "quarks"
-            ? `Structure du ${state.nucleon}`
-            : particles[state.boson].name;
-  const nextLabel = chosen?.next
-    ? chosen.next === "atom"
-      ? "Explorer cet atome"
-      : chosen.next === "nucleus"
-        ? "Entrer dans le noyau"
-        : "Voir les quarks"
-    : state.level === "molecule"
-      ? "Explorer un atome"
-      : state.level === "atom"
-        ? "Entrer dans le noyau"
-        : state.level === "nucleus"
-          ? "Explorer un proton"
-          : "Découvrir les interactions";
-  const searchItems = [
-    ...Object.entries(molecules).map(([id, m]) => ({
-      id: `m-${id}`,
-      name: m.name,
-      symbol: m.formula,
-      type: "Molécule",
-      run: () => go("molecule", { molecule: id as MoleculeId }),
-    })),
-    ...Object.keys(elements).map((id) => ({
-      id: `a-${id}`,
-      name: elements[id as ElementId].name,
-      symbol: id,
-      type: "Atome",
-      run: () => go("atom", { element: id as ElementId }),
-    })),
-    ...Object.entries(particles).map(([id, p]) => ({
-      id: `p-${id}`,
-      name: p.name,
-      symbol: p.symbol,
-      type: p.category.split(" · ")[0].toLowerCase(),
-      run: () => {
-        if (["photon", "gluon", "higgs"].includes(id))
-          go("interaction", { boson: id as BosonId });
-        else if (id === "electron") go("atom", { selected: "electron-0" });
-        else if (id === "proton" || id === "neutron")
-          go("quarks", { nucleon: id });
-        else go("quarks", { selected: id === "up" ? "up-0" : "down-2" });
-      },
-    })),
-  ];
-  const normal = (v: string) =>
-    v
+  const normalized = (s: string) =>
+    s
       .normalize("NFD")
       .replace(/\p{Diacritic}/gu, "")
       .toLowerCase();
-  const results = searchItems.filter((item) =>
-    normal(item.name + " " + item.symbol + " " + item.type).includes(
-      normal(query),
-    ),
-  );
+  const results = [...graph.nodes.values()]
+    .filter((n) =>
+      normalized(
+        n.entry.name +
+          " " +
+          n.entry.symbol +
+          " " +
+          ancestors(graph, n.id)
+            .map((a) => a.entry.name)
+            .join(" "),
+      ).includes(normalized(query)),
+    )
+    .slice(0, 35);
   return (
-    <main
-      data-level={state.level}
-      className={"studio " + (state.light ? "light" : "dark")}
-    >
+    <main className={"studio " + (state.light ? "light" : "dark")}>
       <Scene
         state={state}
-        onSelect={choose}
-        onPhase={onPhase}
-        onReady={() => setReady(true)}
+        graph={graph}
+        onPick={inspect}
+        onFocus={approach}
+        onEvent={setEventText}
       />
       <div className="vignette" />
       <header className="identity">
         <div className="eyebrow">
-          <span className="status-dot" /> EXPLORER L’INVISIBLE
+          <span /> EXPLORER LA MATIÈRE
         </div>
         <h1>
           Matière <em>Atlas</em>
-          <sup>01</sup>
+          <sup>02</sup>
         </h1>
-        <div className="identity-meta">Un voyage vers l’infiniment petit</div>
+        <p>Un monde à l’intérieur de chaque atome.</p>
       </header>
-      <div className="top-actions">
+      <nav className="top-actions" aria-label="Outils de l’atlas">
         <button
-          aria-label="Rechercher"
           className="search-trigger"
+          aria-label="Rechercher"
           onClick={() => {
             setQuery("");
             setModal("search");
           }}
         >
-          <Search size={16} />
+          <Search size={15} />
           <span>Rechercher</span>
           <kbd>/</kbd>
         </button>
-        <i />
         <IconButton
-          label={state.light ? "Passer en mode sombre" : "Passer en mode clair"}
-          Icon={state.light ? Moon : Sun}
+          label={state.light ? "Mode sombre" : "Mode clair"}
+          icon={state.light ? Moon : Sun}
           onClick={() => update({ light: !state.light })}
         />
-        <IconButton label="Partager cette vue" Icon={Share2} onClick={share} />
         <IconButton
-          label="À propos de l’atlas"
-          Icon={CircleHelp}
+          label="Partager cette exploration"
+          icon={Share2}
+          onClick={share}
+        />
+        <IconButton
+          label="À propos"
+          icon={CircleHelp}
           onClick={() => setModal("about")}
         />
-      </div>
-      <aside
-        className={"navigation-panel glass " + (leftOpen ? "mobile-open" : "")}
-        aria-label="Navigation dans la matière"
-      >
-        <div className="panel-heading">
-          <span>Échelles de la matière</span>
-          <span className="small-number">05</span>
-          <button
-            className="mobile-only icon-button"
-            aria-label="Fermer les échelles"
-            onClick={() => setLeftOpen(false)}
-          >
-            <X size={16} />
-          </button>
-        </div>
-        <div className="level-list">
-          {levels.map((l, i) => {
-            const Icon = icons[i];
-            return (
-              <button
-                key={l.id}
-                className={
-                  "level-row " + (state.level === l.id ? "selected" : "")
-                }
-                onClick={() => go(l.id)}
-                aria-current={state.level === l.id ? "step" : undefined}
-              >
-                <span className="level-index">0{i + 1}</span>
-                <Icon size={17} strokeWidth={1.4} />
-                <span className="level-copy">
-                  <strong>{l.name}</strong>
-                  <small>{l.subtitle}</small>
-                </span>
-                <ChevronRight size={13} />
-              </button>
-            );
-          })}
-        </div>
-        <div className="navigation-foot">
-          <span className="tiny-dot" />
-          <span>Du visible à l’élémentaire</span>
-        </div>
-      </aside>
-      <aside
-        className={"contents-panel glass " + (leftOpen ? "mobile-open" : "")}
-        aria-label="Constituants et affichage"
-      >
-        <div className="panel-heading">
-          <span>
-            {state.level === "interaction"
-              ? "Bosons à explorer"
-              : "Constituants"}
-          </span>
-          <span className="small-number">
-            {state.level === "interaction"
-              ? "03"
-              : String(entries.length).padStart(2, "0")}
-          </span>
-        </div>
-        <div className="constituent-list">
-          {state.level === "interaction"
-            ? (["photon", "gluon", "higgs"] as BosonId[]).map((b) => (
-                <button
-                  key={b}
-                  className={
-                    "constituent " + (state.boson === b ? "selected" : "")
-                  }
-                  onClick={() => go("interaction", { boson: b })}
-                >
-                  <span
-                    className="particle-dot"
-                    style={{ background: particles[b].color }}
-                  />
-                  <span>{particles[b].name}</span>
-                  <span className="constituent-symbol">
-                    {particles[b].symbol}
-                  </span>
-                </button>
-              ))
-            : entries.map((e) => (
-                <button
-                  key={e.id}
-                  className={
-                    "constituent " + (chosen?.id === e.id ? "selected" : "")
-                  }
-                  onClick={() => choose(e.id)}
-                >
-                  <span
-                    className="particle-dot"
-                    style={{ background: e.color }}
-                  />
-                  <span>{e.name}</span>
-                  <span className="constituent-symbol">{e.symbol}</span>
-                </button>
-              ))}
-        </div>
-        <div className="display-options">
-          <Toggle
-            label="Annotations"
-            checked={state.labels}
-            onChange={() => update({ labels: !state.labels })}
-          />
-          {state.level !== "nucleus" && (
-            <Toggle
-              label={
-                state.level === "molecule"
-                  ? "Liaisons"
-                  : state.level === "atom" ||
-                      (state.boson === "photon" &&
-                        state.level === "interaction")
-                    ? "Nuage électronique"
-                    : state.level === "interaction" && state.boson === "higgs"
-                      ? "Champ de Higgs"
-                      : "Nuage & échanges"
-              }
-              checked={state.cloud}
-              onChange={() => update({ cloud: !state.cloud })}
-            />
-          )}
-        </div>
-      </aside>
+      </nav>
       <div className="subject-selector">
-        <div className="section-kicker">
-          0{levelIndex + 1} <span>/</span> {level.name.toUpperCase()}
-        </div>
-        <label className="subject-select">
-          <span className="sr-only">
-            {state.level === "molecule"
-              ? "Choisir une molécule"
-              : state.level === "quarks"
-                ? "Choisir un nucléon"
-                : state.level === "interaction"
-                  ? "Choisir un boson"
-                  : "Choisir un élément"}
-          </span>
+        <label>
+          <span className="sr-only">Choisir une molécule</span>
           <select
-            value={
-              state.level === "molecule"
-                ? state.molecule
-                : state.level === "quarks"
-                  ? state.nucleon
-                  : state.level === "interaction"
-                    ? state.boson
-                    : state.element
-            }
-            onChange={(e) => {
-              const v = e.target.value;
-              if (state.level === "molecule")
-                go("molecule", { molecule: v as MoleculeId });
-              else if (state.level === "quarks")
-                go("quarks", { nucleon: v as "proton" | "neutron" });
-              else if (state.level === "interaction")
-                go("interaction", { boson: v as BosonId });
-              else go(state.level, { element: v as ElementId });
-            }}
+            value={state.molecule}
+            onChange={(e) => changeMolecule(e.target.value as MoleculeId)}
           >
-            {state.level === "molecule" ? (
-              Object.entries(molecules).map(([id, m]) => (
-                <option value={id} key={id}>
-                  {m.name} · {m.formula}
-                </option>
-              ))
-            ) : state.level === "quarks" ? (
-              <>
-                <option value="proton">Proton · uud</option>
-                <option value="neutron">Neutron · udd</option>
-              </>
-            ) : state.level === "interaction" ? (
-              (["photon", "gluon", "higgs"] as BosonId[]).map((b) => (
-                <option value={b} key={b}>
-                  {particles[b].name}
-                </option>
-              ))
-            ) : (
-              Object.entries(elements).map(([id, e]) => (
-                <option value={id} key={id}>
-                  {e.name} · {id}-{e.z + e.n}
-                </option>
-              ))
-            )}
+            {Object.entries(molecules).map(([id, m]) => (
+              <option value={id} key={id}>
+                {m.name} · {m.formula}
+              </option>
+            ))}
           </select>
           <ChevronDown size={13} />
         </label>
+        <div className="breadcrumb" aria-label="Appartenance dans la molécule">
+          {path.map((n, i) => (
+            <span key={n.id}>
+              {i > 0 && <ChevronRight size={10} />}
+              <button onClick={() => approach(n.id)} title={n.entry.name}>
+                {i === 0
+                  ? mol.formula
+                  : n.kind === "atom"
+                    ? n.entry.name
+                    : n.kind === "nucleus"
+                      ? "Noyau"
+                      : n.entry.name}
+              </button>
+            </span>
+          ))}
+        </div>
       </div>
-      <nav className="view-controls glass" aria-label="Commandes de la vue">
+      <aside
+        className={
+          "tree-panel glass " + (panel === "tree" ? "mobile-open" : "")
+        }
+        aria-label="Composition imbriquée"
+      >
+        <div className="panel-heading">
+          <span>Dans cette molécule</span>
+          <button
+            className="mobile-only icon-button"
+            aria-label="Fermer la composition"
+            onClick={() => setPanel(null)}
+          >
+            <X size={15} />
+          </button>
+          <span className="desktop-only counter">
+            {graph.totals.atoms} atomes
+          </span>
+        </div>
+        <p className="panel-hint">Cliquez sur un constituant pour l’ouvrir.</p>
+        <div className="tree-scroll">{row(graph.nodes.get(graph.root)!)}</div>
+        <div className="composition-summary">
+          <span>
+            <b>{graph.totals.electrons}</b> électrons
+          </span>
+          <span>
+            <b>{graph.totals.nucleons}</b> nucléons
+          </span>
+          <span>
+            <b>{graph.totals.quarks}</b> quarks de valence
+          </span>
+        </div>
+        <div className="display-options">
+          <Switch
+            label="Annotations"
+            value={state.labels}
+            toggle={() => update({ labels: !state.labels })}
+          />
+          <Switch
+            label="Enveloppes & nuages"
+            value={state.cloud}
+            toggle={() => update({ cloud: !state.cloud })}
+          />
+        </div>
+        <div className="tree-foot">
+          <span className="tiny-dot" />
+          {visibleCount} constituants révélés
+        </div>
+      </aside>
+      <div className="view-controls glass">
         <IconButton
           label="Zoomer"
-          Icon={Plus}
+          icon={Plus}
           onClick={() => update({ zoom: state.zoom + 1 })}
         />
         <IconButton
           label="Dézoomer"
-          Icon={Minus}
+          icon={Minus}
           onClick={() => update({ zoom: state.zoom - 1 })}
         />
         <i />
         <IconButton
           label={state.rotate ? "Arrêter la rotation" : "Rotation automatique"}
-          Icon={state.rotate ? Pause : RotateCw}
+          icon={state.rotate ? Pause : RotateCw}
           active={state.rotate}
           onClick={() => update({ rotate: !state.rotate })}
         />
         <IconButton
-          label="Recentrer la vue"
-          Icon={Crosshair}
-          onClick={() => update({ reset: state.reset + 1, zoom: 0 })}
+          label="Revoir toute la molécule"
+          icon={Crosshair}
+          onClick={overview}
         />
         {document.fullscreenEnabled && (
-          <>
-            <i />
-            <IconButton
-              label={fullscreen ? "Quitter le plein écran" : "Plein écran"}
-              Icon={Maximize2}
-              onClick={toggleFullscreen}
-            />
-          </>
+          <IconButton
+            label="Plein écran"
+            icon={Maximize2}
+            onClick={fullscreen}
+          />
         )}
-      </nav>
+      </div>
       <aside
         className={
           "detail-panel glass " +
-          (mobileDetails ? "mobile-open" : "") +
-          (detailVisible ? "" : " is-hidden")
+          (panel === "details" ? "mobile-open" : "") +
+          (!inspector ? " dismissed" : "")
         }
-        aria-label="Détails de la sélection"
+        aria-label="Constituant sélectionné"
       >
         <div className="detail-top">
-          <span className="detail-kicker">
-            {chosen ? "SÉLECTION" : "À LA LOUPE"}
+          <span className="eyebrow">
+            {node.kind === "molecule"
+              ? "VUE D’ENSEMBLE"
+              : kindNames[node.kind].toUpperCase()}
           </span>
-          <button
-            className="icon-button detail-close"
-            aria-label="Fermer les détails"
+          <IconButton
+            label="Fermer les détails"
+            icon={X}
             onClick={() => {
-              update({ selected: null, isolated: false });
-              setMobileDetails(false);
-              setDetailVisible(false);
+              setInspector(false);
+              setPanel(null);
             }}
-          >
-            <X size={15} />
-          </button>
+          />
         </div>
         <div
-          className="element-tile"
-          style={{ "--particle": detail.color } as React.CSSProperties}
+          className="symbol-tile"
+          style={{ "--particle": node.entry.color } as React.CSSProperties}
         >
-          <span className="tile-number">
-            {chosen?.element
-              ? String(elements[chosen.element].z).padStart(2, "0")
-              : state.level === "molecule"
-                ? String(mol.atoms.length).padStart(2, "0")
-                : state.level === "atom"
-                  ? String(el.z).padStart(2, "0")
-                  : ""}
-          </span>
-          <span>{detail.symbol}</span>
-          <small>
-            {state.level === "molecule" && !chosen
-              ? "MOLÉCULE"
-              : detail.category.split(" · ")[0]}
-          </small>
+          {node.entry.symbol}
         </div>
-        <div className="detail-title-row">
-          <h2>{detail.name}</h2>
-          <span className="detail-color" style={{ background: detail.color }} />
-        </div>
-        <p className="detail-description">{detail.description}</p>
+        <h2>{node.entry.name}</h2>
+        {node.parent && (
+          <button className="belongs-to" onClick={() => approach(node.parent!)}>
+            <ArrowLeft size={11} />
+            <span>
+              Dans {graph.nodes.get(node.parent)!.entry.name.toLowerCase()}
+            </span>
+          </button>
+        )}
+        <p className="description">{node.entry.description}</p>
+        {node.children.length > 0 && (
+          <div className="contains">
+            <Layers3 size={14} />
+            <span>
+              Contient <strong>{node.children.length}</strong>{" "}
+              {node.kind === "molecule"
+                ? "atomes"
+                : node.kind === "atom"
+                  ? "constituants"
+                  : node.kind === "nucleus"
+                    ? "nucléons"
+                    : "quarks de valence"}
+            </span>
+          </div>
+        )}
         <dl className="facts">
-          {detail.facts.map(([k, v]) => (
-            <div key={k}>
-              <dt>{k}</dt>
-              <dd>{v}</dd>
+          {node.entry.facts.map(([name, value]) => (
+            <div key={name}>
+              <dt>{name}</dt>
+              <dd>{value}</dd>
             </div>
           ))}
         </dl>
         <div className="detail-actions">
-          {chosen && state.level !== "interaction" && (
-            <button
-              className={"isolate-button " + (state.isolated ? "active" : "")}
-              onClick={() => update({ isolated: !state.isolated })}
-            >
-              {state.isolated ? <Layers3 size={15} /> : <Crosshair size={15} />}{" "}
-              {state.isolated
-                ? "Revenir à l’ensemble"
-                : "Isoler ce constituant"}
-            </button>
-          )}
-          {(chosen ? !!chosen.next : state.level !== "interaction") && (
-            <button className="primary-action" onClick={() => next(chosen)}>
-              <span>{nextLabel}</span>
-              <ArrowRight size={16} />
-            </button>
-          )}
-          {state.level === "interaction" && state.boson === "photon" && (
+          {node.children.length > 0 && (
             <button
               className="primary-action"
-              onClick={() => {
-                if (phase === 4)
-                  update({ play: state.play + 1, playing: true });
-                else update({ playing: !state.playing });
-              }}
+              onClick={() => toggleNode(node.id)}
             >
-              {state.playing ? <Pause size={15} /> : <Play size={15} />}
+              {isOpen ? <Box size={15} /> : <Expand size={15} />}
               <span>
-                {state.playing
-                  ? "Mettre en pause"
-                  : phase === 4
-                    ? "Rejouer la transition"
-                    : "Jouer la transition"}
+                {isOpen ? "Refermer ce constituant" : "Ouvrir ce constituant"}
               </span>
+              <ChevronRight size={13} />
+            </button>
+          )}
+          {node.kind !== "molecule" && (
+            <button
+              className="secondary-action"
+              onClick={() => approach(node.id)}
+            >
+              <Crosshair size={14} /> Approcher sans perdre le contexte
             </button>
           )}
         </div>
         <a
-          href={detail.source}
+          className="source-link"
+          href={node.entry.source}
           target="_blank"
           rel="noreferrer"
-          className="source-link"
         >
-          Source scientifique <ArrowUpRight size={12} />
+          Source scientifique <ArrowUpRight size={11} />
         </a>
       </aside>
-      <div className="scene-caption">
-        <span className="caption-rule" />
-        <span>
-          {state.isolated
-            ? "CONSTITUANT ISOLÉ"
-            : state.explode > 95
-              ? "VUE ÉCLATÉE"
-              : state.explode > 5
-                ? "DÉCOMPOSITION"
-                : state.level === "interaction"
-                  ? "OBSERVER LES INTERACTIONS"
-                  : "LA MATIÈRE, RÉVÉLÉE"}
-        </span>
-        <span className="caption-rule" />
-      </div>
-      <div className="subject-caption">
-        <strong>{heroSymbol}</strong>
-        <span>{heroName}</span>
+      <div className="interaction-controls glass">
+        <span className="interaction-title">Observer une interaction</span>
+        <button onClick={photon} aria-label="Envoyer un photon">
+          <Zap size={15} />
+          <span>Photon</span>
+        </button>
         <button
-          aria-label="Afficher les détails"
-          title="Afficher les détails"
-          onClick={() => {
-            setDetailVisible(true);
-            setMobileDetails(true);
-            setLeftOpen(false);
-          }}
+          className={state.higgs ? "active" : ""}
+          onClick={() => update({ higgs: !state.higgs })}
+          aria-pressed={state.higgs}
+          aria-label="Afficher le champ de Higgs"
         >
-          <CircleHelp size={15} />
+          <Sparkles size={15} />
+          <span>Champ de Higgs</span>
         </button>
       </div>
-      {state.level === "interaction" && state.boson === "photon" && (
-        <div className="photon-status" role="status">
-          <span className={phase === 1 || phase === 3 ? "live" : ""} />
-          {
-            [
-              "Photon incident",
-              "Absorption du photon",
-              "Atome excité · n = 2",
-              "Émission d’un photon",
-              "État fondamental · n = 1",
-            ][phase]
-          }
+      {eventText && (
+        <div className="event-status" role="status">
+          <span />
+          {eventText}
+          <button
+            aria-label="Masquer le message"
+            onClick={() => setEventText("")}
+          >
+            <X size={10} />
+          </button>
         </div>
       )}
+      <div className="scene-hint">
+        {state.focus ? (
+          <button onClick={overview}>
+            <ArrowLeft size={13} /> Revoir toute la molécule
+          </button>
+        ) : (
+          <>
+            <span className="hint-line" />
+            <span>
+              {local
+                ? "EXPLORATION LIBRE"
+                : state.depth > 90
+                  ? "TOUT EST LÀ, IMBRIQUÉ"
+                  : state.depth > 0
+                    ? "LA MOLÉCULE SE DÉPLIE"
+                    : "CLIQUEZ SUR UN ATOME POUR L’OUVRIR"}
+            </span>
+            <span className="hint-line" />
+          </>
+        )}
+      </div>
       <div className="bottom-dock glass">
         <button
-          className="dock-mode mobile-only"
+          className="dock-button mobile-only"
+          aria-label="Afficher la composition"
           onClick={() => {
-            setLeftOpen(!leftOpen);
-            setMobileDetails(false);
+            setPanel(panel === "tree" ? null : "tree");
+            setInspector(true);
           }}
-          aria-label="Ouvrir les échelles"
         >
           <Layers3 size={19} />
-          <span>Explorer</span>
+          <span>Composition</span>
         </button>
-        {state.level !== "interaction" ? (
-          <>
-            <button
-              className={
-                "dock-mode desktop-only " +
-                (state.explode === 0 ? "active" : "")
-              }
-              onClick={reset}
-              title="Rassembler"
-            >
-              <Box size={20} strokeWidth={1.4} />
-              <span>Assemblé</span>
-            </button>
-            <div className="explode-control">
-              <div className="explode-label">
-                <label htmlFor="explode">Décomposer la matière</label>
-                <output htmlFor="explode">
-                  {state.explode}
-                  <span>%</span>
-                </output>
-              </div>
-              <input
-                id="explode"
-                type="range"
-                min="0"
-                max="100"
-                step="1"
-                value={state.explode}
-                onChange={(e) =>
-                  update({
-                    explode: Number(e.target.value),
-                    isolated: false,
-                    rotate: false,
-                  })
-                }
-                style={
-                  { "--progress": state.explode + "%" } as React.CSSProperties
-                }
-              />
-              <div className="slider-endpoints">
-                <span>Assemblé</span>
-                <span>Constituants séparés</span>
-              </div>
-            </div>
-            <button
-              className={"dock-mode " + (state.explode === 100 ? "active" : "")}
-              aria-label="Séparer tous les constituants"
-              onClick={() =>
-                update({ explode: 100, isolated: false, rotate: false })
-              }
-            >
-              <Expand size={19} strokeWidth={1.4} />
-              <span>Éclaté</span>
-            </button>
-          </>
-        ) : (
-          <div className="interaction-dock">
-            <Zap size={20} />
-            <div>
-              <strong>
-                {state.boson === "photon"
-                  ? "Un quantum de lumière"
-                  : state.boson === "gluon"
-                    ? "L’interaction forte"
-                    : "Le champ de Higgs"}
-              </strong>
-              <span>
-                {state.boson === "photon"
-                  ? "Absorption → excitation → émission"
-                  : state.boson === "gluon"
-                    ? "Des échanges au cœur du proton"
-                    : "Une excitation du champ, représentée en 3D"}
-              </span>
-            </div>
-            {state.boson === "photon" && (
-              <button
-                className="play-button"
-                aria-label={
-                  state.playing
-                    ? "Mettre la transition en pause"
-                    : "Jouer la transition photonique"
-                }
-                onClick={() => {
-                  if (phase === 4)
-                    update({ play: state.play + 1, playing: true });
-                  else update({ playing: !state.playing });
-                }}
-              >
-                {state.playing ? <Pause size={20} /> : <Play size={20} />}
-              </button>
-            )}
-          </div>
-        )}
-        <span className="dock-divider" />
         <button
-          className="dock-mode"
+          className={"dock-button play " + (automatic ? "active" : "")}
+          aria-label={
+            automatic
+              ? "Mettre le dépliage en pause"
+              : "Déplier automatiquement"
+          }
+          onClick={() => {
+            if (state.depth >= 100) update({ depth: 0, overrides: {} });
+            setAutomatic((a) => !a);
+          }}
+        >
+          {automatic ? <Pause size={18} /> : <Play size={18} />}
+          <span className="desktop-only">{automatic ? "Pause" : "Animer"}</span>
+        </button>
+        <div className="depth-control">
+          <div className="depth-label">
+            <label htmlFor="depth">Déplier l’ensemble</label>
+            <output htmlFor="depth">
+              {local ? "Libre" : `${Math.round(state.depth)} %`}
+            </output>
+          </div>
+          <input
+            id="depth"
+            type="range"
+            min="0"
+            max="100"
+            step="1"
+            value={state.depth}
+            style={{ "--progress": `${state.depth}%` } as React.CSSProperties}
+            onChange={(e) => globalDepth(Number(e.target.value))}
+          />
+          <div className="range-labels">
+            <span>Molécule liée</span>
+            <span>Tous les constituants</span>
+          </div>
+        </div>
+        <button
+          className="dock-button"
+          aria-label="Tout déplier"
+          onClick={() => globalDepth(100)}
+        >
+          <Expand size={18} />
+          <span className="desktop-only">Déplier</span>
+        </button>
+        <i />
+        <button
+          className="dock-button"
+          aria-label="Tout rassembler"
           onClick={reset}
-          aria-label="Réinitialiser"
         >
           <RotateCcw size={17} />
-          <span>Réinitialiser</span>
+          <span className="desktop-only">Rassembler</span>
         </button>
       </div>
-      <div className="scale-indicator">
-        <div className="scale-bar">
-          <i />
-          <i />
-          <i />
-        </div>
-        <strong>{level.power}</strong>
-        <span>{level.scale}</span>
+      <div className="lower-left">
+        <span className="mini-formula">{mol.formula}</span>
+        <span>
+          Une seule molécule.
+          <br />
+          Tous ses constituants.
+        </span>
       </div>
       <button
-        className="next-level desktop-only"
-        onClick={() =>
-          state.level === "interaction" ? go("molecule") : next()
-        }
+        className="detail-reopen"
+        onClick={() => {
+          setInspector(true);
+          setPanel("details");
+        }}
+        aria-label="Afficher les détails"
       >
-        <span>
-          {state.level === "interaction"
-            ? "Revenir à la molécule"
-            : "Poursuivre l’exploration"}
-        </span>
-        {state.level === "interaction" ? (
-          <ArrowLeft size={14} />
-        ) : (
-          <ArrowDown size={14} />
-        )}
+        <CircleHelp size={15} />
+        <span>{node.kind === "molecule" ? "À la loupe" : node.entry.name}</span>
       </button>
-      <footer className="studio-footer">
+      <footer>
         <span>
-          Glisser pour tourner <b>·</b> Défiler pour zoomer <b>·</b> Cliquer
-          pour inspecter
+          Glisser : tourner <b>·</b> Molette : zoomer <b>·</b> Double clic :
+          approcher
         </span>
         <button onClick={() => setModal("about")}>
-          <span className="tiny-dot" />{" "}
-          {state.level === "atom"
-            ? "Nuage illustratif · Noyau agrandi"
-            : state.level === "quarks"
-              ? "Schéma de composition · Quarks confinés"
-              : "Modèle pédagogique · Échelles adaptées"}{" "}
-          <ArrowUpRight size={11} />
+          Schéma pédagogique · Échelles adaptées <ArrowUpRight size={11} />
         </button>
       </footer>
-      {!ready && (
-        <div className="loading glass">
-          <Atom size={28} />
-          <span>Préparation de la matière…</span>
-        </div>
-      )}
-      {toast && (
+      {message && (
         <div className="toast glass" role="status">
-          <Check size={15} />
-          {toast}
+          <Check size={14} />
+          {message}
         </div>
       )}
       <dialog
         ref={dialog}
-        className={
-          "atlas-dialog " + (modal === "search" ? "search-dialog" : "")
-        }
         onCancel={() => setModal(null)}
-        onClick={(e) => {
-          if (e.target === e.currentTarget) {
-            const r = e.currentTarget.getBoundingClientRect();
-            if (
-              e.clientX < r.left ||
-              e.clientX > r.right ||
-              e.clientY < r.top ||
-              e.clientY > r.bottom
-            )
-              setModal(null);
-          }
-        }}
+        className="atlas-dialog"
         aria-labelledby="dialog-title"
       >
-        <div className="dialog-head">
+        <div className="dialog-heading">
           <span className="eyebrow">MATIÈRE ATLAS</span>
           <IconButton
             label="Fermer la fenêtre"
-            Icon={X}
+            icon={X}
             onClick={() => setModal(null)}
           />
         </div>
         {modal === "search" ? (
           <>
-            <h2 id="dialog-title">Que voulez-vous explorer ?</h2>
-            <div className="search-input">
-              <Search size={19} />
+            <h2 id="dialog-title">À l’intérieur de {mol.formula}</h2>
+            <div className="search-box">
+              <Search size={18} />
               <input
-                ref={searchInput}
+                ref={searchRef}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Molécule, atome, particule…"
-                aria-label="Rechercher dans l’atlas"
+                placeholder="Oxygène, noyau, proton, électron…"
+                aria-label="Rechercher un constituant"
               />
             </div>
             <div className="search-results">
-              {results.map((item) => (
+              {results.map((n) => (
                 <button
-                  key={item.id}
+                  key={n.id}
                   onClick={() => {
-                    item.run();
+                    setState((s) => ({
+                      ...s,
+                      selected: n.id,
+                      focus: n.kind === "molecule" ? null : n.id,
+                      overrides: n.parent
+                        ? openBranch(graph, s, n.parent)
+                        : s.overrides,
+                    }));
+                    setInspector(true);
                     setModal(null);
                   }}
                 >
-                  <span className="search-symbol">{item.symbol}</span>
-                  <span>
-                    <strong>{item.name}</strong>
-                    <small>{item.type}</small>
+                  <span
+                    className="search-symbol"
+                    style={{ color: n.entry.color }}
+                  >
+                    {n.entry.symbol}
                   </span>
-                  <ArrowUpRight size={15} />
+                  <span>
+                    <strong>{n.entry.name}</strong>
+                    <small>
+                      {ancestors(graph, n.id)
+                        .slice(0, -1)
+                        .map((a) => a.entry.name)
+                        .join(" › ") || "La molécule entière"}
+                    </small>
+                  </span>
+                  <Crosshair size={14} />
                 </button>
               ))}
               {!results.length && (
-                <p className="empty-result">
-                  Aucun résultat. Essayez « oxygène », « quark » ou « photon ».
-                </p>
+                <p>Aucun constituant trouvé dans cette molécule.</p>
               )}
-            </div>
-            <div className="search-foot">
-              <span>{results.length} résultats</span>
-              <span>Échap pour fermer</span>
             </div>
           </>
         ) : (
           <>
-            <h2 id="dialog-title">Un monde dans chaque détail.</h2>
-            <p className="about-intro">
-              De la molécule familière aux particules élémentaires : un atlas
-              pour regarder la matière autrement.
+            <h2 id="dialog-title">Tout est lié.</h2>
+            <p>
+              La même molécule reste à l’écran. Ses atomes contiennent leurs
+              noyaux et leurs électrons ; les noyaux contiennent leurs nucléons
+              ; les protons et les neutrons révèlent leurs trois quarks de
+              valence.
             </p>
-            <div className="about-section">
-              <h3>Ce que vous regardez</h3>
-              <p>{detail.note}</p>
-              <p>
-                Les tailles, les distances, les couleurs et les durées sont
-                adaptées pour l’exploration. Les nuages sont des illustrations
-                de la distribution électronique, pas des calculs d’orbitales.
-                Les électrons visibles servent de repères de sélection, sans
-                trajectoire physique.
-              </p>
-              <p>
-                Le photon et le gluon sont déjà des bosons. Les interactions
-                complètent le parcours de composition : elles ne sont pas une
-                nouvelle couche à l’intérieur de l’électron.
-              </p>
-            </div>
-            <div className="about-section">
-              <h3>Prendre l’atlas en main</h3>
-              <p>
-                Glissez pour tourner, pincez ou défilez pour zoomer. Cliquez sur
-                un constituant, puis isolez-le ou entrez à l’intérieur. Le
-                curseur sépare les éléments de chaque vue.
-              </p>
-              <div className="shortcuts">
-                <span>
-                  <kbd>1–5</kbd> Échelles
-                </span>
-                <span>
-                  <kbd>R</kbd> Réinitialiser
-                </span>
-                <span>
-                  <kbd>L</kbd> Annotations
-                </span>
-                <span>
-                  <kbd>/</kbd> Rechercher
-                </span>
-              </div>
-            </div>
-            <div className="about-section">
-              <h3>Sources & inspirations</h3>
-              <a href={sources.cern} target="_blank" rel="noreferrer">
-                CERN · Particules et interactions <ArrowUpRight size={13} />
+            <h3>Explorez directement</h3>
+            <p>
+              Cliquez sur un constituant pour l’ouvrir sur place. Double-cliquez
+              pour vous en approcher. Les enveloppes transparentes et l’arbre de
+              composition gardent le lien avec ses parents. Le curseur agit sur
+              toute la molécule ; chaque branche peut aussi être ouverte ou
+              refermée librement.
+            </p>
+            <h3>Ce que représente la scène</h3>
+            <p>{node.entry.note}</p>
+            <p>
+              Les sphères et leurs enveloppes ne sont pas des parois physiques.
+              Les tailles sont adaptées, les nuages électroniques sont
+              illustratifs et les électrons marqués servent à la sélection. Les
+              quarks restent confinés : leur représentation séparée est un
+              schéma de composition. Les gluons sont figurés par les courbes
+              entre quarks.
+            </p>
+            <p>
+              Le photon et le boson de Higgs ne sont pas des morceaux cachés
+              dans un électron. Le photon illustre un échange d’énergie avec un
+              atome. La surface du champ de Higgs est une représentation
+              conceptuelle. Les temps et les trajectoires de ces animations sont
+              schématiques.
+            </p>
+            <h3>Sources & inspirations</h3>
+            <a href={sources.cern} target="_blank" rel="noreferrer">
+              CERN · Particules et interactions <ArrowUpRight size={12} />
+            </a>
+            <a href={sources.atom} target="_blank" rel="noreferrer">
+              OpenStax · Structure atomique <ArrowUpRight size={12} />
+            </a>
+            <p>
+              Interface inspirée de{" "}
+              <a
+                href="https://github.com/ashemag/human-atlas"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Human Atlas
+              </a>{" "}
+              et{" "}
+              <a
+                href="https://github.com/ashemag/model-x-studio"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Model X Studio
               </a>
-              <a href={sources.atom} target="_blank" rel="noreferrer">
-                OpenStax · Structure atomique <ArrowUpRight size={13} />
-              </a>
-              <a href={sources.water} target="_blank" rel="noreferrer">
-                PubChem · Données moléculaires <ArrowUpRight size={13} />
-              </a>
-              <p>
-                Interface et principe d’exploration inspirés de{" "}
-                <a
-                  href="https://github.com/ashemag/human-atlas"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Human Atlas
-                </a>{" "}
-                et{" "}
-                <a
-                  href="https://github.com/ashemag/model-x-studio"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Model X Studio
-                </a>
-                , par ashemag. Adaptation de principes de mise en page et de
-                caméra de Human Atlas, sous{" "}
-                <a
-                  href="/licenses/human-atlas.txt"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  licence MIT
-                </a>
-                . Modèles de matière créés pour cet atlas.
-              </p>
+              , par ashemag.{" "}
+              <a href="/licenses/human-atlas.txt">Licence MIT de Human Atlas</a>
+              .
+            </p>
+            <p className="shortcuts">
+              R : rassembler · L : annotations · Espace : animer · / :
+              rechercher
+            </p>
+            <div className="particle-reference">
+              <Atom size={16} />
+              <span>
+                {particles.photon.name} · {particles.gluon.name} ·{" "}
+                {particles.higgs.name}
+              </span>
             </div>
           </>
         )}

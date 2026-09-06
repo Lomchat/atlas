@@ -2,67 +2,76 @@ import { useEffect, useRef, useState } from "react";
 import * as T from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
-import { elements, molecules, entriesFor, particles } from "./data";
-import type { ModelState, Entry } from "./data";
+import { elements, molecules } from "./data";
+import { ancestors, expansion } from "./continuum";
+import type { ExplorerState, MatterGraph, MatterNode } from "./continuum";
 
 type Props = {
-  state: ModelState;
-  onSelect: (id: string) => void;
-  onPhase: (phase: number) => void;
-  onReady: () => void;
+  state: ExplorerState;
+  graph: MatterGraph;
+  onPick: (id: string) => void;
+  onFocus: (id: string) => void;
+  onEvent: (text: string) => void;
 };
-type Piece = {
-  id: string;
-  object: T.Object3D;
-  home: T.Vector3;
-  away: T.Vector3;
-  radius: number;
+type View = {
+  node: MatterNode;
+  group: T.Group;
+  skin: T.Mesh<T.SphereGeometry, T.MeshPhysicalMaterial>;
+  wire: T.LineSegments;
   label: HTMLButtonElement;
-  material?: T.MeshPhysicalMaterial;
+  open: number;
+  reveal: number;
+  radius: number;
+  closedRadius: number;
+  openRadius: number;
+  cloud?: T.Points;
+  links: T.Line[];
+  world: T.Vector3;
 };
-type Link = {
-  mesh: T.Mesh<T.CylinderGeometry, T.MeshStandardMaterial>;
-  a: number;
-  b: number;
-  offset: number;
-};
-const vec = (x = 0, y = 0, z = 0) => new T.Vector3(x, y, z);
-function seeded(seed: number) {
+const v = (x = 0, y = 0, z = 0) => new T.Vector3(x, y, z);
+const smooth = (a: number, b: number, x: number) =>
+  T.MathUtils.smoothstep(x, a, b);
+function cluster(count: number) {
+  const list: T.Vector3[] = [];
+  for (let x = -2; x <= 2; x++)
+    for (let y = -2; y <= 2; y++)
+      for (let z = -2; z <= 2; z++)
+        if ((x + y + z) % 2 === 0) list.push(v(x * 0.47, y * 0.47, z * 0.47));
+  list.sort((a, b) => a.lengthSq() - b.lengthSq() || a.x - b.x || a.y - b.y);
+  const points = list.slice(0, count),
+    center = points.reduce((sum, p) => sum.add(p), v()).divideScalar(count);
+  return points.map((p) => p.sub(center));
+}
+function rng(seed: number) {
   return () => {
     seed = (Math.imul(1664525, seed) + 1013904223) | 0;
     return (seed >>> 0) / 4294967296;
   };
 }
 
-export default function Scene({ state, onSelect, onPhase, onReady }: Props) {
+export default function Scene({
+  state,
+  graph,
+  onPick,
+  onFocus,
+  onEvent,
+}: Props) {
   const host = useRef<HTMLDivElement>(null),
-    latest = useRef(state),
-    selectRef = useRef(onSelect),
-    phaseRef = useRef(onPhase),
-    readyRef = useRef(onReady);
-  latest.current = state;
-  selectRef.current = onSelect;
-  phaseRef.current = onPhase;
-  readyRef.current = onReady;
+    current = useRef(state),
+    pick = useRef(onPick),
+    focus = useRef(onFocus),
+    event = useRef(onEvent);
+  current.current = state;
+  pick.current = onPick;
+  focus.current = onFocus;
+  event.current = onEvent;
   const [error, setError] = useState(false);
-  const key = [
-    state.level,
-    state.molecule,
-    state.element,
-    state.nucleon,
-    state.boson,
-    state.light,
-  ].join(":");
   useEffect(() => {
-    const container = host.current!;
-    let disposed = false,
-      frame = 0;
-    const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const el = host.current!;
     let renderer: T.WebGLRenderer;
     try {
       renderer = new T.WebGLRenderer({
         antialias: true,
-        alpha: false,
         powerPreference: "high-performance",
       });
     } catch {
@@ -70,530 +79,347 @@ export default function Scene({ state, onSelect, onPhase, onReady }: Props) {
       return;
     }
     setError(false);
-    const mobile = container.clientWidth < 768;
-    renderer.setPixelRatio(Math.min(devicePixelRatio, mobile ? 1.5 : 2));
-    renderer.setSize(container.clientWidth, container.clientHeight);
+    let disposed = false,
+      raf = 0;
+    const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    renderer.setPixelRatio(
+      Math.min(devicePixelRatio, el.clientWidth < 768 ? 1.5 : 1.75),
+    );
     renderer.outputColorSpace = T.SRGBColorSpace;
     renderer.toneMapping = T.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = state.light ? 1.0 : 1.05;
+    renderer.toneMappingExposure = 1;
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = T.PCFSoftShadowMap;
-    renderer.domElement.setAttribute(
+    const canvas = renderer.domElement;
+    canvas.setAttribute(
       "aria-label",
-      "Modèle 3D interactif de la matière",
+      "Molécule et constituants imbriqués en 3D",
     );
-    container.appendChild(renderer.domElement);
+    canvas.dataset.sceneId = crypto.randomUUID();
+    el.appendChild(canvas);
     const scene = new T.Scene();
-    scene.background = new T.Color(state.light ? "#e9ece7" : "#101413");
-    scene.fog = new T.Fog(state.light ? "#e9ece7" : "#101413", 22, 65);
-    const camera = new T.PerspectiveCamera(34, 1, 0.05, 150);
-    camera.position.set(0.2, 3.2, 12);
-    const controls = new OrbitControls(camera, renderer.domElement);
+    scene.background = new T.Color("#111318");
+    const camera = new T.PerspectiveCamera(36, 1, 0.015, 180);
+    camera.position.set(0.5, 2.9, 12);
+    const controls = new OrbitControls(camera, canvas);
     controls.enableDamping = true;
-    controls.dampingFactor = 0.07;
-    controls.target.set(0, 0, 0);
-    controls.minDistance = 2;
-    controls.maxDistance = 45;
-    controls.autoRotateSpeed = 0.45;
-    controls.enablePan = true;
-    controls.maxPolarAngle = Math.PI * 0.89;
-    const pmrem = new T.PMREMGenerator(renderer),
-      room = new RoomEnvironment();
-    const env = pmrem.fromScene(room, 0.03);
-    scene.environment = env.texture;
+    controls.dampingFactor = 0.075;
+    controls.minDistance = 0.28;
+    controls.maxDistance = 90;
+    controls.autoRotateSpeed = 0.5;
+    controls.maxPolarAngle = Math.PI * 0.87;
+    const room = new RoomEnvironment(),
+      pmrem = new T.PMREMGenerator(renderer),
+      environment = pmrem.fromScene(room, 0.03);
+    scene.environment = environment.texture;
     scene.environmentIntensity = 0.65;
     room.dispose();
     pmrem.dispose();
-    scene.add(
-      new T.HemisphereLight(state.light ? 0xf7ffff : 0xdfe8d8, 0x324039, 0.9),
-    );
-    const keyLight = new T.DirectionalLight(0xffeee0, 2.7);
-    keyLight.position.set(-4, 7, 5);
+    const hemi = new T.HemisphereLight(0xf5f7ff, 0x343744, 1);
+    scene.add(hemi);
+    const keyLight = new T.DirectionalLight(0xffffff, 2.8);
+    keyLight.position.set(-4, 7, 6);
     keyLight.castShadow = true;
     keyLight.shadow.mapSize.set(1024, 1024);
-    keyLight.shadow.camera.left = -8;
-    keyLight.shadow.camera.right = 8;
-    keyLight.shadow.camera.top = 8;
-    keyLight.shadow.camera.bottom = -8;
-    keyLight.shadow.bias = -0.001;
-    keyLight.shadow.normalBias = 0.035;
-    keyLight.shadow.radius = 5;
+    Object.assign(keyLight.shadow.camera, {
+      left: -8,
+      right: 8,
+      top: 8,
+      bottom: -8,
+    });
+    keyLight.shadow.normalBias = 0.025;
+    keyLight.shadow.bias = -0.0006;
     scene.add(keyLight);
-    const fill = new T.DirectionalLight(0xb3d8d0, 1.7);
-    fill.position.set(5, 2, -5);
+    const fill = new T.DirectionalLight(0xc1d0ed, 1.5);
+    fill.position.set(5, 3, -5);
     scene.add(fill);
-    const model = new T.Group();
-    scene.add(model);
-    const sphereGeo = new T.SphereGeometry(1, 48, 32);
-    const pieces: Piece[] = [],
-      links: Link[] = [],
-      clouds: T.Object3D[] = [],
-      pickers: T.Object3D[] = [];
-    const labels = document.createElement("div");
-    labels.className = "scene-labels";
-    container.appendChild(labels);
-    const entries = entriesFor(state);
-    const materials: T.Material[] = [];
-    function material(color: string, glow = 0) {
-      const m = new T.MeshPhysicalMaterial({
-        color,
-        metalness: 0.22,
-        roughness: 0.26,
-        clearcoat: 1,
-        clearcoatRoughness: 0.22,
-        emissive: color,
-        emissiveIntensity: glow,
-      });
-      materials.push(m);
-      return m;
-    }
-    function ball(
-      parent: T.Object3D,
-      color: string,
-      radius: number,
-      pos = vec(),
-      glow = 0,
-    ) {
-      const m = material(color, glow),
-        mesh = new T.Mesh(sphereGeo, m);
-      mesh.scale.setScalar(radius);
-      mesh.position.copy(pos);
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
-      parent.add(mesh);
-      return mesh;
-    }
-    function labelFor(entry: Entry) {
-      const button = document.createElement("button");
-      button.className = "atom-label";
-      button.dataset.piece = entry.id;
-      button.setAttribute("aria-label", `Inspecter ${entry.name}`);
-      button.innerHTML = `<span class="label-symbol">${entry.symbol}</span><span class="label-name">${entry.name}</span><span class="label-line"></span>`;
-      button.style.setProperty("--particle", entry.color);
-      button.addEventListener("pointerdown", (e) => e.stopPropagation());
-      button.addEventListener("click", () => selectRef.current(entry.id));
-      labels.appendChild(button);
-      return button;
-    }
-    function register(
-      object: T.Object3D,
-      entry: Entry,
-      home: T.Vector3,
-      away: T.Vector3,
-      radius: number,
-      mat?: T.MeshPhysicalMaterial,
-    ) {
-      object.position.copy(home);
-      object.userData.pieceId = entry.id;
-      object.traverse((child) => {
-        if (child instanceof T.Mesh) {
-          child.userData.pieceId = entry.id;
-          pickers.push(child);
+    const world = new T.Group();
+    scene.add(world);
+    const views = new Map<string, View>(),
+      pickers: T.Mesh[] = [];
+    const sphere = new T.SphereGeometry(1, 32, 24),
+      materials = new Set<T.Material>(),
+      geometries = new Set<T.BufferGeometry>([sphere]);
+    const labelRoot = document.createElement("div");
+    labelRoot.className = "scene-labels";
+    el.appendChild(labelRoot);
+    const tooltip = document.createElement("div");
+    tooltip.className = "hover-card";
+    tooltip.hidden = true;
+    el.appendChild(tooltip);
+    const circles: number[] = [];
+    for (let axis = 0; axis < 3; axis++)
+      for (let i = 0; i < 80; i++) {
+        for (const a of [
+          (i / 80) * Math.PI * 2,
+          ((i + 1) / 80) * Math.PI * 2,
+        ]) {
+          const x = Math.cos(a),
+            y = Math.sin(a);
+          circles.push(
+            ...(axis === 0 ? [x, y, 0] : axis === 1 ? [x, 0, y] : [0, x, y]),
+          );
         }
-      });
-      const piece = {
-        id: entry.id,
-        object,
-        home,
-        away,
-        radius,
-        label: labelFor(entry),
-        material: mat,
-      };
-      pieces.push(piece);
-      return piece;
-    }
-    function cloud(
-      parent: T.Object3D,
+      }
+    const wireGeo = new T.BufferGeometry();
+    wireGeo.setAttribute("position", new T.Float32BufferAttribute(circles, 3));
+    geometries.add(wireGeo);
+    function points(
       radius: number,
       count: number,
       color: string,
-      shape: "sphere" | "p" = "sphere",
-      seed = 1,
+      seed: number,
     ) {
-      const rng = seeded(seed),
-        positions = new Float32Array(count * 3);
+      const random = rng(seed),
+        a = new Float32Array(count * 3);
       for (let i = 0; i < count; i++) {
-        const az = rng() * Math.PI * 2,
-          cos = 2 * rng() - 1,
-          sin = Math.sqrt(1 - cos * cos),
-          r = radius * Math.pow(rng(), 0.6);
-        let x = r * sin * Math.cos(az),
-          y = r * cos,
-          z = r * sin * Math.sin(az);
-        if (shape === "p") {
-          x *= 0.47;
-          z *= 0.47;
-          y = (y < 0 ? -1 : 1) * (0.25 + Math.abs(y));
-        }
-        positions.set([x, y, z], i * 3);
+        const az = random() * Math.PI * 2,
+          cos = random() * 2 - 1,
+          r = radius * Math.pow(random(), 0.55),
+          sin = Math.sqrt(1 - cos * cos);
+        a.set([r * sin * Math.cos(az), r * cos, r * sin * Math.sin(az)], i * 3);
       }
-      const geometry = new T.BufferGeometry();
-      geometry.setAttribute("position", new T.BufferAttribute(positions, 3));
+      const geo = new T.BufferGeometry();
+      geo.setAttribute("position", new T.BufferAttribute(a, 3));
+      geometries.add(geo);
       const mat = new T.PointsMaterial({
         color,
-        size: mobile ? 0.028 : 0.019,
+        size: 0.023,
         transparent: true,
-        opacity: state.light ? 0.24 : 0.35,
+        opacity: 0.22,
         depthWrite: false,
-        blending: state.light ? T.NormalBlending : T.AdditiveBlending,
       });
       mat.onBeforeCompile = (shader) => {
-        shader.fragmentShader = shader.fragmentShader
-          .replace(
-            "#include <clipping_planes_fragment>",
-            "#include <clipping_planes_fragment>\nfloat d=length(gl_PointCoord-vec2(0.5)); if(d>0.5) discard;",
-          )
-          .replace(
-            "vec4 diffuseColor = vec4( diffuse, opacity );",
-            "vec4 diffuseColor = vec4( diffuse, opacity * (1.0-smoothstep(0.1,0.5,length(gl_PointCoord-vec2(0.5)))) );",
-          );
+        shader.fragmentShader = shader.fragmentShader.replace(
+          "#include <clipping_planes_fragment>",
+          "#include <clipping_planes_fragment>\nif(length(gl_PointCoord-vec2(.5))>.5) discard;",
+        );
       };
-      materials.push(mat);
-      const obj = new T.Points(geometry, mat);
-      parent.add(obj);
-      clouds.push(obj);
-      return obj;
+      materials.add(mat);
+      return new T.Points(geo, mat);
     }
-    function line(points: T.Vector3[], color: string, opacity = 0.3) {
-      const geo = new T.BufferGeometry().setFromPoints(points),
-        mat = new T.LineBasicMaterial({ color, transparent: true, opacity });
-      materials.push(mat);
-      const obj = new T.Line(geo, mat);
-      model.add(obj);
-      return obj;
-    }
-    function ring(radius: number, y: number, color: string, opacity = 0.25) {
-      const pts = Array.from({ length: 129 }, (_, i) =>
-        vec(
-          Math.cos((i / 128) * Math.PI * 2) * radius,
-          y,
-          Math.sin((i / 128) * Math.PI * 2) * radius,
-        ),
-      );
-      return line(pts, color, opacity);
-    }
-    function positionsNucleus(count: number, spacing = 0.62) {
-      const pts: T.Vector3[] = [];
-      for (let x = -2; x <= 2; x++)
-        for (let y = -2; y <= 2; y++)
-          for (let z = -2; z <= 2; z++)
-            if ((x + y + z) % 2 === 0)
-              pts.push(vec(x * spacing, y * spacing, z * spacing));
-      pts.sort((a, b) => a.lengthSq() - b.lengthSq() || a.x - b.x || a.z - b.z);
-      return pts.slice(0, count);
-    }
-    function makeNucleus(
-      parent: T.Object3D,
-      z: number,
-      n: number,
-      radius: number,
-    ) {
-      const pts = positionsNucleus(z + n, 0.62);
-      const g = new T.Group();
-      pts.forEach((p, i) =>
-        ball(
-          g,
-          i < z ? particles.proton.color : particles.neutron.color,
-          0.44,
-          p,
-        ),
-      );
-      const box = new T.Box3().setFromObject(g),
-        c = box.getCenter(vec());
-      g.children.forEach((o) => o.position.sub(c));
-      const max = box.getSize(vec()).length() / 2;
-      g.scale.setScalar(radius / Math.max(0.5, max));
-      parent.add(g);
-      return g;
-    }
-    function coil(a: T.Vector3, b: T.Vector3, phase = 0) {
-      const direction = b.clone().sub(a),
-        normal = vec(0, 0, 1),
-        side = vec().crossVectors(direction, normal).normalize();
-      return Array.from({ length: 100 }, (_, i) => {
-        const t = i / 99,
-          envelope = Math.sin(t * Math.PI) * 0.14;
-        return a
-          .clone()
-          .lerp(b, t)
-          .addScaledVector(normal, Math.cos(t * 40 + phase) * envelope)
-          .addScaledVector(side, Math.sin(t * 40 + phase) * envelope);
+    function makeLine(color: string, positions: T.Vector3[]) {
+      const geo = new T.BufferGeometry().setFromPoints(positions);
+      geometries.add(geo);
+      const mat = new T.LineBasicMaterial({
+        color,
+        transparent: true,
+        opacity: 0.5,
       });
+      materials.add(mat);
+      return new T.Line(geo, mat);
     }
-    let photon: T.Group | undefined,
-      hydrogenCloud: T.Points | undefined,
-      electron: T.Mesh | undefined,
-      higgsSurface: T.Points | undefined;
-    let interactionClock = 0,
-      phase = -1,
-      lastPlay = state.play;
-    const gluonLines: T.Line[] = [];
-    if (state.level === "molecule") {
-      const mol = molecules[state.molecule];
-      mol.atoms.forEach((a, i) => {
-        const radius = a.element === "H" ? 0.57 : 0.87,
-          home = vec(...a.pos);
-        const away = home.clone().multiplyScalar(1.85);
-        if (i === 0) away.y += 0.55;
-        const mesh = ball(model, elements[a.element].color, radius);
-        register(mesh, entries[i], home, away, radius, mesh.material);
+    for (const node of graph.nodes.values()) {
+      if (node.kind === "molecule") continue;
+      const parent =
+          node.parent === graph.root ? world : views.get(node.parent!)!.group,
+        group = new T.Group();
+      parent.add(group);
+      const big = elements[node.element].z > 1;
+      const closedRadius =
+        node.kind === "atom"
+          ? node.element === "H"
+            ? 0.57
+            : 0.87
+          : node.kind === "nucleus"
+            ? big
+              ? 0.48
+              : 0.24
+            : node.kind === "proton" || node.kind === "neutron"
+              ? big
+                ? 0.22
+                : 0.32
+              : node.kind === "electron"
+                ? 0.085
+                : big
+                  ? 0.073
+                  : 0.105;
+      const openRadius =
+        node.kind === "atom"
+          ? big
+            ? 2.3
+            : 1.65
+          : node.kind === "nucleus"
+            ? big
+              ? 1.45
+              : 0.77
+            : node.children.length
+              ? big
+                ? 0.34
+                : 0.52
+              : closedRadius;
+      const mat = new T.MeshPhysicalMaterial({
+        color: node.entry.color,
+        metalness: 0.25,
+        roughness: 0.27,
+        clearcoat: 0.8,
+        clearcoatRoughness: 0.24,
+        transparent: true,
+        opacity: 1,
       });
-      mol.bonds.forEach(([a, b, count]) => {
-        for (let i = 0; i < count; i++) {
-          const m = new T.MeshStandardMaterial({
-            color: state.light ? "#a8b3a9" : "#708279",
-            metalness: 0.65,
-            roughness: 0.3,
+      materials.add(mat);
+      const skin = new T.Mesh(sphere, mat);
+      skin.scale.setScalar(closedRadius);
+      skin.castShadow = node.kind === "atom";
+      skin.receiveShadow = true;
+      skin.userData.nodeId = node.id;
+      group.add(skin);
+      pickers.push(skin);
+      const wireMat = new T.LineBasicMaterial({
+        color: node.entry.color,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+      });
+      materials.add(wireMat);
+      const wire = new T.LineSegments(wireGeo, wireMat);
+      group.add(wire);
+      const label = document.createElement("button");
+      label.className = "atom-label";
+      label.dataset.node = node.id;
+      label.setAttribute("aria-label", `Inspecter ${node.entry.name}`);
+      label.innerHTML = `<span class="label-symbol">${node.entry.symbol}</span><span class="label-name">${node.entry.name}</span>`;
+      label.style.setProperty("--particle", node.entry.color);
+      label.onclick = () => pick.current(node.id);
+      label.ondblclick = (e) => {
+        e.preventDefault();
+        focus.current(node.id);
+      };
+      labelRoot.appendChild(label);
+      const view: View = {
+        node,
+        group,
+        skin,
+        wire,
+        label,
+        open: 0,
+        reveal: node.kind === "atom" ? 1 : 0,
+        radius: closedRadius,
+        closedRadius,
+        openRadius,
+        links: [],
+        world: v(),
+      };
+      if (node.kind === "atom") {
+        view.cloud = points(
+          openRadius * 0.94,
+          big ? 1600 : 650,
+          "#92acdc",
+          node.atom + 4,
+        );
+        group.add(view.cloud);
+      }
+      views.set(node.id, view);
+    }
+    // Each child remains attached to its real parent throughout every animation.
+    const nucleiPositions = new Map<string, T.Vector3[]>();
+    for (const node of graph.nodes.values())
+      if (node.kind === "nucleus")
+        nucleiPositions.set(node.id, cluster(node.children.length));
+    for (const view of views.values())
+      if (view.node.kind === "proton" || view.node.kind === "neutron")
+        for (let i = 0; i < 3; i++) {
+          const curve = makeLine(
+            "#a3bde7",
+            Array.from({ length: 28 }, () => v()),
+          );
+          view.group.add(curve);
+          view.links.push(curve);
+        }
+    const bonds = molecules[state.molecule].bonds.flatMap(([a, b, n]) =>
+      Array.from({ length: n }, (_, i) => {
+        const geo = new T.CylinderGeometry(0.105, 0.105, 1, 18),
+          mat = new T.MeshStandardMaterial({
+            color: "#8993a4",
+            metalness: 0.6,
+            roughness: 0.34,
             transparent: true,
           });
-          materials.push(m);
-          const mesh = new T.Mesh(new T.CylinderGeometry(0.12, 0.12, 1, 24), m);
-          mesh.castShadow = true;
-          model.add(mesh);
-          links.push({
-            mesh,
-            a,
-            b,
-            offset: count === 2 ? (i - 0.5) * 0.34 : 0,
-          });
-        }
-      });
-    } else if (state.level === "atom") {
-      const e = elements[state.element],
-        g = new T.Group();
-      model.add(g);
-      makeNucleus(g, e.z, e.n, 0.55);
-      register(g, entries[0], vec(), vec(0, 0.2, 0), 0.65);
-      const inner = cloud(model, 0.94, 2400, "#9ecbd2");
-      inner.userData.cloud = true;
-      if (e.z > 2) {
-        const outer = cloud(model, 2.1, 5200, "#91bbaa");
-        outer.userData.cloud = true;
-        for (let a = 0; a < 3; a++) {
-          const p = cloud(model, 1.65, 1100, "#91bbaa", "p", a + 3);
-          p.rotation.z = (a * Math.PI) / 3;
-        }
-      }
-      for (let i = 0; i < e.z; i++) {
-        const r = i < 2 ? 0.85 : 1.92,
-          angle = i * 2.39996,
-          home = vec(
-            Math.cos(angle) * r,
-            Math.sin(angle) * r * 0.83,
-            Math.sin(angle * 1.7) * r * 0.45,
-          );
-        const away = vec(((i % 4) - 1.5) * 1.35, (i < 4 ? 1 : -1) * 1.9, 0.3);
-        const mesh = ball(model, particles.electron.color, 0.115, vec(), 0.25);
-        register(mesh, entries[i + 1], home, away, 0.16, mesh.material);
-      }
-    } else if (state.level === "nucleus") {
-      const e = elements[state.element],
-        pts = positionsNucleus(e.z + e.n, 0.75),
-        center = pts.reduce((a, p) => a.add(p), vec()).divideScalar(pts.length);
-      entries.forEach((entry, i) => {
-        const home = pts[i].clone().sub(center),
-          cols = 4,
-          rows = Math.ceil(entries.length / cols),
-          away = vec(
-            ((i % cols) - 1.5) * 1.25,
-            ((rows - 1) / 2 - Math.floor(i / cols)) * 1.25,
-            0,
-          );
-        if (entries.length === 1) away.set(0, 0, 0);
-        const mesh = ball(model, entry.color, 0.51);
-        register(mesh, entry, home, away, 0.51, mesh.material);
-      });
-    } else if (
-      state.level === "quarks" ||
-      (state.level === "interaction" && state.boson === "gluon")
-    ) {
-      const quarks =
-        state.level === "quarks"
-          ? entries.slice(0, 3)
-          : [particles.up, particles.up, particles.down];
-      quarks.forEach((entry, i) => {
-        const a = (i / 3) * Math.PI * 2 + Math.PI / 2,
-          home = vec(
-            Math.cos(a) * 1.05,
-            Math.sin(a) * 1.05,
-            Math.sin(i * 3) * 0.25,
-          ),
-          mesh = ball(model, entry.color, 0.51);
-        if (state.level === "quarks")
-          register(
-            mesh,
-            entry,
-            home,
-            home.clone().multiplyScalar(2.0),
-            0.51,
-            mesh.material,
-          );
-        else mesh.position.copy(home);
-      });
-      cloud(model, 1.65, 4000, "#a3ba9f");
-      for (let i = 0; i < 3; i++) {
-        const a =
-            state.level === "quarks"
-              ? pieces[i].home
-              : vec(
-                  Math.cos((i / 3) * Math.PI * 2 + Math.PI / 2) * 1.05,
-                  Math.sin((i / 3) * Math.PI * 2 + Math.PI / 2) * 1.05,
-                  0,
-                ),
-          j = (i + 1) % 3,
-          b =
-            state.level === "quarks"
-              ? pieces[j].home
-              : vec(
-                  Math.cos((j / 3) * Math.PI * 2 + Math.PI / 2) * 1.05,
-                  Math.sin((j / 3) * Math.PI * 2 + Math.PI / 2) * 1.05,
-                  0,
-                );
-        gluonLines.push(line(coil(a, b), "#a5c5ae", 0.8));
-      }
-      if (state.level === "quarks") {
-        const anchor = new T.Group();
-        model.add(anchor);
-        register(anchor, entries[3], vec(1.6, 0.5, 0), vec(2.3, 1, 0), 0.2);
-      }
-    } else if (state.boson === "photon") {
-      ball(model, particles.proton.color, 0.3);
-      hydrogenCloud = cloud(model, 1.13, 4300, "#9ecbd2");
-      electron = ball(
-        model,
-        particles.electron.color,
-        0.13,
-        vec(0.95, 0.3, 0),
-        0.35,
-      );
-      // These circles are energy-level guides, not paths followed by an electron.
-      const r1 = ring(1.12, 0, "#74969c", 0.3),
-        r2 = ring(2.1, 0, "#74969c", 0.15);
-      r1.rotation.x = Math.PI / 2;
-      r2.rotation.x = Math.PI / 2;
-      photon = new T.Group();
-      model.add(photon);
-      ball(photon, "#e7c77e", 0.11, vec(), 1);
-      const wave = Array.from({ length: 100 }, (_, i) => {
-        const x = (i / 99) * 1.5 - 1.5;
-        return vec(
-          x,
-          Math.sin(x * 17) * 0.22 * Math.sin((i / 99) * Math.PI),
-          0,
-        );
-      });
-      const beam = line(wave, "#e7c77e", 0.95);
-      model.remove(beam);
-      photon.add(beam);
-      photon.position.set(-3.5, 0.3, 0);
-      const anchor = new T.Group();
-      model.add(anchor);
-      register(anchor, entries[0], vec(-3.5, 0.3, 0), vec(-3.5, 0.3, 0), 0.2);
-    } else {
-      const count = 80,
-        coords = new Float32Array(count * count * 3);
-      for (let x = 0; x < count; x++)
-        for (let y = 0; y < count; y++)
-          coords.set(
-            [(x / (count - 1) - 0.5) * 6, -0.5, (y / (count - 1) - 0.5) * 6],
-            (x * count + y) * 3,
-          );
-      const g = new T.BufferGeometry();
-      g.setAttribute("position", new T.BufferAttribute(coords, 3));
-      const m = new T.PointsMaterial({
-        color: particles.higgs.color,
-        size: 0.029,
-        transparent: true,
-        opacity: 0.55,
-      });
-      materials.push(m);
-      higgsSurface = new T.Points(g, m);
-      model.add(higgsSurface);
-      cloud(model, 0.8, 2000, particles.higgs.color);
-      const orb = ball(
-        model,
-        particles.higgs.color,
-        0.32,
-        vec(0, 0.5, 0),
-        0.25,
-      );
-      register(
-        orb,
-        entries[0],
-        vec(0, 0.5, 0),
-        vec(0, 0.5, 0),
-        0.5,
-        orb.material,
-      );
-    }
-    const stage = new T.Group();
-    scene.add(stage);
-    const stageMat = new T.MeshStandardMaterial({
-      color: state.light ? "#c2cdc0" : "#0b120e",
-      roughness: 0.7,
-      metalness: 0.22,
-    });
-    materials.push(stageMat);
-    const platform = new T.Mesh(
-      new T.CylinderGeometry(2.75, 2.79, 0.1, 128),
-      stageMat,
+        geometries.add(geo);
+        materials.add(mat);
+        const mesh = new T.Mesh(geo, mat);
+        world.add(mesh);
+        return { mesh, a, b, offset: n === 2 ? (i - 0.5) * 0.32 : 0 };
+      }),
     );
-    platform.position.y = -1.85;
+    const bondTraces = molecules[state.molecule].bonds.map(([a, b]) => {
+      const line = makeLine("#7c8596", [v(), v()]);
+      world.add(line);
+      return { line, a, b };
+    });
+    const platformMat = new T.MeshStandardMaterial({
+      color: "#1b1e26",
+      metalness: 0.4,
+      roughness: 0.65,
+      transparent: true,
+    });
+    materials.add(platformMat);
+    const platformGeo = new T.CylinderGeometry(2.8, 2.84, 0.09, 100);
+    geometries.add(platformGeo);
+    const platform = new T.Mesh(platformGeo, platformMat);
+    platform.position.y = -1.8;
     platform.receiveShadow = true;
-    stage.add(platform);
-    const groundMat = new T.ShadowMaterial({
-      opacity: state.light ? 0.12 : 0.23,
-    });
-    materials.push(groundMat);
-    const ground = new T.Mesh(new T.PlaneGeometry(30, 30), groundMat);
-    ground.rotation.x = -Math.PI / 2;
-    ground.position.y = -1.79;
-    ground.receiveShadow = true;
-    stage.add(ground);
-    const rim = ring(2.65, -1.79, state.light ? "#9aab9f" : "#7e9584", 0.35);
-    model.remove(rim);
-    stage.add(rim);
-    const innerRim = ring(
-      2.46,
-      -1.79,
-      state.light ? "#9aab9f" : "#7e9584",
-      0.14,
+    scene.add(platform);
+    const rim = makeLine(
+      "#7a8497",
+      Array.from({ length: 101 }, (_, i) =>
+        v(
+          Math.cos((i / 100) * Math.PI * 2) * 2.7,
+          -1.75,
+          Math.sin((i / 100) * Math.PI * 2) * 2.7,
+        ),
+      ),
     );
-    model.remove(innerRim);
-    stage.add(innerRim);
-    const ticks: T.Vector3[] = [];
-    for (let i = 0; i < 96; i++) {
-      const a = (i / 96) * Math.PI * 2;
-      const r = i % 8 === 0 ? 2.5 : 2.58;
-      ticks.push(
-        vec(Math.cos(a) * r, -1.787, Math.sin(a) * r),
-        vec(Math.cos(a) * 2.64, -1.787, Math.sin(a) * 2.64),
-      );
-    }
-    const tickGeo = new T.BufferGeometry().setFromPoints(ticks),
-      tickMat = new T.LineBasicMaterial({
-        color: state.light ? "#9aab9f" : "#7e9584",
-        transparent: true,
-        opacity: 0.3,
-      });
-    materials.push(tickMat);
-    stage.add(new T.LineSegments(tickGeo, tickMat));
+    scene.add(rim);
+    const photon = new T.Group(),
+      photonMat = new T.MeshBasicMaterial({ color: "#ffd58e" });
+    materials.add(photonMat);
+    const photonDot = new T.Mesh(sphere, photonMat);
+    photonDot.scale.setScalar(0.08);
+    photon.add(photonDot);
+    photon.add(
+      makeLine(
+        "#f0ca81",
+        Array.from({ length: 60 }, (_, i) =>
+          v(
+            (-i / 60) * 1.1,
+            Math.sin(i * 0.5) * 0.13 * Math.sin((i / 60) * Math.PI),
+            0,
+          ),
+        ),
+      ),
+    );
+    scene.add(photon);
+    photon.visible = false;
+    const field = points(11, 5000, "#b49dcf", 12);
+    const fieldAttr = field.geometry.getAttribute(
+      "position",
+    ) as T.BufferAttribute;
+    for (let i = 0; i < fieldAttr.count; i++) fieldAttr.setY(i, -3);
+    scene.add(field);
+    field.visible = false;
     let width = 1,
       height = 1,
-      viewWidth = 1,
-      viewHeight = 1;
+      availableW = 1,
+      availableH = 1,
+      fitTime = 1,
+      lastFocus: string | null = null,
+      lastReset = -1,
+      lastZoom = 0,
+      lastTheme: boolean | undefined,
+      rootOpen = 0,
+      oldState: ExplorerState | undefined;
     function resize() {
-      width = container.clientWidth;
-      height = container.clientHeight;
-      const small = width < 768,
+      width = el.clientWidth;
+      height = el.clientHeight;
+      const mobile = width < 768,
         landscape = height < 520 && width > height;
-      const left = landscape ? 205 : small ? 16 : width < 1100 ? 245 : 310,
-        right = landscape ? width - 280 : small ? width - 55 : width - 320,
-        top = landscape ? 150 : small ? 185 : 205,
-        bottom = height - (landscape ? 105 : small ? 240 : 225);
-      viewWidth = Math.max(180, right - left);
-      viewHeight = Math.max(landscape ? 90 : 160, bottom - top);
+      const left = mobile ? 16 : landscape ? 215 : width < 1150 ? 260 : 300,
+        right = mobile ? width - 52 : width - 325,
+        top = landscape ? 135 : mobile ? 148 : 178,
+        bottom = height - (landscape ? 116 : mobile ? 220 : 205);
+      availableW = Math.max(180, right - left);
+      availableH = Math.max(90, bottom - top);
       renderer.setSize(width, height);
       camera.aspect = width / height;
       camera.setViewOffset(
@@ -605,360 +431,448 @@ export default function Scene({ state, onSelect, onPhase, onReady }: Props) {
         height,
       );
       camera.updateProjectionMatrix();
-      needsFit = 1;
+      fitTime = 1;
     }
-    let needsFit = 1,
-      amount = 0,
-      oldReset = -1,
-      oldZoom = 0,
-      oldIsolate = "",
-      oldExplode = -1;
     const observer = new ResizeObserver(resize);
-    observer.observe(container);
+    observer.observe(el);
     resize();
     controls.addEventListener("start", () => {
-      needsFit = 0;
+      fitTime = 0;
     });
-    const ray = new T.Raycaster(),
-      mouse = new T.Vector2();
-    let start: { x: number; y: number; id: number } | null = null,
-      multi = false;
-    const active = new Set<number>();
-    const down = (e: PointerEvent) => {
-      active.add(e.pointerId);
-      if (active.size > 1) multi = true;
-      else {
-        multi = false;
-        start = { x: e.clientX, y: e.clientY, id: e.pointerId };
-      }
-    };
-    const up = (e: PointerEvent) => {
-      active.delete(e.pointerId);
-      if (
-        !multi &&
-        start?.id === e.pointerId &&
-        Math.hypot(e.clientX - start.x, e.clientY - start.y) < 7
-      ) {
-        const bounds = renderer.domElement.getBoundingClientRect();
-        mouse.set(
-          ((e.clientX - bounds.left) / bounds.width) * 2 - 1,
-          (-(e.clientY - bounds.top) / bounds.height) * 2 + 1,
+    const raycaster = new T.Raycaster(),
+      pointer = new T.Vector2();
+    let down: { x: number; y: number; id: number } | null = null,
+      multitouch = false,
+      hover: string | null = null;
+    const pointers = new Set<number>();
+    let hoverTime = 0;
+    function hit(x: number, y: number) {
+      const box = canvas.getBoundingClientRect();
+      pointer.set(
+        ((x - box.left) / box.width) * 2 - 1,
+        (-(y - box.top) / box.height) * 2 + 1,
+      );
+      raycaster.setFromCamera(pointer, camera);
+      return raycaster.intersectObjects(pickers, false).find((h) => {
+        const view = views.get(h.object.userData.nodeId)!;
+        const fid = current.current.focus;
+        return (
+          view.reveal > 0.2 &&
+          (!fid ||
+            view.node.id === fid ||
+            view.node.id.startsWith(fid + "/")) &&
+          (!view.node.children.length || view.open < 0.45)
         );
-        ray.setFromCamera(mouse, camera);
-        const hit = ray.intersectObjects(pickers, false).find((h) => {
-          let o: T.Object3D | null = h.object;
-          while (o) {
-            if (!o.visible) return false;
-            o = o.parent;
-          }
-          return true;
-        });
-        if (hit?.object.userData.pieceId)
-          selectRef.current(hit.object.userData.pieceId);
+      })?.object.userData.nodeId as string | undefined;
+    }
+    function pointerDown(e: PointerEvent) {
+      pointers.add(e.pointerId);
+      if (pointers.size > 1) multitouch = true;
+      else {
+        multitouch = false;
+        down = { x: e.clientX, y: e.clientY, id: e.pointerId };
       }
-      start = null;
-    };
+      tooltip.hidden = true;
+    }
+    function pointerUp(e: PointerEvent) {
+      pointers.delete(e.pointerId);
+      if (
+        !multitouch &&
+        down?.id === e.pointerId &&
+        Math.hypot(e.clientX - down.x, e.clientY - down.y) < 7
+      ) {
+        const id = hit(e.clientX, e.clientY);
+        if (id) pick.current(id);
+      }
+      down = null;
+    }
+    function pointerMove(e: PointerEvent) {
+      if (
+        down ||
+        e.pointerType === "touch" ||
+        performance.now() - hoverTime < 60
+      )
+        return;
+      hoverTime = performance.now();
+      hover = hit(e.clientX, e.clientY) || null;
+      canvas.style.cursor = hover ? "pointer" : "grab";
+      tooltip.hidden = !hover;
+      if (hover) {
+        const node = graph.nodes.get(hover)!;
+        tooltip.textContent = `${node.entry.name} · ${node.children.length ? "cliquer pour ouvrir" : "particule élémentaire"}`;
+        tooltip.style.left = Math.min(width - 245, e.clientX + 15) + "px";
+        tooltip.style.top = Math.min(height - 110, e.clientY + 18) + "px";
+      }
+    }
     const cancel = (e: PointerEvent) => {
-      active.delete(e.pointerId);
-      start = null;
+      pointers.delete(e.pointerId);
+      down = null;
     };
-    renderer.domElement.addEventListener("pointerdown", down);
-    renderer.domElement.addEventListener("pointerup", up);
-    renderer.domElement.addEventListener("pointercancel", cancel);
+    const dbl = (e: MouseEvent) => {
+      const id = hit(e.clientX, e.clientY) || current.current.selected;
+      if (id) focus.current(id);
+    };
+    const leave = () => {
+      tooltip.hidden = true;
+      hover = null;
+    };
+    canvas.addEventListener("pointerdown", pointerDown);
+    canvas.addEventListener("pointerup", pointerUp);
+    canvas.addEventListener("pointermove", pointerMove);
+    canvas.addEventListener("pointercancel", cancel);
+    canvas.addEventListener("pointerleave", leave);
+    canvas.addEventListener("dblclick", dbl);
     const lost = (e: Event) => {
       e.preventDefault();
       setError(true);
     };
-    renderer.domElement.addEventListener("webglcontextlost", lost);
-    let time = 0,
+    canvas.addEventListener("webglcontextlost", lost);
+    let clock = 0,
       last = performance.now(),
       labelTime = 0,
-      lastRenderedState: ModelState | undefined;
-    const projected = vec(),
-      direction = vec(),
-      target = vec(),
-      quat = new T.Quaternion();
-    function animate(now: number) {
+      lastPhoton = state.photon,
+      photonTime = 7,
+      photonAtom = graph.atoms[0],
+      eventPhase = -1;
+    const bounds = new T.Box3(),
+      point = v(),
+      size = v(),
+      target = v(),
+      direction = v(),
+      center = v(),
+      color = new T.Color();
+    function frame(now: number) {
       if (disposed) return;
-      frame = requestAnimationFrame(animate);
+      raf = requestAnimationFrame(frame);
       const dt = Math.max(0, Math.min((now - last) / 1000, 0.05));
       last = now;
       if (document.hidden) return;
-      const s = latest.current;
-      time += dt;
-      const goal = s.explode / 100;
-      amount = reduced ? goal : T.MathUtils.damp(amount, goal, 7, dt);
-      model.scale.setScalar(reduced ? 1 : Math.min(1, 0.86 + time * 0.35));
-      if (s.explode !== oldExplode) {
-        needsFit = 1;
-        oldExplode = s.explode;
+      clock += dt;
+      const s = current.current;
+      let moving = false;
+      const nextRoot = expansion(graph.nodes.get(graph.root)!, s);
+      rootOpen = reduced
+        ? nextRoot
+        : T.MathUtils.damp(rootOpen, nextRoot, 7, dt);
+      if (Math.abs(rootOpen - nextRoot) > 0.0001) moving = true;
+      if (lastTheme !== s.light) {
+        lastTheme = s.light;
+        scene.background = color.set(s.light ? "#edf0f5" : "#111318").clone();
+        platformMat.color.set(s.light ? "#c8cdd7" : "#1b1e26");
+        renderer.toneMappingExposure = s.light ? 1.05 : 1;
+        fitTime = 1;
       }
-      const isolateKey = s.isolated ? s.selected || "" : "";
-      if (isolateKey !== oldIsolate) {
-        needsFit = 1;
-        oldIsolate = isolateKey;
+      if (s.focus !== lastFocus || s.reset !== lastReset) {
+        fitTime = 1;
+        lastFocus = s.focus;
+        if (s.reset !== lastReset) {
+          lastReset = s.reset;
+          camera.position.set(0.5, 2.9, 12);
+          controls.target.set(0, 0, 0);
+        }
       }
-      if (s.reset !== oldReset) {
-        needsFit = 1;
-        oldReset = s.reset;
-        camera.position.set(0.2, 3.2, 12);
-        controls.target.set(0, 0, 0);
-      }
-      if (s.zoom !== oldZoom) {
+      if (s.zoom !== lastZoom) {
         camera.position
           .sub(controls.target)
-          .multiplyScalar(Math.pow(0.8, s.zoom - oldZoom))
+          .multiplyScalar(Math.pow(0.8, s.zoom - lastZoom))
           .add(controls.target);
-        oldZoom = s.zoom;
-        needsFit = 0;
+        lastZoom = s.zoom;
+        fitTime = 0;
       }
-      pieces.forEach((p) => {
-        p.object.position.copy(p.home).lerp(p.away, amount);
-        p.object.visible = !s.isolated || p.id === s.selected;
-        const chosen = s.selected === p.id;
-        if (p.material) {
-          p.material.emissiveIntensity = chosen
-            ? 0.16
-            : p.id.startsWith("electron")
-              ? 0.22
-              : 0;
-          p.material.roughness = chosen ? 0.18 : 0.26;
-        }
-      });
-      links.forEach((l) => {
-        const a = pieces[l.a].object.position.clone(),
-          b = pieces[l.b].object.position.clone();
-        a.z += l.offset;
-        b.z += l.offset;
-        direction.copy(b).sub(a);
-        l.mesh.position.copy(a).add(b).multiplyScalar(0.5);
-        l.mesh.scale.y = direction.length();
-        l.mesh.quaternion.setFromUnitVectors(
-          vec(0, 1, 0),
-          direction.normalize(),
+      if (oldState?.depth !== s.depth || oldState?.overrides !== s.overrides)
+        fitTime = 1;
+      for (const view of views.values()) {
+        const n = view.node,
+          goal = expansion(n, s),
+          parent = n.parent === graph.root ? null : views.get(n.parent!)!;
+        view.open = reduced ? goal : T.MathUtils.damp(view.open, goal, 8, dt);
+        if (Math.abs(view.open - goal) > 0.0002) moving = true;
+        view.reveal = parent
+          ? parent.reveal * smooth(0.08, 0.65, parent.open)
+          : 1;
+        view.group.visible = view.reveal > 0.004;
+        view.radius = T.MathUtils.lerp(
+          view.closedRadius,
+          view.openRadius,
+          view.open,
         );
-        l.mesh.material.opacity = 1 - T.MathUtils.smoothstep(amount, 0, 0.7);
-        l.mesh.visible = s.cloud && !s.isolated && amount < 0.7;
-      });
-      clouds.forEach((c) => {
-        c.visible = s.cloud && !s.isolated;
-        if (c !== hydrogenCloud) c.scale.setScalar(1 + amount * 0.1);
-      });
-      stage.visible = !s.isolated && amount < 0.45 && s.level === "molecule";
-      if (gluonLines.length) {
-        gluonLines.forEach((line, i) => {
-          line.visible = s.cloud && (!s.isolated || s.selected === "gluon");
-          if (s.level === "quarks") {
-            const a = pieces[i].object.position,
-              b = pieces[(i + 1) % 3].object.position;
-            const pts = coil(a, b, reduced ? 0 : time * 1.2);
-            const attr = line.geometry.getAttribute(
-              "position",
-            ) as T.BufferAttribute;
-            pts.forEach((p, j) => attr.setXYZ(j, p.x, p.y, p.z));
-            attr.needsUpdate = true;
-            line.geometry.computeBoundingSphere();
-          }
-        });
-      }
-      if (s.play !== lastPlay) {
-        interactionClock = 0;
-        lastPlay = s.play;
-      }
-      if (s.playing) interactionClock = Math.min(9, interactionClock + dt);
-      if (photon && electron && hydrogenCloud) {
-        const t = interactionClock;
-        const current = t < 2.7 ? 0 : t < 3.3 ? 1 : t < 6 ? 2 : t < 9 ? 3 : 4;
-        const excited = t >= 3 && t < 6;
-        hydrogenCloud.scale.setScalar(
-          T.MathUtils.damp(hydrogenCloud.scale.x, excited ? 1.85 : 1, 6, dt),
-        );
-        electron.position.lerp(
-          vec(excited ? 1.8 : 0.95, excited ? 0.65 : 0.3, 0),
-          1 - Math.exp(-dt * 6),
-        );
-        photon.visible = t < 3 || t >= 6;
-        photon.position.set(
-          t < 3 ? -3.5 + (t / 3) * 4.45 : 0.95 + ((t - 6) / 3) * 4.45,
-          0.3,
-          0,
-        );
-        if (t === 0) photon.position.x = -3.5;
-        if (pieces[0]) {
-          pieces[0].object.position.copy(photon.position);
-          pieces[0].object.visible = photon.visible;
-        }
-        if (current !== phase) {
-          phase = current;
-          phaseRef.current(current);
-        }
-      }
-      if (higgsSurface) {
-        higgsSurface.visible = s.cloud;
-        const attr = higgsSurface.geometry.getAttribute(
-          "position",
-        ) as T.BufferAttribute;
-        for (let i = 0; i < attr.count; i++) {
-          const x = attr.getX(i),
-            z = attr.getZ(i),
-            r = Math.hypot(x, z);
-          attr.setY(
-            i,
-            -0.5 +
-              Math.cos(r * 5 - (reduced ? 0 : time * 1.5)) *
-                Math.exp(-r * 0.5) *
-                0.2,
+        view.skin.scale.setScalar(view.radius);
+        view.wire.scale.setScalar(view.radius * 1.01);
+        const inFocus =
+            !s.focus || n.id === s.focus || n.id.startsWith(s.focus + "/"),
+          context = inFocus ? 1 : 0.025;
+        view.skin.material.opacity =
+          view.reveal * (1 - view.open * 0.965) * context;
+        view.skin.material.depthWrite = view.skin.material.opacity > 0.95;
+        const selected = s.selected === n.id,
+          related = s.selected
+            ? ancestors(graph, s.selected).some((a) => a.id === n.id)
+            : false;
+        view.skin.material.emissive.set(n.entry.color);
+        view.skin.material.emissiveIntensity = selected
+          ? 0.14
+          : hover === n.id
+            ? 0.09
+            : 0;
+        (view.wire.material as T.LineBasicMaterial).opacity =
+          view.reveal *
+          (selected ? 0.55 : related ? 0.32 : 0.13) *
+          view.open *
+          (inFocus || related ? 1 : 0.12);
+        view.wire.visible = view.open > 0.01 && s.cloud;
+        if (n.kind === "atom") {
+          const home = molecules[s.molecule].atoms[n.atom].pos;
+          view.group.position.set(...home).multiplyScalar(1 + 2.35 * rootOpen);
+        } else if (n.kind === "nucleus") {
+          view.group.position.set(0, 0, 0);
+          view.group.scale.setScalar(T.MathUtils.lerp(0.3, 1, parent!.open));
+        } else if (n.kind === "electron") {
+          const count = elements[n.element].z,
+            angle = n.index * 2.39996,
+            r = parent!.openRadius * (n.index < 2 && count > 2 ? 0.62 : 0.89);
+          view.group.position.set(
+            Math.cos(angle) * r,
+            Math.sin(angle) * r * 0.88,
+            Math.sin(angle * 1.9) * r * 0.42,
           );
+        } else if (n.kind === "proton" || n.kind === "neutron") {
+          view.group.position
+            .copy(nucleiPositions.get(n.parent!)![n.index])
+            .multiplyScalar(T.MathUtils.lerp(0.28, 1, parent!.open));
+        } else {
+          const angle = (n.index / 3) * Math.PI * 2 + Math.PI / 2,
+            r = parent!.openRadius * 0.58;
+          view.group.position
+            .set(Math.cos(angle) * r, Math.sin(angle) * r, 0)
+            .multiplyScalar(0.4 + parent!.open * 0.6);
         }
+        if (view.cloud) {
+          view.cloud.visible =
+            s.cloud && view.open > 0.05 && (!s.focus || s.focus === n.id);
+          (view.cloud.material as T.PointsMaterial).opacity = view.open * 0.2;
+        }
+        for (let i = 0; i < view.links.length; i++) {
+          const line = view.links[i],
+            a = views.get(n.children[i])!.group.position,
+            b = views.get(n.children[(i + 1) % 3])!.group.position,
+            attr = line.geometry.getAttribute("position") as T.BufferAttribute;
+          for (let j = 0; j < attr.count; j++) {
+            const t = j / (attr.count - 1);
+            point.copy(a).lerp(b, t);
+            point.z +=
+              Math.sin(t * Math.PI * 12) * 0.028 * Math.sin(t * Math.PI);
+            attr.setXYZ(j, point.x, point.y, point.z);
+          }
+          attr.needsUpdate = true;
+          line.geometry.computeBoundingSphere();
+          line.visible = s.cloud && view.open > 0.15;
+          (line.material as T.LineBasicMaterial).opacity =
+            view.reveal * view.open * 0.65 * context;
+        }
+      }
+      world.updateMatrixWorld(true);
+      views.forEach((view) => view.group.getWorldPosition(view.world));
+      bonds.forEach(({ mesh, a, b, offset }) => {
+        const p = views.get(graph.atoms[a])!.world,
+          q = views.get(graph.atoms[b])!.world;
+        mesh.position.copy(p).add(q).multiplyScalar(0.5);
+        mesh.position.z += offset;
+        direction.copy(q).sub(p);
+        mesh.scale.y = direction.length();
+        mesh.quaternion.setFromUnitVectors(v(0, 1, 0), direction.normalize());
+        mesh.material.opacity = 1 - smooth(0, 0.65, rootOpen);
+        mesh.visible = rootOpen < 0.65;
+      });
+      bondTraces.forEach(({ line, a, b }) => {
+        const attr = line.geometry.getAttribute(
+            "position",
+          ) as T.BufferAttribute,
+          p = views.get(graph.atoms[a])!.world,
+          q = views.get(graph.atoms[b])!.world;
+        attr.setXYZ(0, p.x, p.y, p.z);
+        attr.setXYZ(1, q.x, q.y, q.z);
         attr.needsUpdate = true;
+        line.geometry.computeBoundingSphere();
+        (line.material as T.LineBasicMaterial).opacity = rootOpen * 0.18;
+        line.visible = s.cloud;
+      });
+      platform.visible = rim.visible = rootOpen < 0.45 && !s.focus;
+      platformMat.opacity = 1 - smooth(0, 0.45, rootOpen);
+      (rim.material as T.LineBasicMaterial).opacity =
+        platformMat.opacity * 0.25;
+      if (s.photon !== lastPhoton) {
+        lastPhoton = s.photon;
+        photonTime = s.photon > 0 ? 0 : 7;
+        eventPhase = -1;
+        const selected = graph.nodes.get(s.selected || "");
+        photonAtom =
+          selected && selected.atom >= 0
+            ? graph.atoms[selected.atom]
+            : graph.atoms.find((id) => graph.nodes.get(id)!.element === "H") ||
+              graph.atoms[0];
       }
-      if (needsFit > 0) {
-        target.set(0, 0, 0);
-        let objectWidth = s.level === "molecule" ? 5.0 : 5.5,
-          objectHeight = s.level === "molecule" ? 3.9 : 4.9;
-        objectWidth += amount * 1.6;
-        objectHeight += amount * 0.6;
-        if (s.level === "molecule") {
-          const xs = pieces.map((p) => p.object.position.x),
-            ys = pieces.map((p) => p.object.position.y);
-          objectWidth = Math.max(
-            5,
-            Math.max(...pieces.map((p, i) => xs[i] + p.radius)) -
-              Math.min(...pieces.map((p, i) => xs[i] - p.radius)) +
-              1.1,
+      if (photonTime < 7) {
+        photonTime += dt;
+        const atom = views.get(photonAtom)!,
+          t = photonTime,
+          phase = t < 2 ? 0 : t < 4 ? 1 : t < 6.8 ? 2 : 3;
+        photon.visible = phase === 0 || phase === 2;
+        photon.position
+          .copy(atom.world)
+          .add(v(t < 2 ? -4 + t * 2 : ((t - 4) / 2.8) * 4, 0.25, 0));
+        if (atom.cloud)
+          atom.cloud.scale.setScalar(
+            1 + (phase === 1 ? 0.18 * Math.sin(((t - 2) / 2) * Math.PI) : 0),
           );
-          objectHeight = Math.max(
-            3.9,
-            Math.max(...pieces.map((p, i) => ys[i] + p.radius)) -
-              Math.min(...pieces.map((p, i) => ys[i] - p.radius)) +
-              1.1,
+        if (phase !== eventPhase) {
+          eventPhase = phase;
+          event.current(
+            [
+              `Photon incident · ${atom.node.entry.name}`,
+              `Énergie absorbée · ${atom.node.entry.name}`,
+              `Émission d’un photon · ${atom.node.entry.name}`,
+              "Transition terminée",
+            ][phase],
           );
         }
-        if (s.level === "interaction") {
-          objectWidth = 9.5;
-          objectHeight = 5;
+      } else photon.visible = false;
+      field.visible = s.higgs;
+      if (s.higgs) {
+        for (let i = 0; i < fieldAttr.count; i++) {
+          const r = Math.hypot(fieldAttr.getX(i), fieldAttr.getZ(i));
+          fieldAttr.setY(
+            i,
+            -3 + Math.cos(r * 3 - (reduced ? 0 : clock * 1.5)) * 0.15,
+          );
         }
-        if (s.isolated && s.selected && s.selected !== "gluon") {
-          const p = pieces.find((p) => p.id === s.selected);
-          if (p) {
-            target.copy(p.object.position);
-            objectWidth = objectHeight = Math.max(1.8, p.radius * 3.6);
+        fieldAttr.needsUpdate = true;
+      }
+      if (fitTime > 0) {
+        bounds.makeEmpty();
+        const focused = s.focus ? views.get(s.focus) : undefined;
+        if (focused) {
+          center.copy(focused.world);
+          const worldScale = focused.group.getWorldScale(point).x,
+            r = Math.max(0.16, focused.radius * worldScale);
+          size.setScalar(r * 2.65);
+          target.copy(center);
+        } else {
+          for (const id of graph.atoms) {
+            const a = views.get(id)!;
+            bounds.expandByPoint(a.world.clone().addScalar(a.radius));
+            bounds.expandByPoint(a.world.clone().addScalar(-a.radius));
           }
+          bounds.getSize(size);
+          bounds.getCenter(target);
+          size.x += 1.2;
+          size.y += 1.2;
         }
         const tan = Math.tan(T.MathUtils.degToRad(camera.fov / 2)),
           distance = Math.max(
-            ((objectHeight / (2 * tan)) * height) / viewHeight,
-            ((objectWidth / (2 * tan * camera.aspect)) * width) / viewWidth,
+            ((size.y / (2 * tan)) * height) / availableH,
+            ((size.x / (2 * tan * camera.aspect)) * width) / availableW,
+            size.z * 1.2,
           );
         direction.copy(camera.position).sub(controls.target).normalize();
         controls.target.lerp(target, reduced ? 1 : 1 - Math.exp(-dt * 6));
-        const dest = target.clone().addScaledVector(direction, distance);
-        camera.position.lerp(dest, reduced ? 1 : 1 - Math.exp(-dt * 6));
-        needsFit = reduced ? 0 : Math.max(0, needsFit - dt * 0.6);
+        camera.position.lerp(
+          target.clone().addScaledVector(direction, distance),
+          reduced ? 1 : 1 - Math.exp(-dt * 6),
+        );
+        fitTime = reduced ? 0 : Math.max(0, fitTime - dt * 0.8);
       }
       controls.autoRotate = s.rotate && !reduced;
       const cameraChanged = controls.update(dt);
-      if (now - labelTime > 40) {
+      if (now - labelTime > 50) {
         labelTime = now;
-        camera.getWorldQuaternion(quat);
-        pieces.forEach((p) => {
-          p.object.getWorldPosition(projected);
-          const anchor = projected.clone().project(camera);
-          p.label.dataset.anchorX = String(((anchor.x + 1) * width) / 2);
-          p.label.dataset.anchorY = String(((1 - anchor.y) * height) / 2);
-          projected.y += p.radius + 0.12;
-          projected.project(camera);
-          const x = ((projected.x + 1) * width) / 2,
-            y = ((1 - projected.y) * height) / 2;
-          let visible =
+        let count = 0;
+        const focused = s.focus ? graph.nodes.get(s.focus) : null;
+        views.forEach((view) => {
+          point.copy(view.world).project(camera);
+          view.label.dataset.anchorX = String(((point.x + 1) * width) / 2);
+          view.label.dataset.anchorY = String(((1 - point.y) * height) / 2);
+          view.label.dataset.open = view.open.toFixed(3);
+          view.label.dataset.reveal = view.reveal.toFixed(3);
+          const direct =
+            focused &&
+            (view.node.parent === focused.id || view.node.id === focused.id);
+          const selected = s.selected === view.node.id;
+          let eligible =
+            selected ||
+            direct ||
+            (!s.focus &&
+              (view.node.kind === "atom" ||
+                (view.node.kind === "nucleus" &&
+                  views.get(view.node.parent!)!.open > 0.4)));
+          if (view.node.kind === "electron" && !selected && !direct)
+            eligible = false;
+          point.copy(view.world);
+          const scale = view.group.getWorldScale(v()).x;
+          point.y += view.radius * scale + 0.1 * scale;
+          point.project(camera);
+          const x = ((point.x + 1) * width) / 2,
+            y = ((1 - point.y) * height) / 2;
+          const show =
             s.labels &&
-            p.object.visible &&
-            projected.z < 1 &&
-            x > 15 &&
-            x < width - 15 &&
-            y > 100 &&
-            y < height - 140;
-          if (
-            s.level === "atom" &&
-            amount < 0.25 &&
-            p.id.startsWith("electron") &&
-            p.id !== "electron-0" &&
-            p.id !== s.selected
-          )
-            visible = false;
-          if (
-            s.level === "nucleus" &&
-            amount < 0.15 &&
-            p.id !== "proton-0" &&
-            p.id !== "neutron-0" &&
-            p.id !== s.selected
-          )
-            visible = false;
-          p.label.style.display = visible ? "" : "none";
-          p.label.style.transform = `translate(${x}px,${y}px) translate(-50%,-100%)`;
-          p.label.classList.toggle("selected", s.selected === p.id);
+            view.reveal > 0.45 &&
+            eligible &&
+            point.z < 1 &&
+            y > (height < 650 ? 150 : width < 768 ? 205 : 220) &&
+            y < height - 165 &&
+            x > 12 &&
+            x < width - 30;
+          view.label.hidden = !show;
+          view.label.classList.toggle("selected", selected);
+          view.label.style.transform = `translate(${x}px,${y}px) translate(-50%,-100%)`;
+          if (view.reveal > 0.45) count++;
         });
+        canvas.dataset.visibleNodes = String(count);
+        canvas.dataset.depth = s.depth.toFixed(2);
+        canvas.dataset.focus = s.focus || "";
       }
-
-      const moving = Math.abs(amount - goal) > 0.0001;
-      const animated =
-        s.playing ||
-        (!reduced && (s.level === "quarks" || s.level === "interaction"));
       if (
         cameraChanged ||
-        needsFit > 0 ||
-        time < 0.7 ||
         moving ||
-        lastRenderedState !== s ||
-        animated
+        fitTime > 0 ||
+        oldState !== s ||
+        photonTime < 7 ||
+        s.higgs ||
+        clock < 0.5
       ) {
         renderer.render(scene, camera);
-        lastRenderedState = s;
       }
+      oldState = s;
     }
-    frame = requestAnimationFrame(animate);
-    readyRef.current();
+    raf = requestAnimationFrame(frame);
     return () => {
       disposed = true;
-      cancelAnimationFrame(frame);
+      cancelAnimationFrame(raf);
       observer.disconnect();
       controls.dispose();
-      renderer.domElement.removeEventListener("pointerdown", down);
-      renderer.domElement.removeEventListener("pointerup", up);
-      renderer.domElement.removeEventListener("pointercancel", cancel);
-      renderer.domElement.removeEventListener("webglcontextlost", lost);
-      const geometries = new Set<T.BufferGeometry>();
-      scene.traverse((o) => {
-        if (
-          o instanceof T.Mesh ||
-          o instanceof T.Points ||
-          o instanceof T.Line
-        ) {
-          geometries.add(o.geometry);
-          const mats = Array.isArray(o.material) ? o.material : [o.material];
-          mats.forEach((m) => materials.push(m));
-        }
-      });
-      geometries.add(sphereGeo);
+      canvas.removeEventListener("pointerdown", pointerDown);
+      canvas.removeEventListener("pointerup", pointerUp);
+      canvas.removeEventListener("pointermove", pointerMove);
+      canvas.removeEventListener("pointercancel", cancel);
+      canvas.removeEventListener("pointerleave", leave);
+      canvas.removeEventListener("dblclick", dbl);
+      canvas.removeEventListener("webglcontextlost", lost);
       geometries.forEach((g) => g.dispose());
-      new Set(materials).forEach((m) => m.dispose());
-      env.dispose();
+      materials.forEach((m) => m.dispose());
+      environment.dispose();
+      keyLight.shadow.map?.dispose();
       renderer.dispose();
-      renderer.domElement.remove();
-      labels.remove();
+      renderer.forceContextLoss();
+      canvas.remove();
+      labelRoot.remove();
+      tooltip.remove();
     };
-    // The scene rebuilds only when the physical subject or lighting changes; controls use refs.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key]);
+  }, [state.molecule, graph]);
   return (
     <div className="scene" ref={host}>
       {error && (
         <div className="scene-error">
-          <strong>La scène 3D est en pause</strong>
-          <p>
-            Activez l’accélération graphique de votre navigateur, puis rechargez
-            l’atlas.
-          </p>
+          <strong>La scène 3D est en pause.</strong>
+          <p>Rechargez l’atlas avec l’accélération graphique activée.</p>
           <button onClick={() => location.reload()}>Recharger</button>
         </div>
       )}

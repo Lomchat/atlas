@@ -4,3 +4,5 @@ artifacts/
 *.tsbuildinfo
 releases/
 site
+
+.next-dist/

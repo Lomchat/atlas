@@ -1,7 +1,5 @@
-export type Level = "molecule" | "atom" | "nucleus" | "quarks" | "interaction";
 export type ElementId = "H" | "O" | "C";
 export type MoleculeId = "water" | "co2" | "methane";
-export type BosonId = "photon" | "gluon" | "higgs";
 export type Vec3 = [number, number, number];
 export interface Entry {
   id: string;
@@ -13,7 +11,6 @@ export interface Entry {
   note: string;
   facts: [string, string][];
   source: string;
-  next?: Level;
   element?: ElementId;
 }
 export const sources = {
@@ -39,7 +36,7 @@ export const elements: Record<
     z: 1,
     n: 0,
     mass: "1,008 u",
-    color: "#e1ddd0",
+    color: "#e3e6ed",
     config: "1s¹",
   },
   O: {
@@ -47,7 +44,7 @@ export const elements: Record<
     z: 8,
     n: 8,
     mass: "15,999 u",
-    color: "#9fbca9",
+    color: "#d36960",
     config: "1s² 2s² 2p⁴",
   },
   C: {
@@ -55,53 +52,10 @@ export const elements: Record<
     z: 6,
     n: 6,
     mass: "12,011 u",
-    color: "#8b9db6",
+    color: "#798494",
     config: "1s² 2s² 2p²",
   },
 };
-export const levels: {
-  id: Level;
-  name: string;
-  subtitle: string;
-  scale: string;
-  power: string;
-}[] = [
-  {
-    id: "molecule",
-    name: "Molécule",
-    subtitle: "Des atomes liés",
-    scale: "Échelle moléculaire",
-    power: "10⁻¹⁰ m",
-  },
-  {
-    id: "atom",
-    name: "Atome",
-    subtitle: "Le noyau et les électrons",
-    scale: "Échelle atomique",
-    power: "10⁻¹⁰ m",
-  },
-  {
-    id: "nucleus",
-    name: "Noyau",
-    subtitle: "Protons et neutrons",
-    scale: "Échelle nucléaire",
-    power: "10⁻¹⁵ m",
-  },
-  {
-    id: "quarks",
-    name: "Quarks",
-    subtitle: "Au cœur des nucléons",
-    scale: "Structure du nucléon",
-    power: "10⁻¹⁵ m",
-  },
-  {
-    id: "interaction",
-    name: "Interactions",
-    subtitle: "Lumière et champs",
-    scale: "Représentation conceptuelle",
-    power: "E = hν",
-  },
-];
 export const molecules: Record<
   MoleculeId,
   {
@@ -185,7 +139,7 @@ export const particles: Record<string, Entry> = {
     name: "Proton",
     symbol: "p⁺",
     category: "NUCLÉON · BARYON",
-    color: "#cb8f78",
+    color: "#ce826e",
     description:
       "La charge positive du noyau. Le nombre de protons définit l’élément : huit protons, c’est toujours de l’oxygène.",
     note: "Trois quarks de valence (uud), des gluons et une mer de paires quark–antiquark composent sa structure.",
@@ -195,14 +149,13 @@ export const particles: Record<string, Entry> = {
       ["Quarks de valence", "2 up · 1 down"],
     ],
     source: sources.cern,
-    next: "quarks",
   },
   neutron: {
     id: "neutron",
     name: "Neutron",
     symbol: "n⁰",
     category: "NUCLÉON · BARYON",
-    color: "#b9c3c4",
+    color: "#a6b4c9",
     description:
       "Électriquement neutre, il participe à la structure du noyau. Le nombre de neutrons distingue les isotopes d’un même élément.",
     note: "Le neutron contient trois quarks de valence (udd), ainsi que des gluons et une mer de paires quark–antiquark.",
@@ -212,14 +165,13 @@ export const particles: Record<string, Entry> = {
       ["Quarks de valence", "1 up · 2 down"],
     ],
     source: sources.cern,
-    next: "quarks",
   },
   electron: {
     id: "electron",
     name: "Électron",
     symbol: "e⁻",
     category: "PARTICULE ÉLÉMENTAIRE · LEPTON",
-    color: "#9ecbd2",
+    color: "#82b6f2",
     description:
       "L’électron porte une charge négative. Dans un atome, son état quantique est décrit par une orbitale, qui permet de calculer des probabilités de présence.",
     note: "Les points et les nuages sont des repères pédagogiques. Ils ne représentent pas des trajectoires ni une photographie de l’atome.",
@@ -235,7 +187,7 @@ export const particles: Record<string, Entry> = {
     name: "Quark up",
     symbol: "u",
     category: "PARTICULE ÉLÉMENTAIRE · QUARK",
-    color: "#d6b780",
+    color: "#deb778",
     description:
       "Un des deux types de quarks de valence de la matière ordinaire. Deux quarks up et un down donnent au proton sa charge positive.",
     note: "Les quarks sont confinés : la vue éclatée est un schéma de leur composition, pas une séparation physiquement réalisable en quarks libres.",
@@ -251,7 +203,7 @@ export const particles: Record<string, Entry> = {
     name: "Quark down",
     symbol: "d",
     category: "PARTICULE ÉLÉMENTAIRE · QUARK",
-    color: "#ad98c7",
+    color: "#b499d4",
     description:
       "Avec le quark up, il compose les quarks de valence des protons et des neutrons. Un up et deux down donnent un neutron de charge nulle.",
     note: "Les teintes identifient ici les types de particules. Elles ne représentent pas la charge de couleur de la chromodynamique quantique.",
@@ -267,7 +219,7 @@ export const particles: Record<string, Entry> = {
     name: "Photon",
     symbol: "γ",
     category: "BOSON · INTERACTION ÉLECTROMAGNÉTIQUE",
-    color: "#d6b780",
+    color: "#deb778",
     description:
       "Le quantum de lumière. Un atome peut absorber un photon dont l’énergie correspond à une transition permise, puis émettre de la lumière en revenant vers un état de plus basse énergie.",
     note: "La séquence illustre une transition de l’hydrogène entre n = 1 et n = 2. Temps, tailles et forme du photon sont schématiques.",
@@ -283,7 +235,7 @@ export const particles: Record<string, Entry> = {
     name: "Gluon",
     symbol: "g",
     category: "BOSON · INTERACTION FORTE",
-    color: "#a5c5ae",
+    color: "#a3bde7",
     description:
       "Les gluons transmettent l’interaction forte entre les quarks et interagissent aussi entre eux. Ils participent à la dynamique qui maintient les quarks dans les hadrons.",
     note: "Les courbes sont un symbole des interactions. Un gluon n’est pas un ressort et les quarks ne sont pas reliés par des fils.",
@@ -334,7 +286,7 @@ export function atomEntry(element: ElementId, id = "atom"): Entry {
       ["Configuration", e.config],
     ],
     source: sources.atom,
-    next: "atom",
+
     element,
   };
 }
@@ -345,7 +297,7 @@ export function nucleusEntry(element: ElementId): Entry {
     name: `Noyau ${elementOf(element)}`,
     symbol: isotopeSymbol(element),
     category: "STRUCTURE ATOMIQUE · NOYAU",
-    color: "#cb8f78",
+    color: "#ce826e",
     description: `${e.z} proton${e.z > 1 ? "s" : ""}${e.n ? ` et ${e.n} neutrons` : ""} concentrent presque toute la masse de cet atome. Le noyau est beaucoup plus petit que le nuage électronique.`,
     note: "Le noyau est fortement agrandi dans la vue atomique pour rester visible. Les nucléons sont représentés par des sphères conventionnelles.",
     facts: [
@@ -354,78 +306,7 @@ export function nucleusEntry(element: ElementId): Entry {
       ["Nombre de masse", String(e.z + e.n)],
     ],
     source: sources.cern,
-    next: "nucleus",
+
     element,
   };
 }
-export interface ModelState {
-  level: Level;
-  molecule: MoleculeId;
-  element: ElementId;
-  nucleon: "proton" | "neutron";
-  boson: BosonId;
-  explode: number;
-  selected: string | null;
-  isolated: boolean;
-  labels: boolean;
-  cloud: boolean;
-  rotate: boolean;
-  light: boolean;
-  reset: number;
-  zoom: number;
-  play: number;
-  playing: boolean;
-}
-export function entriesFor(s: ModelState): Entry[] {
-  if (s.level === "molecule")
-    return molecules[s.molecule].atoms.map((a, i) =>
-      atomEntry(a.element, `atom-${i}`),
-    );
-  if (s.level === "atom")
-    return [
-      nucleusEntry(s.element),
-      ...Array.from({ length: elements[s.element].z }, (_, i) => ({
-        ...particles.electron,
-        id: `electron-${i}`,
-        name: `Électron ${i + 1}`,
-      })),
-    ];
-  if (s.level === "nucleus")
-    return [
-      ...Array.from({ length: elements[s.element].z }, (_, i) => ({
-        ...particles.proton,
-        id: `proton-${i}`,
-        name: `Proton ${i + 1}`,
-      })),
-      ...Array.from({ length: elements[s.element].n }, (_, i) => ({
-        ...particles.neutron,
-        id: `neutron-${i}`,
-        name: `Neutron ${i + 1}`,
-      })),
-    ];
-  if (s.level === "quarks")
-    return (
-      s.nucleon === "proton" ? ["up", "up", "down"] : ["up", "down", "down"]
-    )
-      .map((q, i) => ({ ...particles[q], id: `${q}-${i}` }))
-      .concat([{ ...particles.gluon }]);
-  return [particles[s.boson]];
-}
-export const initialState: ModelState = {
-  level: "molecule",
-  molecule: "water",
-  element: "O",
-  nucleon: "proton",
-  boson: "photon",
-  explode: 0,
-  selected: null,
-  isolated: false,
-  labels: true,
-  cloud: true,
-  rotate: false,
-  light: false,
-  reset: 0,
-  zoom: 0,
-  play: 0,
-  playing: false,
-};
