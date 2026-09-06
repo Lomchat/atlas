@@ -21,7 +21,7 @@ const p = await browser.newPage({
   errors = [];
 p.setDefaultTimeout(20000);
 p.on("pageerror", (e) => errors.push(e.message));
-const root = "molecule",
+const root = "sample",
   atom = "atom-0",
   nucleus = atom + "/nucleus",
   proton = nucleus + "/proton-0",
@@ -34,7 +34,7 @@ const settle = (id) =>
 const requested = (id) =>
   p.waitForFunction(
     (id) =>
-      (new URLSearchParams(location.search).get("focus") || "molecule") === id,
+      (new URLSearchParams(location.search).get("focus") || "sample") === id,
     id,
   );
 const burst = (direction, count) =>
@@ -55,7 +55,7 @@ try {
     await settle(root);
     const identity = await p.locator("canvas").getAttribute("data-scene-id");
     // Many events in one task exercise stale render snapshots and React batching.
-    await burst("in", 2);
+    await burst("in", 5);
     await requested(nucleus);
     assert.equal(await p.locator('[data-direction="in"]').isDisabled(), false);
     assert.equal(
@@ -73,16 +73,16 @@ try {
     // Actual rapid mouse clicks, without waiting for each camera transition.
     await p
       .locator('[data-direction="in"]')
-      .click({ clickCount: 4, delay: 25 });
+      .click({ clickCount: 7, delay: 25 });
     await requested(quark);
     await settle(quark);
     await p
       .locator('[data-direction="out"]')
-      .click({ clickCount: 4, delay: 25 });
+      .click({ clickCount: 7, delay: 25 });
     await requested(root);
     await settle(root);
     // Reverse while the inward camera movement is still running.
-    await burst("in", 3);
+    await burst("in", 6);
     await requested(proton);
     await p.waitForTimeout(40);
     await burst("out", 2);
@@ -90,7 +90,7 @@ try {
     await settle(atom);
     assert.equal(
       await p.locator('[data-direction="out"]').getAttribute("data-target"),
-      root,
+      "molecule",
     );
     await p.waitForTimeout(800);
     assert.equal(
@@ -98,18 +98,18 @@ try {
       atom,
       "no queued flights replay after the last click",
     );
-    await burst("out", 3);
+    await burst("out", 12);
     await requested(root);
     await settle(root);
     // Rapid key repeat uses the same destination-relative navigation.
     await p.evaluate(() => {
-      for (let i = 0; i < 4; i++)
+      for (let i = 0; i < 7; i++)
         window.dispatchEvent(new KeyboardEvent("keydown", { key: "+" }));
     });
     await requested(quark);
     await settle(quark);
     await p.evaluate(() => {
-      for (let i = 0; i < 4; i++)
+      for (let i = 0; i < 7; i++)
         window.dispatchEvent(new KeyboardEvent("keydown", { key: "-" }));
     });
     await requested(root);
@@ -135,7 +135,7 @@ try {
   await settle(nucleus + "/neutron-2");
   assert.deepEqual(errors, []);
   console.log(
-    "PASS: normal-motion rapid click bursts, actual quadruple clicks, immediate labels and enabled controls, endpoint clamping, mid-flight reversal, no animation queue, key repeat, remembered sibling, mobile and persistent renderer.",
+    "PASS: normal-motion rapid click bursts, actual seven-click bursts, immediate labels and enabled controls, endpoint clamping, mid-flight reversal, no animation queue, key repeat, remembered sibling, mobile and persistent renderer.",
   );
 } catch (e) {
   await p.screenshot({ path: "artifacts/rapid-navigation-failure.png" });

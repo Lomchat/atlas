@@ -3,6 +3,8 @@ import * as T from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { elements, molecules } from "./data";
+import { macroModel, neighborsModel } from "./MacroModel";
+import { isScale } from "./scales";
 import { ancestors, expansion } from "./continuum";
 import type {
   ExplorerState,
@@ -110,14 +112,14 @@ export default function Scene({
     el.appendChild(canvas);
     const scene = new T.Scene();
     scene.background = new T.Color("#111318");
-    const camera = new T.PerspectiveCamera(36, 1, 0.015, 180);
+    const camera = new T.PerspectiveCamera(36, 1, 0.015, 1000000);
     camera.position.set(0.5, 2.9, 12);
     const controls = new OrbitControls(camera, canvas);
     controls.enableDamping = !reduced;
     controls.dampingFactor = 0.075;
     // Let the camera approach even the smallest nested constituents.
     controls.minDistance = 0.00001;
-    controls.maxDistance = 90;
+    controls.maxDistance = 100000;
     controls.zoomToCursor = true;
     let controlsDirty = true;
     controls.addEventListener("change", () => {
@@ -227,9 +229,9 @@ export default function Scene({
       return new T.Line(geo, mat);
     }
     for (const node of graph.nodes.values()) {
-      if (node.kind === "molecule") continue;
+      if (node.kind === "molecule" || isScale(node.id)) continue;
       const parent =
-          node.parent === graph.root ? world : views.get(node.parent!)!.group,
+          node.parent === "molecule" ? world : views.get(node.parent!)!.group,
         group = new T.Group();
       parent.add(group);
       const big = elements[node.element].z > 1;
@@ -391,6 +393,39 @@ export default function Scene({
       ),
     );
     scene.add(rim);
+    const macro = macroModel(state.molecule),
+      portion = macroModel(state.molecule, true),
+      neighborhood = neighborsModel(state.molecule);
+    macro.group.scale.setScalar(900);
+    portion.group.scale.setScalar(150);
+    scene.add(macro.group, portion.group, neighborhood.group);
+    let macroLevel: string = graph.root,
+      macroAlpha = 1,
+      portionAlpha = 0,
+      neighborAlpha = 0;
+    const scaleLabel = document.createElement("button");
+    scaleLabel.className = "scale-anchor";
+    scaleLabel.addEventListener("click", () => {
+      const id = nextOf(macroLevel);
+      if (id) focus.current(id);
+    });
+    el.appendChild(scaleLabel);
+    const anchorGeo = new T.TorusGeometry(1, 0.022, 8, 64);
+    geometries.add(anchorGeo);
+    const anchorMat = new T.MeshBasicMaterial({
+      color: "#edc58d",
+      transparent: true,
+      opacity: 0.85,
+      depthTest: false,
+    });
+    materials.add(anchorMat);
+    const anchor = new T.Mesh(anchorGeo, anchorMat);
+    scene.add(anchor);
+    const nuclearLinks = makeLine(
+      "#edc58d",
+      Array.from({ length: 32 }, () => v()),
+    );
+    scene.add(nuclearLinks);
     const photon = new T.Group(),
       photonMat = new T.MeshBasicMaterial({ color: "#ffd58e" });
     materials.add(photonMat);
@@ -411,11 +446,8 @@ export default function Scene({
     );
     scene.add(photon);
     photon.visible = false;
-    const field = points(11, 5000, "#b49dcf", 12);
-    const fieldAttr = field.geometry.getAttribute(
-      "position",
-    ) as T.BufferAttribute;
-    for (let i = 0; i < fieldAttr.count; i++) fieldAttr.setY(i, -3);
+    const field = points(11, 1100, "#b49dcf", 12);
+
     scene.add(field);
     field.visible = false;
     let width = 1,
@@ -430,6 +462,7 @@ export default function Scene({
       lastReset = -1,
       lastNavigation = -1,
       lastTheme: boolean | undefined,
+      lastInteraction = state.interaction,
       zoomAnchor: string | null = state.focus,
       lastDetail = "",
       detailContext: string | null = null,
@@ -445,8 +478,20 @@ export default function Scene({
         landscape = height < 520 && width > height;
       const left = mobile ? 16 : landscape ? 215 : width < 1150 ? 260 : 300,
         right = mobile ? width - 52 : width - 325,
-        top = landscape ? 160 : mobile ? (height < 650 ? 210 : 250) : 260,
-        bottom = height - (landscape ? 60 : mobile ? 150 : 95);
+        top =
+          mobile && height < 650 && current.current.interaction !== "none"
+            ? 135
+            : landscape
+              ? 160
+              : mobile
+                ? height < 650
+                  ? 210
+                  : 250
+                : 260,
+        bottom =
+          mobile && current.current.interaction !== "none"
+            ? Math.max(top + 80, height * (height < 650 ? 0.48 : 0.58) - 26)
+            : height - (landscape ? 60 : mobile ? 150 : 95);
       availableW = Math.max(180, right - left);
       availableH = Math.max(90, bottom - top);
       renderer.setSize(width, height);
@@ -488,7 +533,7 @@ export default function Scene({
     }
     function preferVisible(id: string) {
       const path = ancestors(graph, id),
-        currentId = detailContext || graph.root;
+        currentId = detailContext || "molecule";
       const index = path.findIndex((n) => n.id === currentId);
       if (index >= 0 && path[index + 1])
         preferred.set(currentId, path[index + 1].id);
@@ -507,6 +552,7 @@ export default function Scene({
       passive: true,
     });
     function hit(x: number, y: number) {
+      if (isScale(macroLevel)) return undefined;
       const box = canvas.getBoundingClientRect();
       pointer.set(
         ((x - box.left) / box.width) * 2 - 1,
@@ -596,10 +642,7 @@ export default function Scene({
     let clock = 0,
       last = performance.now(),
       labelTime = 0,
-      lastPhoton = state.photon,
-      photonTime = 7,
-      photonAtom = graph.atoms[0],
-      eventPhase = -1;
+      photonAtom = graph.atoms[0];
     const bounds = new T.Box3(),
       point = v(),
       size = v(),
@@ -616,6 +659,10 @@ export default function Scene({
       clock += dt;
       const s = current.current;
       let moving = false;
+      if (lastInteraction !== s.interaction) {
+        lastInteraction = s.interaction;
+        resize();
+      }
       if (lastTheme !== s.light) {
         lastTheme = s.light;
         scene.background = color.set(s.light ? "#edf0f5" : "#111318").clone();
@@ -635,7 +682,11 @@ export default function Scene({
         if (s.focus) remember(s.focus);
         if (s.reset !== lastReset) {
           lastReset = s.reset;
-          camera.position.set(0.5, 2.9, 12);
+          camera.position.set(
+            s.focus ? 0.5 : 500,
+            s.focus ? 2.9 : 2900,
+            s.focus ? 12 : 12000,
+          );
           controls.target.set(0, 0, 0);
         }
       }
@@ -650,14 +701,14 @@ export default function Scene({
       camera.updateMatrixWorld();
       const detailUnit = Math.max(120, Math.min(availableW, availableH));
       const route = new Set<string>();
-      let cursor = nextOf(graph.root);
+      let cursor = nextOf("molecule");
       while (cursor) {
         route.add(cursor);
         cursor = nextOf(cursor);
       }
       for (const view of views.values()) {
         const n = view.node,
-          parent = n.parent === graph.root ? null : views.get(n.parent!)!;
+          parent = n.parent === "molecule" ? null : views.get(n.parent!)!;
         // Place children inside their existing parent before measuring their
         // projected size. Opening a shell must not inflate its own LOD metric.
         if (n.kind === "atom") {
@@ -750,6 +801,11 @@ export default function Scene({
           (selected ? 0.55 : related ? 0.32 : 0.13) *
           view.open *
           (inFocus || related ? 1 : 0.12);
+        (view.wire.material as T.LineBasicMaterial).color.set(
+          s.interaction === "photon" && s.phase === 1 && n.id === s.focus
+            ? "#edc58d"
+            : n.entry.color,
+        );
         view.wire.visible = view.open > 0.01 && s.cloud;
         if (view.cloud) {
           view.cloud.visible = s.cloud && view.open > 0.05;
@@ -770,6 +826,7 @@ export default function Scene({
           attr.needsUpdate = true;
           line.geometry.computeBoundingSphere();
           line.visible = s.cloud && view.open > 0.15;
+          (line.material as T.LineBasicMaterial).color.set("#a3bde7");
           (line.material as T.LineBasicMaterial).opacity =
             view.reveal * view.open * 0.65 * context;
         }
@@ -851,61 +908,87 @@ export default function Scene({
         (line.material as T.LineBasicMaterial).opacity = atomOpening * 0.09;
         line.visible = s.cloud;
       });
-      platform.visible = rim.visible = atomOpening < 0.45 && !s.focus;
+      platform.visible = rim.visible = false;
       platformMat.opacity = 1 - smooth(0, 0.45, atomOpening);
       (rim.material as T.LineBasicMaterial).opacity =
         platformMat.opacity * 0.25;
-      if (s.photon !== lastPhoton) {
-        lastPhoton = s.photon;
-        photonTime = s.photon > 0 ? 0 : 7;
-        eventPhase = -1;
-        const selected = graph.nodes.get(s.selected || "");
+      // Each interaction is a user-controlled explanation. Its diagram stays
+      // visible until the next step instead of disappearing on a timer.
+      photon.visible = s.interaction === "photon" && s.phase !== 1;
+      if (s.interaction === "photon") {
+        const selected = graph.nodes.get(s.focus || "");
         photonAtom =
           selected && selected.atom >= 0
             ? graph.atoms[selected.atom]
-            : graph.atoms.find((id) => graph.nodes.get(id)!.element === "H") ||
-              graph.atoms[0];
-      }
-      if (photonTime < 7) {
-        photonTime += dt;
-        const atom = views.get(photonAtom)!,
-          t = photonTime,
-          phase = t < 2 ? 0 : t < 4 ? 1 : t < 6.8 ? 2 : 3;
-        photon.visible = phase === 0 || phase === 2;
+            : graph.atoms[0];
+        const atom = views.get(photonAtom)!;
         photon.position
           .copy(atom.world)
-          .add(v(t < 2 ? -4 + t * 2 : ((t - 4) / 2.8) * 4, 0.25, 0));
-        if (atom.cloud)
-          atom.cloud.scale.setScalar(
-            1 + (phase === 1 ? 0.18 * Math.sin(((t - 2) / 2) * Math.PI) : 0),
-          );
-        if (phase !== eventPhase) {
-          eventPhase = phase;
-          event.current(
-            [
-              `Photon incident · ${atom.node.entry.name}`,
-              `Énergie absorbée · ${atom.node.entry.name}`,
-              `Émission d’un photon · ${atom.node.entry.name}`,
-              "Transition terminée",
-            ][phase],
+          .add(v(s.phase === 0 ? -3 : 3, 0.35, 0));
+        if (atom.cloud) {
+          atom.cloud.scale.setScalar(s.phase === 1 ? 1.2 : 1);
+          (atom.cloud.material as T.PointsMaterial).color.set(
+            s.phase === 1 ? "#edc58d" : "#92acdc",
           );
         }
-      } else photon.visible = false;
-      field.visible = s.higgs;
-      if (s.higgs) {
-        for (let i = 0; i < fieldAttr.count; i++) {
-          const r = Math.hypot(fieldAttr.getX(i), fieldAttr.getZ(i));
-          fieldAttr.setY(
-            i,
-            -3 + Math.cos(r * 3 - (reduced ? 0 : clock * 1.5)) * 0.15,
-          );
+      } else {
+        for (const id of graph.atoms) {
+          const cloud = views.get(id)!.cloud;
+          if (cloud) {
+            cloud.scale.setScalar(1);
+            (cloud.material as T.PointsMaterial).color.set("#92acdc");
+          }
         }
-        fieldAttr.needsUpdate = true;
       }
+      field.visible = s.interaction === "higgs" && s.phase > 0;
+      if (field.visible) {
+        const focused = views.get(s.focus || "");
+        field.position.copy(focused?.world || v());
+        field.scale.setScalar(0.026);
+        (field.material as T.PointsMaterial).sizeAttenuation = false;
+        (field.material as T.PointsMaterial).size = 2;
+        (field.material as T.PointsMaterial).opacity = 0.35;
+      }
+      for (const { mesh } of bonds) {
+        mesh.material.emissive.set(
+          s.interaction === "bonds" && s.phase > 0 ? "#b8843d" : "#000000",
+        );
+        mesh.material.emissiveIntensity = 0.65;
+      }
+      nuclearLinks.visible = s.interaction === "nuclear" && s.phase > 0;
+      if (nuclearLinks.visible) {
+        const n = graph.nodes.get(s.focus || "");
+        const children = n?.kind === "nucleus" ? n.children : [];
+        const attr = nuclearLinks.geometry.getAttribute(
+          "position",
+        ) as T.BufferAttribute;
+        for (let i = 0; i < attr.count; i++) {
+          const pos =
+            views.get(children[i % Math.max(1, children.length)])?.world || v();
+          attr.setXYZ(i, pos.x, pos.y, pos.z);
+        }
+        attr.needsUpdate = true;
+        nuclearLinks.geometry.computeBoundingSphere();
+      }
+      if (s.interaction === "strong" && s.phase > 0)
+        for (const view of views.values())
+          for (const link of view.links) {
+            (link.material as T.LineBasicMaterial).color.set("#edc58d");
+            (link.material as T.LineBasicMaterial).opacity = 0.9;
+          }
       if (fitTime > 0) {
         bounds.makeEmpty();
         const focused = s.focus ? views.get(s.focus) : undefined;
-        if (focused) {
+        if (isScale(s.focus || graph.root)) {
+          const extent =
+            (s.focus || graph.root) === "sample"
+              ? 3300
+              : s.focus === "portion"
+                ? 370
+                : 52;
+          size.setScalar(extent);
+          target.set(0, 0, 0);
+        } else if (focused) {
           center.copy(focused.world);
           const worldScale = focused.group.getWorldScale(point).x,
             r = Math.max(
@@ -941,22 +1024,79 @@ export default function Scene({
             : T.MathUtils.clamp((now - fitStarted) / 300, 0, 1),
           eased = 1 - Math.pow(1 - progress, 3);
         controls.target.lerpVectors(fitFromTarget, target, eased);
-        camera.position.lerpVectors(
-          fitFromPosition,
-          target.clone().addScaledVector(fitDirection, distance),
-          eased,
-        );
+        const fromDistance = fitFromPosition.distanceTo(fitFromTarget);
+        if (distance > 80 || fromDistance > 80) {
+          const flightDistance = Math.exp(
+            T.MathUtils.lerp(
+              Math.log(Math.max(0.00001, fromDistance)),
+              Math.log(distance),
+              eased,
+            ),
+          );
+          camera.position
+            .copy(controls.target)
+            .addScaledVector(fitDirection, flightDistance);
+        } else
+          camera.position.lerpVectors(
+            fitFromPosition,
+            target.clone().addScaledVector(fitDirection, distance),
+            eased,
+          );
         fitTime = progress < 1 ? 1 : 0;
       }
       controls.autoRotate = s.rotate && !reduced;
       const cameraChanged = controls.update(dt);
       camera.updateMatrixWorld();
-      // Keep close details visible without sacrificing depth precision at overview scale.
-      const near = T.MathUtils.clamp(
-        controls.getDistance() * 0.01,
-        1e-7,
-        0.015,
+      const halfView =
+        controls.getDistance() *
+        Math.tan(T.MathUtils.degToRad(camera.fov / 2)) *
+        Math.min((availableW / width) * camera.aspect, availableH / height);
+      macroLevel =
+        halfView > 560
+          ? "sample"
+          : halfView > 65
+            ? "portion"
+            : halfView > 9
+              ? "neighborhood"
+              : "molecule";
+      macroAlpha = smooth(330, 950, halfView);
+      portionAlpha =
+        smooth(35, 110, halfView) * (1 - smooth(850, 1900, halfView));
+      neighborAlpha = smooth(4, 11, halfView) * (1 - smooth(60, 190, halfView));
+      macro.fade(macroAlpha);
+      portion.fade(portionAlpha);
+      neighborhood.update(
+        neighborAlpha,
+        clock,
+        s.interaction,
+        s.phase,
+        reduced,
       );
+      // A sampled volume stays anchored at the same origin throughout the zoom.
+      anchor.visible = isScale(macroLevel);
+      const anchorRadius =
+        macroLevel === "sample" ? 155 : macroLevel === "portion" ? 24 : 3.2;
+      anchor.scale.setScalar(anchorRadius);
+      anchor.quaternion.copy(camera.quaternion);
+      anchor.position.set(0, 0, 0);
+      world.visible = halfView < 90;
+      const anchorPoint = v(0, 0, 0).project(camera);
+      scaleLabel.hidden =
+        !isScale(macroLevel) || !s.labels || s.interaction !== "none";
+      scaleLabel.style.left = `${((anchorPoint.x + 1) * width) / 2}px`;
+      scaleLabel.style.top = `${((1 - anchorPoint.y) * height) / 2 + Math.min(availableH * 0.22, 95)}px`;
+      scaleLabel.textContent =
+        macroLevel === "neighborhood"
+          ? `Explorer une molécule ${molecules[s.molecule].formula} →`
+          : macroLevel === "portion"
+            ? "Voir les molécules à l’intérieur →"
+            : `${graph.nodes.get("portion")!.entry.name} · explorer →`;
+      controls.zoomToCursor = !isScale(macroLevel);
+      canvas.dataset.scale = macroLevel;
+      canvas.dataset.interaction = s.interaction;
+      canvas.dataset.phase = String(s.phase);
+      // Keep close details visible without sacrificing depth precision at overview scale.
+      const near = T.MathUtils.clamp(controls.getDistance() * 0.01, 1e-7, 20);
       const projectionChanged = Math.abs(camera.near - near) > near * 0.001;
       if (projectionChanged) {
         camera.near = near;
@@ -1009,7 +1149,7 @@ export default function Scene({
           let eligible =
             selected ||
             direct ||
-            (!s.focus &&
+            ((!s.focus || s.focus === "molecule") &&
               (view.node.kind === "atom" ||
                 (view.node.kind === "nucleus" &&
                   views.get(view.node.parent!)!.open > 0.4)));
@@ -1023,6 +1163,7 @@ export default function Scene({
             y = ((1 - point.y) * height) / 2;
           const show =
             s.labels &&
+            !isScale(macroLevel) &&
             view.reveal > 0.45 &&
             eligible &&
             point.z < 1 &&
@@ -1040,12 +1181,14 @@ export default function Scene({
           view.label.hidden = !show;
           view.label.classList.toggle("selected", selected);
           view.label.style.transform = `translate(${x}px,${y}px) translate(-50%,-100%)`;
-          if (view.reveal > 0.45) count++;
+          if (view.reveal > 0.45 && !isScale(macroLevel)) count++;
         });
         canvas.dataset.visibleNodes = String(count);
         const viewpoint = navigationActive
           ? s.focus || graph.root
-          : detailContext || graph.root;
+          : isScale(macroLevel)
+            ? macroLevel
+            : detailContext || "molecule";
         canvas.dataset.viewpoint = viewpoint;
         canvas.dataset.cameraDistance = controls.getDistance().toFixed(6);
         canvas.dataset.transitioning = String(fitTime > 0);
@@ -1077,8 +1220,7 @@ export default function Scene({
         moving ||
         fitTime > 0 ||
         oldState !== s ||
-        photonTime < 7 ||
-        s.higgs ||
+        s.interaction !== "none" ||
         clock < 0.5
       ) {
         renderer.render(scene, camera);
@@ -1100,6 +1242,10 @@ export default function Scene({
       canvas.removeEventListener("pointerleave", leave);
       canvas.removeEventListener("dblclick", dbl);
       canvas.removeEventListener("webglcontextlost", lost);
+      macro.dispose();
+      portion.dispose();
+      neighborhood.dispose();
+      scaleLabel.remove();
       geometries.forEach((g) => g.dispose());
       materials.forEach((m) => m.dispose());
       environment.dispose();

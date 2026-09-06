@@ -1,3 +1,4 @@
+import { scaleEntry, scaleIds } from "./scales";
 import {
   atomEntry,
   elements,
@@ -8,6 +9,9 @@ import {
 } from "./data";
 import type { ElementId, Entry, MoleculeId } from "./data";
 export type Kind =
+  | "sample"
+  | "portion"
+  | "neighborhood"
   | "molecule"
   | "atom"
   | "nucleus"
@@ -50,6 +54,16 @@ export interface ExplorerState {
   destinations: Record<string, string>;
   photon: number;
   higgs: boolean;
+  interaction:
+    | "none"
+    | "cohesion"
+    | "motion"
+    | "bonds"
+    | "nuclear"
+    | "strong"
+    | "photon"
+    | "higgs";
+  phase: number;
 }
 export interface SceneDetail {
   molecule: MoleculeId;
@@ -76,11 +90,13 @@ export const defaultState: ExplorerState = {
   destinations: {},
   photon: 0,
   higgs: false,
+  interaction: "none",
+  phase: 0,
 };
 export function createGraph(molecule: MoleculeId): MatterGraph {
   const m = molecules[molecule],
     nodes = new Map<string, MatterNode>(),
-    root = "molecule",
+    root = "sample",
     atoms: string[] = [];
   const totals = {
     atoms: m.atoms.length,
@@ -92,17 +108,34 @@ export function createGraph(molecule: MoleculeId): MatterGraph {
     nodes.set(n.id, n);
     if (n.parent) nodes.get(n.parent)!.children.push(n.id);
   };
+  scaleIds.forEach((id, i) =>
+    add({
+      id,
+      parent: i ? scaleIds[i - 1] : null,
+      kind: id,
+      atom: -1,
+      index: 0,
+      element: m.atoms[0].element,
+      children: [],
+      entry: scaleEntry(molecule, id),
+    }),
+  );
   add({
-    id: root,
-    parent: null,
+    id: "molecule",
+    parent: "neighborhood",
     kind: "molecule",
     atom: -1,
     index: 0,
     element: m.atoms[0].element,
     children: [],
     entry: {
-      id: root,
-      name: m.name,
+      id: "molecule",
+      name:
+        molecule === "water"
+          ? "Molécule d’eau"
+          : molecule === "co2"
+            ? "Molécule de CO₂"
+            : "Molécule de méthane",
       symbol: m.formula,
       color: "#c6cbd4",
       category: "MOLÉCULE",
@@ -118,7 +151,7 @@ export function createGraph(molecule: MoleculeId): MatterGraph {
     atoms.push(id);
     add({
       id,
-      parent: root,
+      parent: "molecule",
       kind: "atom",
       atom: i,
       index: i,
@@ -217,6 +250,9 @@ export function expansion(node: MatterNode, state: ExplorerState): number {
     : 0;
 }
 export const kindNames: Record<Kind, string> = {
+  sample: "objet",
+  portion: "volume",
+  neighborhood: "voisinage",
   molecule: "molécule",
   atom: "atome",
   nucleus: "noyau",

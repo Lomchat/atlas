@@ -79,9 +79,11 @@ async function move(direction, target) {
 }
 async function home() {
   await p
-    .getByRole("button", { name: "Revoir toute la molécule", exact: true })
+    .getByRole("button", { name: "Revenir à l’objet entier", exact: true })
     .click();
-  await view("molecule");
+  await view("sample");
+  for (const target of ["portion", "neighborhood", "molecule"])
+    await move("in", target);
   await ready();
 }
 async function search(term) {
@@ -93,14 +95,14 @@ async function search(term) {
   await ready();
 }
 try {
-  await p.goto(base, { waitUntil: "networkidle" });
+  await p.goto(base + "/?focus=molecule", { waitUntil: "networkidle" });
   await view("molecule");
   await ready();
   const identity = await p.locator("canvas").getAttribute("data-scene-id");
   assert.equal(await p.getByRole("slider").count(), 0);
   assert.equal(await p.locator(".bottom-dock").count(), 0);
   assert.equal(await p.locator(".zoom-navigation button").count(), 2);
-  assert.equal(await nav("out").isDisabled(), true);
+  assert.equal(await nav("out").isDisabled(), false);
   await shot("overview");
   for (const id of [atom, nucleus, proton, quark]) {
     await move("in", id);
@@ -134,7 +136,7 @@ try {
   assert.equal(await nav("in").isDisabled(), true);
   assert.ok((await nav("in").innerText()).includes("PARTICULE ÉLÉMENTAIRE"));
   for (const id of [proton, nucleus, atom, "molecule"]) await move("out", id);
-  assert.equal(await nav("out").isDisabled(), true);
+  assert.equal(await nav("out").isDisabled(), false);
   assert.equal(
     await p.locator("canvas").getAttribute("data-visible-nodes"),
     "3",
@@ -187,23 +189,21 @@ try {
     await p.mouse.wheel(0, 500);
     await p.waitForTimeout(130);
   }
-  await view("molecule");
+  await p.waitForFunction(
+    () =>
+      !document.querySelector("canvas")?.dataset.viewpoint?.startsWith("atom-"),
+  );
   await reveal(nucleus, 0);
   await home();
   // Search, photon exchange, themes and the graph all remain in the same renderer.
   await search("électron 1");
   await view("atom-0/electron-0");
   assert.equal(await nav("in").isDisabled(), true);
-  await p.getByRole("button", { name: "Envoyer un photon" }).click();
+  await p.getByRole("button", { name: "Comprendre le photon" }).click();
   await view(atom);
-  await p.waitForFunction(
-    () =>
-      document
-        .querySelector(".event-status")
-        ?.textContent.includes("Transition terminée"),
-    null,
-    { timeout: 30000 },
-  );
+  await p.getByRole("button", { name: /Étape 2 :/ }).click();
+  await p.getByRole("button", { name: /Étape 3 :/ }).click();
+  await p.getByRole("button", { name: "Fermer l’explication" }).click();
   await p.getByRole("button", { name: "Mode clair", exact: true }).click();
   await settle();
   assert.equal(await p.locator("html").getAttribute("data-theme"), "light");
@@ -217,7 +217,8 @@ try {
   await settle();
   assert.equal(await p.locator(".atom-label:visible").count(), 0);
   await p.keyboard.press("r");
-  await view("molecule");
+  await view("sample");
+  await home();
   await ready();
   for (const [width, height] of [
     [390, 844],
@@ -225,7 +226,7 @@ try {
     [844, 390],
   ]) {
     await p.setViewportSize({ width, height });
-    await p.goto(base, { waitUntil: "networkidle" });
+    await p.goto(base + "/?focus=molecule", { waitUntil: "networkidle" });
     await view("molecule");
     await ready();
     const box = await p.locator(".zoom-navigation").boundingBox();
@@ -254,7 +255,7 @@ try {
   }
   // Pinching toward a hydrogen atom must use that branch, not the default oxygen.
   await p.setViewportSize({ width: 390, height: 844 });
-  await p.goto(base, { waitUntil: "networkidle" });
+  await p.goto(base + "/?focus=molecule", { waitUntil: "networkidle" });
   await ready();
   const h = await anchor("atom-1"),
     cdp = await context.newCDPSession(p);
@@ -303,7 +304,8 @@ try {
     await p.getByRole("button", { name: "Choisir une molécule" }).click();
     await p.locator(`[data-molecule-choice="${molecule}"]`).click();
     await p.locator("[data-molecule-enter]").click();
-    await view("molecule");
+    await view("sample");
+    await home();
     await ready();
     assert.equal(await p.locator(".atom-label").count(), total);
     assert.equal(
@@ -317,7 +319,8 @@ try {
     base + "/?molecule=__proto__&depth=100&open=atom-0&focus=constructor",
     { waitUntil: "networkidle" },
   );
-  await view("molecule");
+  await view("sample");
+  await home();
   await ready();
   assert.equal(
     await p.locator("canvas").getAttribute("data-visible-nodes"),

@@ -1,42 +1,30 @@
-# Validation — 6 September 2026 — named zoom navigation
+# Validation — 6 September 2026 — continuous scales and explained interactions
 
 Production: https://atlas.chalco.website
 
-## Behavior
+## Current behavior
 
-- The unfolding gauge, full-expansion controls and automatic unfolding mode have been removed.
-- Exactly two main navigation buttons name the outward parent and inward child. They follow molecule → atom → nucleus → nucleon → elementary particle, with the same path back. Endpoint buttons are disabled with an explicit label.
-- Pointing at a visible sibling changes the inward destination, which remains selected when moving the pointer to the button. Clicking an object, its label or a tree entry targets that exact constituent.
-- Child coordinates remain fixed throughout exploration. Camera fitting uses the selected object's center and bounds. Readability uses camera-to-object distance instead of projected depth, with hysteresis and one targeted branch. Orbiting no longer shifts the annotation coordinates behind the camera update.
-- Wheel and pinch navigation remain available. A pinch over a hydrogen atom follows that branch instead of the default oxygen branch.
-- The underlying graph retains 88 (water), 204 (carbon dioxide) and 84 (methane) nodes excluding the root. Only the readable hierarchy is displayed, in the same renderer.
+- All three materials have an eight-level named route: object → sampled volume or CO₂ bubble → molecular neighborhood → molecule → atom → nucleus → nucleon → valence quark. The root is now the object. Deep links to existing molecular constituents remain valid.
+- The same renderer contains the three outer representations and the original microscopic graph. A central marker links the sampled regions. Visibility follows the camera's framed scale, with overlapping fades. Macro wheel zoom stays centered; microscopic pointer targeting, orbit and pinch remain available.
+- The two navigation buttons accept repeated requests during their 300 ms transitions. Large scale changes interpolate camera distance logarithmically. New requests replace the current destination, including a mid-flight reversal. Reduced motion snaps to the requested view.
+- The collection dialog presents the macroscopic object in a draggable 3D preview, illustrated object choices and a miniature molecule. Browsing, cancellation and resuming preserve the main renderer and focused constituent. Entering another material starts at the object. Preview GPU resources are disposed on close.
+- Seven contextual explanations provide three user-controlled moments, observable 3D effects, legends, interpretation and linked scientific sources: water cohesion, gas motion, chemical bonds, nuclear cohesion, strong interaction, photon energy exchange and the Higgs field. The photon lesson includes an energy-level diagram. No timed explanatory sequence expires before it can be read. Navigating with the named controls exits the lesson; Escape closes it while retaining the current scale.
+- All macro counts are illustrative samples. The inspector distinguishes the conceptual water/methane sample boundary from the CO₂ gas–water interface. Intermolecular attractions, chemical bonds, nuclear links and gluon curves are identified separately. Higgs markers are symbolic field markers, not individual bosons or a viscous medium.
 
-## Checks
+## Local checks
 
-- TypeScript and production build passed. The build is staged outside the live directory before an atomic directory exchange. Older releases and hashed assets remain available.
-- The complete local Playwright suite passed: named inward/outward chain; elementary and overview endpoints; no gauge; remembered sibling choice; actual mesh picking; centered targets after orbit; wheel progression and reversal; photon exchange; search; themes; shared focus; invalid URLs; all molecule graph totals; persistent renderer; no browser errors or failed application requests.
-- Layout and navigation passed at 1440 × 1000, 390 × 844, 320 × 568 and 844 × 390. Mobile composition selection closes the drawer. A two-touch gesture was injected through Chromium's touch input protocol to verify hydrogen pinch targeting.
-- A separate normal-motion check passed both locally and on the public HTTPS site: named camera destinations, stable centered targets after transitions, outward navigation and persistent renderer identity.
-- Screenshots are in `artifacts/navigation-*.png`. Production is served statically by Caddy from `/srv/explode/dist`.
+- TypeScript, staged Vite production build and `git diff --check` passed.
+- The full existing navigation suite passed after adapting its molecule-overview setup to the added outer levels: exact inward/outward ancestry, pointed sibling choice, ray picking, camera centering after orbit, wheel reversal, hydrogen pinch targeting, all three microscopic graph totals, search, photon explanation controls, themes, sharing, invalid URLs, absence of the unfolding gauge, persistent renderer and no browser errors or failed application requests.
+- The normal-motion rapid-navigation suite passed at 1440 × 1000 and 390 × 844: batched events, actual seven-click bursts across the entire route, endpoint clamping, direction reversal, no queued flights, keyboard repeat and remembered non-default branches.
+- The collection suite passed after changing the preview to macro objects: real drag, choice browsing without resetting the main focus, resuming, explicit commit, native dialog Escape/backdrop dismissal and focus restoration, keyboard selection, renderer cleanup, light mode and usable confirmation buttons at 1440 × 1000, 390 × 844, 320 × 568 and 844 × 390.
 
-Checks use headless Chromium and software WebGL. Touch events are emulated; these tests do not measure physical-device frame rates or touchscreen hardware. The geometry remains a schematic composition model, not a quantum simulation.
+Screenshots are saved under `artifacts/scales-*.png`, `artifacts/picker-*.png` and `artifacts/navigation-*.png`. Verification uses headless Chromium with software WebGL; touch gestures are emulated. These checks do not measure hardware touchscreen performance or validate a physical simulation.
 
-## Rapid navigation
+- The dedicated scale/interaction suite passed locally: all three routes from object to quark and back, stable renderer identity, manual wheel traversal through neighborhood/volume/object and back, every contextual lesson and its three phases, visible pixel changes in the 3D scene for the five microscopic lessons, gallery previews, mobile/landscape layouts, and Escape closing an explanation without changing the focused atom. No page errors occurred.
+- A final targeted 320 × 568 check verified that all three explanation paragraphs fit above the sticky controls after the compact-header adjustment. The final screenshots were visually inspected, including the smaller Higgs markers and the object/molecule gallery layout.
 
-Navigation controls now remain active during movement, except at actual hierarchy endpoints. Each click resolves against the latest requested destination using a functional state update, so even multiple events in the same browser task advance separately. Previously chosen branches survive a rapid return and re-entry. Keyboard repeat and the inspector's navigation actions use the same behavior.
+## Deployment
 
-Camera transitions use a 300 ms wall-clock cubic easing. New requests retarget from the current camera position, without queuing intermediate flights. Manual wheel/orbit input cancels the flight. The displayed destination remains stable while the camera and detail settle.
+The final production build was staged outside the live directory and deployed by atomic directory exchange. The prior version is retained at `releases/before-continuous-scales-20260906T105416Z`. Caddy serves the new `index-CRWpTIfV.js` and `index-BSXBvkCk.css` assets; HTTPS retrieval succeeded. No server configuration change was needed.
 
-The dedicated `npm run test:rapid` suite passed both locally and on the public HTTPS site with normal motion at 1440 × 1000 and 390 × 844: synchronous click bursts, actual quadruple mouse clicks, immediate labels and enabled buttons, excess-click endpoint clamping, reversing mid-flight, no later replay of queued motion, rapid keyboard events, remembered non-default siblings, persistent renderer and no page errors.
-
-The complete existing navigation suite also passed after this change, including wheel reversal and hydrogen pinch targeting. TypeScript and the staged production build passed; the live site returns HTTP 200.
-
-## Visual molecule collection
-
-The native select is replaced with an accessible modal containing one draggable Three.js molecule preview, SVG choice illustrations generated from the same molecular coordinates, composition, geometry and an explicit entry button. Preview selection stays local to the dialog. Closing, Escape, backdrop dismissal and resuming the current molecule preserve the main renderer and focused constituent. Selecting a different molecule commits only on entry. The preview renderer, controls, animation frame and GPU resources are released on close. Reduced-motion preferences disable automatic rotation.
-
-TypeScript and the staged production build passed. The existing full navigation and rapid-navigation suites passed with the new selector. The dedicated `npm run test:picker` suite passed locally, covering actual preview drag, preview switching without changing the exploration URL or renderer, resuming a focused nucleus, committing a new molecule, keyboard selection, Escape/backdrop dismissal, focus restoration, preview cleanup, light mode and accessible entry-button placement at 1440 × 1000, 390 × 844, 320 × 568 and 844 × 390. Screenshots in `artifacts/picker-*.png` were visually inspected; the landscape preview remains fully visible alongside the scrolling choices.
-
-The production build was deployed by atomic directory exchange, with the previous version retained under `releases/before-molecule-picker-20260906T103448Z`. No outward layers beyond the molecule have been implemented in this change; these remain a proposed extension.
-
-The same picker suite also passed against the public HTTPS site after deployment. The live document successfully serves the new `index-BeqyAMrY.js` and `index-CdJgIv66.css` assets.
+The full scale/interaction suite also passed against the public HTTPS deployment, including all three routes, macro wheel traversal, every contextual lesson, all gallery previews, mobile/landscape layouts, persistent renderer identity and no page errors.

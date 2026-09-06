@@ -95,9 +95,9 @@ try {
     "true",
   );
   await page.locator("[data-molecule-enter]").click();
-  await ready("molecule");
+  await ready("sample");
   assert.equal(new URL(page.url()).searchParams.get("molecule"), "co2");
-  assert.equal(await canvas().getAttribute("data-visible-nodes"), "3");
+  assert.equal(await canvas().getAttribute("data-scale"), "sample");
   for (const [name, width, height] of [
     ["mobile", 390, 844],
     ["small", 320, 568],
@@ -120,7 +120,7 @@ try {
     await page.screenshot({ path: `artifacts/picker-${name}.png` });
     await page.locator('[data-molecule-choice="methane"]').click();
     await page.locator("[data-molecule-enter]").click();
-    await ready("molecule");
+    await ready("sample");
     assert.equal(new URL(page.url()).searchParams.get("molecule"), "methane");
     assert.equal(await page.locator("canvas").count(), 1);
   }

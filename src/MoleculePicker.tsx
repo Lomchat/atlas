@@ -2,6 +2,8 @@ import { useEffect, useId, useRef, useState } from "react";
 import { ArrowRight, Check, Rotate3D } from "lucide-react";
 import * as T from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { macroModel } from "./MacroModel";
+import { environments } from "./scales";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { elements, molecules } from "./data";
 import type { MoleculeId } from "./data";
@@ -71,6 +73,79 @@ function Thumbnail({ id }: { id: MoleculeId }) {
   );
 }
 
+function MacroThumbnail({ id }: { id: MoleculeId }) {
+  const uid = useId();
+  return (
+    <svg viewBox="0 0 140 94" aria-hidden="true">
+      <defs>
+        <linearGradient id={uid}>
+          <stop stopColor="#dbe9f7" stopOpacity=".4" />
+          <stop offset=".5" stopColor="#bdd2e7" stopOpacity=".04" />
+          <stop offset="1" stopColor="#dbe9f7" stopOpacity=".5" />
+        </linearGradient>
+      </defs>
+      {id === "methane" ? (
+        <>
+          <path
+            d="M59 18 L59 31 Q43 38 43 47 L43 78 Q70 86 97 78 L97 47 Q97 38 81 31 L81 18 Z"
+            fill={`url(#${uid})`}
+            stroke="#b5bdd2"
+            strokeWidth="1.4"
+          />
+          <rect x="56" y="12" width="28" height="9" rx="2" fill="#9295ae" />
+          <path
+            d="M44 57 Q70 64 96 57 L96 68 Q70 75 44 68 Z"
+            fill="#a8abc0"
+            opacity=".3"
+          />
+        </>
+      ) : (
+        <>
+          <path
+            d="M44 20 L50 78 Q70 86 90 78 L96 20"
+            fill={`url(#${uid})`}
+            stroke="#b6ccdd"
+            strokeWidth="1.4"
+          />
+          <ellipse
+            cx="70"
+            cy="20"
+            rx="26"
+            ry="7"
+            fill="none"
+            stroke="#d0deeb"
+          />
+          <path
+            d="M47 39 Q70 47 93 39 L90 77 Q70 84 50 77 Z"
+            fill="#9ebdd6"
+            opacity=".28"
+          />
+          <ellipse
+            cx="70"
+            cy="39"
+            rx="23"
+            ry="6"
+            fill="#a9c9e0"
+            opacity=".22"
+          />
+          {id === "co2" &&
+            [0, 1, 2, 3, 4, 5].map((i) => (
+              <circle
+                key={i}
+                cx={61 + (i % 3) * 9}
+                cy={48 + i * 4}
+                r={1.5 + (i % 2)}
+                fill="none"
+                stroke="#d2e2ef"
+                strokeOpacity=".7"
+              />
+            ))}
+        </>
+      )}
+    </svg>
+  );
+}
+
 function Preview({ id, light }: { id: MoleculeId; light: boolean }) {
   const host = useRef<HTMLDivElement>(null);
   const change = useRef<((id: MoleculeId) => void) | null>(null);
@@ -90,7 +165,7 @@ function Preview({ id, light }: { id: MoleculeId; light: boolean }) {
     renderer.toneMappingExposure = light ? 1.3 : 1.1;
     renderer.domElement.setAttribute(
       "aria-label",
-      "Aperçu 3D de la molécule, glisser pour tourner",
+      "Aperçu 3D de l’objet, glisser pour tourner",
     );
     el.appendChild(renderer.domElement);
     const scene = new T.Scene(),
@@ -107,24 +182,7 @@ function Preview({ id, light }: { id: MoleculeId; light: boolean }) {
     scene.add(key);
     const group = new T.Group();
     scene.add(group);
-    const sphere = new T.SphereGeometry(1, 40, 28),
-      cylinder = new T.CylinderGeometry(1, 1, 1, 16);
-    const materials = Object.fromEntries(
-      Object.entries(elements).map(([k, e]) => [
-        k,
-        new T.MeshPhysicalMaterial({
-          color: e.color,
-          roughness: 0.27,
-          metalness: 0.12,
-          clearcoat: 0.45,
-        }),
-      ]),
-    );
-    const bondMaterial = new T.MeshStandardMaterial({
-      color: 0x929baa,
-      roughness: 0.32,
-      metalness: 0.3,
-    });
+    let model: ReturnType<typeof macroModel> | null = null;
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableZoom = false;
     controls.enablePan = false;
@@ -159,36 +217,12 @@ function Preview({ id, light }: { id: MoleculeId; light: boolean }) {
     }
     function show(next: MoleculeId) {
       group.clear();
-      const molecule = molecules[next];
-      molecule.atoms.forEach((a) => {
-        const mesh = new T.Mesh(sphere, materials[a.element]);
-        mesh.position.set(...a.pos);
-        mesh.scale.setScalar(a.element === "H" ? 0.43 : 0.65);
-        group.add(mesh);
-      });
-      molecule.bonds.forEach(([a, b, order]) => {
-        const start = new T.Vector3(...molecule.atoms[a].pos),
-          end = new T.Vector3(...molecule.atoms[b].pos);
-        const direction = end.clone().sub(start),
-          unit = direction.clone().normalize();
-        const offset = new T.Vector3()
-          .crossVectors(unit, new T.Vector3(0, 0, 1))
-          .normalize();
-        for (let i = 0; i < order; i++) {
-          const mesh = new T.Mesh(cylinder, bondMaterial);
-          mesh.position
-            .copy(start)
-            .add(end)
-            .multiplyScalar(0.5)
-            .addScaledVector(offset, (i - (order - 1) / 2) * 0.25);
-          mesh.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), unit);
-          mesh.scale.set(0.095, direction.length(), 0.095);
-          group.add(mesh);
-        }
-      });
+      model?.dispose();
+      model = macroModel(next);
+      group.add(model.group);
       const bounds = new T.Box3().setFromObject(group),
         center = bounds.getCenter(new T.Vector3());
-      radius = bounds.getBoundingSphere(new T.Sphere()).radius;
+      radius = bounds.getBoundingSphere(new T.Sphere()).radius * 0.78;
       controls.target.copy(center);
       camera.position
         .copy(center)
@@ -196,7 +230,7 @@ function Preview({ id, light }: { id: MoleculeId; light: boolean }) {
       if (next !== "methane")
         camera.position
           .copy(center)
-          .add(new T.Vector3(0.15, 0.1, 1).multiplyScalar(10));
+          .add(new T.Vector3(0.15, 0.3, 1).multiplyScalar(10));
       resize();
       renderer.domElement.dataset.moleculePreview = next;
     }
@@ -219,10 +253,7 @@ function Preview({ id, light }: { id: MoleculeId; light: boolean }) {
       observer.disconnect();
       motion.removeEventListener("change", preference);
       controls.dispose();
-      sphere.dispose();
-      cylinder.dispose();
-      bondMaterial.dispose();
-      Object.values(materials).forEach((m) => m.dispose());
+      model?.dispose();
       env.dispose();
       renderer.dispose();
       renderer.forceContextLoss();
@@ -234,7 +265,7 @@ function Preview({ id, light }: { id: MoleculeId; light: boolean }) {
   }, [id]);
   return (
     <div className="molecule-preview" ref={host}>
-      {failed && <Thumbnail id={id} />}
+      {failed && <MacroThumbnail id={id} />}
     </div>
   );
 }
@@ -256,25 +287,31 @@ export default function MoleculePicker({
   return (
     <>
       <div className="picker-intro">
-        <span className="eyebrow">COLLECTION · 03 MOLÉCULES</span>
-        <h2 id="dialog-title">Tout commence ici.</h2>
-        <p>Choisissez un petit monde à explorer.</p>
+        <span className="eyebrow">COLLECTION · 03 MONDES</span>
+        <h2 id="dialog-title">Du visible à l’invisible.</h2>
+        <p>Choisissez un objet. Découvrez la matière qu’il contient.</p>
       </div>
       <div className="picker-body">
         <div className="picker-stage">
           <span className="preview-formula" aria-hidden="true">
-            {m.formula}
+            {environments[selected].state}
           </span>
           <Preview id={selected} light={light} />
+          <div className="molecule-inset">
+            <Thumbnail id={selected} />
+            <span>
+              À l’intérieur<strong>{m.formula}</strong>
+            </span>
+          </div>
           <span className="preview-hint">
             <Rotate3D size={14} /> Glisser pour tourner
           </span>
           <div className="preview-caption">
-            <span>{m.facts[0][1]}</span>
-            <span>{m.atoms.length} atomes</span>
+            <span>{environments[selected].name}</span>
+            <span>≈ cm → nm</span>
           </div>
         </div>
-        <div className="picker-collection" aria-label="Molécules disponibles">
+        <div className="picker-collection" aria-label="Matières disponibles">
           {(Object.keys(molecules) as MoleculeId[]).map((id, i) => (
             <button
               key={id}
@@ -284,9 +321,9 @@ export default function MoleculePicker({
               onClick={() => setSelected(id)}
             >
               <span className="choice-number">0{i + 1}</span>
-              <Thumbnail id={id} />
+              <MacroThumbnail id={id} />
               <span className="choice-copy">
-                <strong>{molecules[id].name}</strong>
+                <strong>{environments[id].name}</strong>
                 <span>
                   {molecules[id].formula} <i>·</i> {molecules[id].atoms.length}{" "}
                   atomes
@@ -298,7 +335,12 @@ export default function MoleculePicker({
             </button>
           ))}
           <div className="picker-facts" aria-live="polite">
-            <p>{m.detail}</p>
+            <p>{environments[selected].subtitle}</p>
+            <div className="picker-route">
+              <span>Objet</span> →{" "}
+              <span>{selected === "co2" ? "Bulle" : "Volume"}</span> →{" "}
+              <span>Voisinage</span> → <strong>{m.formula}</strong>
+            </div>
             <div className="element-chips">
               {composition.map((e) => (
                 <span key={e}>
@@ -321,7 +363,7 @@ export default function MoleculePicker({
       </div>
       <div className="picker-footer">
         <span>
-          De la molécule aux quarks.
+          De l’objet aux quarks.
           <small>Le même monde, à chaque échelle.</small>
         </span>
         <button
@@ -331,7 +373,7 @@ export default function MoleculePicker({
         >
           {selected === current
             ? "Reprendre l’exploration"
-            : `Explorer ${m.formula}`}
+            : "Explorer cet objet"}
           <ArrowRight size={17} />
         </button>
       </div>

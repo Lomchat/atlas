@@ -2,21 +2,19 @@
 
 https://atlas.chalco.website
 
-An interactive French-language 3D atlas of matter. A single molecule stays in the same Three.js scene while its actual hierarchy unfolds: atoms contain nuclei and electrons; nuclei contain protons and neutrons; nucleons contain valence quarks. The neutral charcoal studio is inspired by Human Atlas and Model X Studio.
+An interactive French-language Three.js atlas of matter, from familiar objects to valence quarks. The neutral studio and camera-led exploration are inspired by Human Atlas and Model X Studio.
 
 ## Explore
 
-- The molecule selector opens a visual collection with a draggable 3D preview, illustrated choices, composition and geometry. Browsing is local to the dialog; Escape, closing or resuming preserves the current exploration. A different molecule is loaded only on confirmation. The layout adapts to mobile with an always-visible confirmation button.
+- Start with a glass of water, a glass of sparkling water or a methane flask. The collection dialog shows the large object in 3D, with a small molecular illustration and the path between them. Browsing and cancelling preserve the current exploration; entering a different material starts at its object.
+- One camera follows object → sampled volume / CO₂ bubble → molecular neighborhood → one molecule → atom → nucleus → nucleon → quark. The reverse path remains available throughout. Surrounding representations fade with the actual camera scale. An anchored marker connects each large level with the next smaller volume.
+- The two top buttons name their destinations. Repeated clicks immediately update the requested destination, including a reversal during a flight. Macro transitions interpolate distance logarithmically; all button flights last 300 ms with no animation queue. Reduced motion snaps to the destination.
+- Wheel and pinch remain available. At macroscopic scales, wheel zoom stays centered on the sampled volume. Within the molecule, pointer targeting, remembered branches, fixed child coordinates and adaptive layers remain active.
+- Contextual explanations connect an observable effect to its meaning: attractions between water molecules, gas motion and wall collisions, covalent bonds, nuclear cohesion, gluon exchanges, photon absorption/emission, and the Higgs field. Each has three user-controlled moments, a legend, a limitation and a scientific source. Photon energy levels are shown alongside the 3D representation.
+- The macro objects, molecular neighbors and selected microscopic hierarchy share one renderer. Water, carbon dioxide and methane retain their 88, 204 and 84 microscopic nodes excluding the molecule. The three outer nodes describe sampled scales, not actual counts of molecules.
+- Search, theme selection, orbit, annotations, sharing and the composition tree remain available. There is no unfolding gauge.
 
-- Two buttons at the top name the next inward destination and the outward parent. They remain usable during camera motion: repeated clicks immediately advance the requested destination, and changing direction retargets from the current camera position. Transitions use a 300 ms wall-clock easing instead of queuing animations. They move the camera through the same scene: molecule → atom → nucleus → nucleon → quark, with the reverse route always available.
-- Point at a different visible child to choose it as the inward destination. That choice stays in place when moving to the button. Clicking a constituent or a composition-tree entry approaches that exact object.
-- Wheel and pinch gestures also reveal successive layers. Geometry stays at fixed local coordinates, and detail uses camera distance rather than projected depth. Only the targeted branch opens automatically; its surroundings remain as faint context.
-- Elementary particles have no deeper destination; the inward button indicates that limit. The outward button is disabled at the molecule overview.
-- There is no unfolding gauge, automatic unfolding animation or separate expansion mode.
-- Orbit, return to the molecule, toggle annotations and envelopes, or change the theme. Search, a photon exchange and the illustrative Higgs field remain available.
-- Water, carbon dioxide and methane contain 88, 204 and 84 nested graph nodes excluding the root; only readable layers are displayed. A focused constituent can be shared via its URL.
-
-Keyboard: `R` reset, `L` annotations, `+` / `−` move to the named destination, `/` search, Escape return to the molecule.
+Keyboard: `R` return to the object, `L` annotations, `+` / `−` named zoom, `/` search, Escape close the explanation or return to the object. Native dialogs use Escape to close.
 
 ## Development
 
@@ -44,17 +42,20 @@ npm run build -- --outDir .next-dist
 npm test
 npm run test:rapid
 npm run test:picker
+npm run test:scales
 ATLAS_URL=https://atlas.chalco.website npm test
 ```
 
 The local suite expects `npm run dev` to be running. Set `CHROMIUM_PATH` if needed, or install Chromium with `npx playwright install chromium`.
 
-The rapid-navigation suite uses normal motion to check batched clicks, actual quadruple clicks, mid-flight reversal, endpoint clamping, keyboard repeat, remembered siblings and mobile behavior. The main browser suite checks the named inward/outward destination chain, disabled endpoint buttons, a pointed sibling remaining selected, exact ray picking, centered camera targets after orbiting, wheel reversal, mobile and landscape layouts, pinch targeting a hydrogen atom, absence of the gauge, persistent scene identity, photons, search, themes, shared URLs and graph composition totals. Screenshots are saved to `artifacts/navigation-*.png`.
+The rapid-navigation suite uses normal motion to check batched clicks, actual seven-click bursts, mid-flight reversal, endpoint clamping, keyboard repeat, remembered siblings and mobile behavior. The main browser suite checks the named inward/outward destination chain, disabled endpoint buttons, a pointed sibling remaining selected, exact ray picking, centered camera targets after orbiting, wheel reversal, mobile and landscape layouts, pinch targeting a hydrogen atom, absence of the gauge, persistent scene identity, photons, search, themes, shared URLs and graph composition totals. Screenshots are saved to `artifacts/navigation-*.png`.
 
 ## Scientific conventions
 
-This is a composition diagram, not a quantum simulation. Spheres and envelopes are visual conventions, not hard physical walls. Nuclei and their contents are enlarged. Clouds illustrate electron distributions rather than computed orbitals; electron markers are selectable symbols, not physical trajectories. The molecular representation uses simplified isolated-atom properties to explain composition.
+The scale chain is a schematic composition diagram, not a literal geometric scale model or a quantum simulation. Intermediate sizes are adapted to make the transitions readable. Neighboring molecules and volume specks are illustrative samples, never a count of all molecules present. The highlighted water volume and methane volume are conceptual samples without a physical membrane; the CO₂ bubble has a real gas–liquid interface. The sparkling-water route follows the CO₂ in the bubble while the surrounding liquid contains water.
 
-Quarks are confined. Three displayed valence quarks omit the full quark–gluon dynamics, and the connecting curves are not physical wires. Photon animations illustrate energy exchange with arbitrary visual times and paths. The Higgs field is a conceptual surface. Neither interaction is presented as another component inside the electron.
+Within a molecule, spheres and envelopes are visual conventions. Nuclei are enlarged; clouds do not compute molecular orbitals. Electron markers identify constituents, not classical trajectories. The photon lesson uses an isolated-atom, two-level schematic; molecular energy levels differ. Its steps do not represent elapsed physical time.
 
-Scientific sources are linked in the interface: CERN, OpenStax Chemistry 2e and PubChem. Geometry is original to this project. Human Atlas layout/camera inspiration is credited under its MIT license (`public/licenses/human-atlas.txt`); Model X Studio is a visual reference. No automotive or anatomy assets are reused. DM Sans is distributed under the SIL Open Font License.
+The nuclear links, intermolecular dashed lines and gluon curves are symbolic. Gas trajectories are slowed, simplified wall-collision illustrations. Three valence quarks omit full quark–gluon dynamics and virtual pairs; quarks remain confined. The Higgs dots represent a field, not individual bosons, a fluid or friction. The lesson distinguishes elementary-particle mass from the strong-interaction contribution that dominates proton mass.
+
+Sources are linked in each explanation and the inspector: OpenStax Chemistry 2e, CERN and PubChem. All 3D geometry is procedural and local. Human Atlas inspiration is credited under its MIT license (`public/licenses/human-atlas.txt`); Model X Studio is a visual reference. No automotive or anatomy assets are reused. DM Sans uses the SIL Open Font License.

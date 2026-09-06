@@ -25,6 +25,9 @@ import {
 import type { LucideIcon } from "lucide-react";
 import Scene from "./Scene";
 import MoleculePicker from "./MoleculePicker";
+import Interactions, { contextualInteraction, lessons } from "./Interactions";
+import type { Interaction } from "./Interactions";
+import { environments, isScale } from "./scales";
 import { molecules, particles, sources } from "./data";
 import type { MoleculeId } from "./data";
 import {
@@ -142,6 +145,9 @@ export default function App() {
       selected: id === graph.root ? null : id,
       destinations,
       navigation: s.navigation + 1,
+      interaction: "none",
+      phase: 0,
+      higgs: false,
     };
   }
   function step(direction: "in" | "out") {
@@ -198,20 +204,35 @@ export default function App() {
     }));
     setPanel(null);
   }
-  function photon() {
-    const target =
-      node.atom >= 0
-        ? graph.atoms[node.atom]
-        : graph.atoms.find((id) => graph.nodes.get(id)!.element === "H") ||
-          graph.atoms[0];
+  function startInteraction(type: Interaction) {
+    let target = node.id;
+    if (type === "cohesion" || type === "motion") target = "neighborhood";
+    if (type === "bonds") target = "molecule";
+    if (type === "photon")
+      target =
+        node.atom >= 0
+          ? graph.atoms[node.atom]
+          : graph.atoms.find((id) => graph.nodes.get(id)!.element === "H") ||
+            graph.atoms[0];
+    if (type === "higgs")
+      target =
+        node.kind === "electron"
+          ? node.id
+          : `${graph.atoms[Math.max(0, node.atom)]}/electron-0`;
+    if (type === "strong") {
+      if (node.kind === "nucleus") target = node.children[0];
+      else if (node.kind === "up" || node.kind === "down")
+        target = node.parent!;
+    }
+    setInspector(false);
+    setPanel(null);
+    setEventText("");
     setState((s) => ({
-      ...s,
-      selected: target,
-      focus: target,
-      navigation: s.navigation + 1,
-      photon: s.photon + 1,
+      ...destinationState(s, target),
+      interaction: type,
+      phase: 0,
+      higgs: type === "higgs",
     }));
-    setEventText("Photon incident");
   }
   function notify(text: string) {
     setMessage(text);
@@ -276,6 +297,11 @@ export default function App() {
       if (e.key.toLowerCase() === "r") reset();
       if (e.key.toLowerCase() === "l") update({ labels: !state.labels });
       if (e.key === "Escape") {
+        if (state.interaction !== "none") {
+          update({ interaction: "none", phase: 0, higgs: false });
+          setInspector(true);
+          return;
+        }
         overview();
         setPanel(null);
       }
@@ -298,8 +324,10 @@ export default function App() {
     [],
   );
   const visibleCount = sceneDetail?.count ?? graph.atoms.length;
+  const contextInteraction = contextualInteraction(node, state.molecule);
   function row(n: MatterNode, depth = 0): React.ReactNode {
     const expanded =
+      isScale(n.id) ||
       n.kind === "molecule" ||
       expansion(n, state) > 0.25 ||
       sceneDetail?.open.includes(n.id);
@@ -351,7 +379,13 @@ export default function App() {
     )
     .slice(0, 35);
   return (
-    <main className={"studio " + (state.light ? "light" : "dark")}>
+    <main
+      className={
+        "studio " +
+        (state.light ? "light" : "dark") +
+        (state.interaction !== "none" ? " has-lesson" : "")
+      }
+    >
       <Scene
         state={state}
         graph={graph}
@@ -369,7 +403,7 @@ export default function App() {
           Matière <em>Atlas</em>
           <sup>02</sup>
         </h1>
-        <p>Un monde à l’intérieur de chaque atome.</p>
+        <p>Du monde visible à l’intérieur des atomes.</p>
       </header>
       <nav className="top-actions" aria-label="Outils de l’atlas">
         <button
@@ -407,7 +441,7 @@ export default function App() {
           aria-haspopup="dialog"
           onClick={() => setModal("molecules")}
         >
-          <span>{mol.name}</span>
+          <span>{environments[state.molecule].name}</span>
           <small>{mol.formula}</small>
           <ChevronDown size={13} />
         </button>
@@ -416,13 +450,19 @@ export default function App() {
             <span key={n.id}>
               {i > 0 && <ChevronRight size={10} />}
               <button onClick={() => approach(n.id)} title={n.entry.name}>
-                {i === 0
-                  ? mol.formula
-                  : n.kind === "atom"
-                    ? n.entry.name
-                    : n.kind === "nucleus"
-                      ? "Noyau"
-                      : n.entry.name}
+                {isScale(n.id)
+                  ? n.id === "sample"
+                    ? "Objet"
+                    : n.id === "portion"
+                      ? "Volume"
+                      : "Voisinage"
+                  : n.kind === "molecule"
+                    ? mol.formula
+                    : n.kind === "atom"
+                      ? n.entry.name
+                      : n.kind === "nucleus"
+                        ? "Noyau"
+                        : n.entry.name}
               </button>
             </span>
           ))}
@@ -475,7 +515,7 @@ export default function App() {
         aria-label="Composition imbriquée"
       >
         <div className="panel-heading">
-          <span>Dans cette molécule</span>
+          <span>Du visible à l’infiniment petit</span>
           <button
             className="mobile-only icon-button"
             aria-label="Fermer la composition"
@@ -483,15 +523,15 @@ export default function App() {
           >
             <X size={15} />
           </button>
-          <span className="desktop-only counter">
-            {graph.totals.atoms} atomes
-          </span>
         </div>
         <p className="panel-hint">
-          Pointez ou cliquez sur un constituant à explorer.
+          Suivez un volume, une molécule, puis ses constituants.
         </p>
         <div className="tree-scroll">{row(graph.nodes.get(graph.root)!)}</div>
         <div className="composition-summary">
+          <span className="composition-caption">
+            Dans une molécule {mol.formula}
+          </span>
           <span>
             <b>{graph.totals.electrons}</b> électrons
           </span>
@@ -516,7 +556,9 @@ export default function App() {
         </div>
         <div className="tree-foot">
           <span className="tiny-dot" />
-          {visibleCount} constituants affichés · Détail adaptatif
+          {isScale(node.id)
+            ? "Un volume repère · molécules illustratives"
+            : `${visibleCount} constituants affichés · Détail adaptatif`}
         </div>
       </aside>
       <div className="view-controls glass">
@@ -527,7 +569,7 @@ export default function App() {
           onClick={() => update({ rotate: !state.rotate })}
         />
         <IconButton
-          label="Revoir toute la molécule"
+          label="Revenir à l’objet entier"
           icon={Crosshair}
           onClick={overview}
         />
@@ -582,14 +624,22 @@ export default function App() {
           <div className="contains">
             <Layers3 size={14} />
             <span>
-              Contient <strong>{node.children.length}</strong>{" "}
-              {node.kind === "molecule"
-                ? "atomes"
-                : node.kind === "atom"
-                  ? "constituants"
-                  : node.kind === "nucleus"
-                    ? "nucléons"
-                    : "quarks de valence"}
+              {isScale(node.id) ? (
+                <>
+                  Zoom sur <strong>{next?.entry.name}</strong>
+                </>
+              ) : (
+                <>
+                  Contient <strong>{node.children.length}</strong>{" "}
+                  {node.kind === "molecule"
+                    ? "atomes"
+                    : node.kind === "atom"
+                      ? "constituants"
+                      : node.kind === "nucleus"
+                        ? "nucléons"
+                        : "quarks de valence"}
+                </>
+              )}
             </span>
           </div>
         )}
@@ -626,21 +676,40 @@ export default function App() {
         </a>
       </aside>
       <div className="interaction-controls glass">
-        <span className="interaction-title">Observer une interaction</span>
-        <button onClick={photon} aria-label="Envoyer un photon">
+        <button
+          className="context-interaction"
+          onClick={() => startInteraction(contextInteraction)}
+          aria-label={lessons[contextInteraction].question}
+        >
           <Zap size={15} />
-          <span>Photon</span>
+          <span>{lessons[contextInteraction].question}</span>
+          <CircleHelp size={14} />
         </button>
         <button
-          className={state.higgs ? "active" : ""}
-          onClick={() => update({ higgs: !state.higgs })}
-          aria-pressed={state.higgs}
-          aria-label="Afficher le champ de Higgs"
+          onClick={() => startInteraction("photon")}
+          aria-label="Comprendre le photon"
         >
-          <Sparkles size={15} />
-          <span>Champ de Higgs</span>
+          <span>Lumière</span>
+        </button>
+        <button
+          onClick={() => startInteraction("higgs")}
+          aria-label="Comprendre le champ de Higgs"
+        >
+          <Sparkles size={14} />
+          <span>Higgs</span>
         </button>
       </div>
+      {state.interaction !== "none" && (
+        <Interactions
+          type={state.interaction}
+          phase={state.phase}
+          onPhase={(phase) => update({ phase })}
+          onClose={() => {
+            update({ interaction: "none", phase: 0, higgs: false });
+            setInspector(true);
+          }}
+        />
+      )}
       {eventText && (
         <div className="event-status" role="status">
           <span />
@@ -667,9 +736,11 @@ export default function App() {
       <div className="lower-left">
         <span className="mini-formula">{mol.formula}</span>
         <span>
-          Une seule molécule.
+          {isScale(node.id) ? node.entry.category : "Une molécule repérée."}
           <br />
-          Tous ses constituants.
+          {isScale(node.id)
+            ? "Échelles raccordées · échantillon illustratif"
+            : "Tous ses constituants."}
         </span>
       </div>
       <button
@@ -783,10 +854,13 @@ export default function App() {
           <>
             <h2 id="dialog-title">Tout est lié.</h2>
             <p>
-              La même molécule reste à l’écran. Ses atomes contiennent leurs
-              noyaux et leurs électrons ; les noyaux contiennent leurs nucléons
-              ; les protons et les neutrons révèlent leurs trois quarks de
-              valence.
+              Le zoom part d’un objet, traverse un volume repère et son
+              voisinage moléculaire, puis suit une seule molécule. Les
+              changements d’échelle sont adaptés ; les molécules visibles
+              constituent un échantillon illustratif. Ses atomes contiennent
+              leurs noyaux et leurs électrons ; les noyaux contiennent leurs
+              nucléons ; les protons et les neutrons révèlent leurs trois quarks
+              de valence.
             </p>
             <h3>Explorez directement</h3>
             <p>
@@ -810,9 +884,8 @@ export default function App() {
             <p>
               Le photon et le boson de Higgs ne sont pas des morceaux cachés
               dans un électron. Le photon illustre un échange d’énergie avec un
-              atome. La surface du champ de Higgs est une représentation
-              conceptuelle. Les temps et les trajectoires de ces animations sont
-              schématiques.
+              atome. Le volume du champ de Higgs est une représentation
+              conceptuelle. Les trajets et mouvements sont schématiques.
             </p>
             <h3>Sources & inspirations</h3>
             <a href={sources.cern} target="_blank" rel="noreferrer">
