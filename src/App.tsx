@@ -231,6 +231,8 @@ export default function App() {
       ...destinationState(s, target),
       interaction: type,
       phase: 0,
+      interactionPaused: false,
+      interactionReplay: s.interactionReplay + 1,
       higgs: type === "higgs",
     }));
   }
@@ -391,6 +393,7 @@ export default function App() {
         graph={graph}
         onPick={inspect}
         onFocus={approach}
+        onAdvance={() => step("in")}
         onEvent={setEventText}
         onDetail={setDetail}
       />
@@ -704,6 +707,17 @@ export default function App() {
           type={state.interaction}
           phase={state.phase}
           onPhase={(phase) => update({ phase })}
+          paused={state.interactionPaused}
+          onPause={() =>
+            update({ interactionPaused: !state.interactionPaused })
+          }
+          onReplay={() =>
+            setState((s) => ({
+              ...s,
+              interactionPaused: false,
+              interactionReplay: s.interactionReplay + 1,
+            }))
+          }
           onClose={() => {
             update({ interaction: "none", phase: 0, higgs: false });
             setInspector(true);

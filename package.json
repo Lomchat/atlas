@@ -10,7 +10,8 @@
     "test": "node scripts/verify.mjs",
     "test:rapid": "node scripts/verify-rapid-navigation.mjs",
     "test:picker": "node scripts/verify-picker.mjs",
-    "test:scales": "node scripts/verify-scales.mjs"
+    "test:scales": "node scripts/verify-scales.mjs",
+    "test:experience": "node scripts/verify-experience.mjs"
   },
   "dependencies": {
     "lucide-react": "0.468.0",

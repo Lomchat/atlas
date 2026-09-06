@@ -4,6 +4,7 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { elements, molecules } from "./data";
 import { macroModel, neighborsModel } from "./MacroModel";
+import { interactionEffects } from "./InteractionEffects";
 import { isScale } from "./scales";
 import { ancestors, expansion } from "./continuum";
 import type {
@@ -18,6 +19,7 @@ type Props = {
   graph: MatterGraph;
   onPick: (id: string) => void;
   onFocus: (id: string) => void;
+  onAdvance: () => void;
   onEvent: (text: string) => void;
   onDetail: (detail: SceneDetail) => void;
 };
@@ -64,6 +66,7 @@ export default function Scene({
   graph,
   onPick,
   onFocus,
+  onAdvance,
   onEvent,
   onDetail,
 }: Props) {
@@ -71,11 +74,13 @@ export default function Scene({
     current = useRef(state),
     pick = useRef(onPick),
     focus = useRef(onFocus),
+    advance = useRef(onAdvance),
     event = useRef(onEvent),
     detail = useRef(onDetail);
   current.current = state;
   pick.current = onPick;
   focus.current = onFocus;
+  advance.current = onAdvance;
   event.current = onEvent;
   detail.current = onDetail;
   const [error, setError] = useState(false);
@@ -405,10 +410,7 @@ export default function Scene({
       neighborAlpha = 0;
     const scaleLabel = document.createElement("button");
     scaleLabel.className = "scale-anchor";
-    scaleLabel.addEventListener("click", () => {
-      const id = nextOf(macroLevel);
-      if (id) focus.current(id);
-    });
+    scaleLabel.addEventListener("click", () => advance.current());
     el.appendChild(scaleLabel);
     const anchorGeo = new T.TorusGeometry(1, 0.022, 8, 64);
     geometries.add(anchorGeo);
@@ -421,6 +423,7 @@ export default function Scene({
     materials.add(anchorMat);
     const anchor = new T.Mesh(anchorGeo, anchorMat);
     scene.add(anchor);
+    const effects = interactionEffects(scene);
     const nuclearLinks = makeLine(
       "#edc58d",
       Array.from({ length: 32 }, () => v()),
@@ -463,6 +466,9 @@ export default function Scene({
       lastNavigation = -1,
       lastTheme: boolean | undefined,
       lastInteraction = state.interaction,
+      lastPhase = -1,
+      lastReplay = -1,
+      interactionTime = 0,
       zoomAnchor: string | null = state.focus,
       lastDetail = "",
       detailContext: string | null = null,
@@ -476,11 +482,15 @@ export default function Scene({
       height = el.clientHeight;
       const mobile = width < 768,
         landscape = height < 520 && width > height;
+      const lessonOpen = current.current.interaction !== "none";
+      const lessonWidth = width >= 1150 ? 440 : Math.max(340, width * 0.4);
       const left = mobile ? 16 : landscape ? 215 : width < 1150 ? 260 : 300,
-        right = mobile ? width - 52 : width - 325,
+        right = mobile
+          ? width - 52
+          : width - (lessonOpen ? lessonWidth + 44 : width >= 1150 ? 420 : 325),
         top =
           mobile && height < 650 && current.current.interaction !== "none"
-            ? 135
+            ? 120
             : landscape
               ? 160
               : mobile
@@ -490,7 +500,7 @@ export default function Scene({
                 : 260,
         bottom =
           mobile && current.current.interaction !== "none"
-            ? Math.max(top + 80, height * (height < 650 ? 0.48 : 0.58) - 26)
+            ? Math.max(top + 80, height * (height < 650 ? 0.4 : 0.48) - 28)
             : height - (landscape ? 60 : mobile ? 150 : 95);
       availableW = Math.max(180, right - left);
       availableH = Math.max(90, bottom - top);
@@ -661,8 +671,18 @@ export default function Scene({
       let moving = false;
       if (lastInteraction !== s.interaction) {
         lastInteraction = s.interaction;
+        interactionTime = 0;
         resize();
       }
+      if (lastPhase !== s.phase || lastReplay !== s.interactionReplay) {
+        lastPhase = s.phase;
+        lastReplay = s.interactionReplay;
+        interactionTime = 0;
+      }
+      if (!s.interactionPaused && !reduced && s.interaction !== "none")
+        interactionTime += dt;
+      const animationTime = reduced ? 0.8 : interactionTime;
+      canvas.dataset.animationTime = animationTime.toFixed(3);
       if (lastTheme !== s.light) {
         lastTheme = s.light;
         scene.background = color.set(s.light ? "#edf0f5" : "#111318").clone();
@@ -924,9 +944,23 @@ export default function Scene({
         const atom = views.get(photonAtom)!;
         photon.position
           .copy(atom.world)
-          .add(v(s.phase === 0 ? -3 : 3, 0.35, 0));
+          .add(
+            v(
+              s.phase === 0
+                ? -3.2 + ((animationTime % 2.8) / 2.8) * 2.7
+                : 0.3 + ((animationTime % 2.8) / 2.8) * 3,
+              0.35,
+              0,
+            ),
+          );
+        photon.scale.setScalar(1 + 0.1 * Math.sin(animationTime * 5));
         if (atom.cloud) {
-          atom.cloud.scale.setScalar(s.phase === 1 ? 1.2 : 1);
+          atom.cloud.scale.setScalar(
+            s.phase === 1 ? 1.1 + 0.07 * Math.sin(animationTime * 2.5) : 1,
+          );
+          atom.cloud.visible = true;
+          (atom.cloud.material as T.PointsMaterial).opacity =
+            s.phase === 1 ? 0.4 + 0.15 * Math.sin(animationTime * 2.5) : 0.2;
           (atom.cloud.material as T.PointsMaterial).color.set(
             s.phase === 1 ? "#edc58d" : "#92acdc",
           );
@@ -947,13 +981,15 @@ export default function Scene({
         field.scale.setScalar(0.026);
         (field.material as T.PointsMaterial).sizeAttenuation = false;
         (field.material as T.PointsMaterial).size = 2;
-        (field.material as T.PointsMaterial).opacity = 0.35;
+        (field.material as T.PointsMaterial).opacity =
+          0.28 + 0.16 * (0.5 + 0.5 * Math.sin(animationTime * 1.8));
       }
       for (const { mesh } of bonds) {
         mesh.material.emissive.set(
           s.interaction === "bonds" && s.phase > 0 ? "#b8843d" : "#000000",
         );
-        mesh.material.emissiveIntensity = 0.65;
+        mesh.material.emissiveIntensity =
+          0.65 + 0.45 * (0.5 + 0.5 * Math.sin(animationTime * 3));
       }
       nuclearLinks.visible = s.interaction === "nuclear" && s.phase > 0;
       if (nuclearLinks.visible) {
@@ -976,6 +1012,40 @@ export default function Scene({
             (link.material as T.LineBasicMaterial).color.set("#edc58d");
             (link.material as T.LineBasicMaterial).opacity = 0.9;
           }
+      const effectPaths: T.Vector3[][] = [];
+      const interactionView = views.get(s.focus || "");
+      if (s.interaction === "bonds")
+        for (const { a, b } of bonds)
+          effectPaths.push([
+            views.get(graph.atoms[a])!.world,
+            views.get(graph.atoms[b])!.world,
+          ]);
+      if (s.interaction === "nuclear" && interactionView) {
+        const children = interactionView.node.children.map(
+          (id) => views.get(id)!.world,
+        );
+        children.forEach((p, i) =>
+          effectPaths.push([p, children[(i + 1) % children.length]]),
+        );
+      }
+      if (s.interaction === "strong" && interactionView)
+        for (const link of interactionView.links) {
+          const attr = link.geometry.getAttribute("position");
+          effectPaths.push(
+            Array.from({ length: attr.count }, (_, i) =>
+              link.localToWorld(v(attr.getX(i), attr.getY(i), attr.getZ(i))),
+            ),
+          );
+        }
+      effects.update(
+        s.interaction,
+        s.phase,
+        animationTime,
+        interactionView?.world || v(),
+        s.interaction === "bonds" ? 2 : interactionView?.openRadius || 1,
+        effectPaths,
+        camera.quaternion,
+      );
       if (fitTime > 0) {
         bounds.makeEmpty();
         const focused = s.focus ? views.get(s.focus) : undefined;
@@ -985,7 +1055,9 @@ export default function Scene({
               ? 3300
               : s.focus === "portion"
                 ? 370
-                : 52;
+                : s.interaction === "motion"
+                  ? 64
+                  : 52;
           size.setScalar(extent);
           target.set(0, 0, 0);
         } else if (focused) {
@@ -1067,7 +1139,7 @@ export default function Scene({
       portion.fade(portionAlpha);
       neighborhood.update(
         neighborAlpha,
-        clock,
+        animationTime,
         s.interaction,
         s.phase,
         reduced,
@@ -1080,17 +1152,23 @@ export default function Scene({
       anchor.quaternion.copy(camera.quaternion);
       anchor.position.set(0, 0, 0);
       world.visible = halfView < 90;
-      const anchorPoint = v(0, 0, 0).project(camera);
-      scaleLabel.hidden =
-        !isScale(macroLevel) || !s.labels || s.interaction !== "none";
+      const explorerId = navigationActive
+        ? s.focus || graph.root
+        : isScale(macroLevel)
+          ? macroLevel
+          : detailContext || "molecule";
+      const explorerNext = nextOf(explorerId);
+      const explorerNode = graph.nodes.get(explorerId)!;
+      const anchorPoint = controls.target.clone().project(camera);
+      scaleLabel.hidden = s.interaction !== "none";
+      scaleLabel.disabled = !explorerNext;
+      scaleLabel.dataset.target = explorerNext || "";
+      scaleLabel.dataset.viewpoint = explorerId;
       scaleLabel.style.left = `${((anchorPoint.x + 1) * width) / 2}px`;
-      scaleLabel.style.top = `${((1 - anchorPoint.y) * height) / 2 + Math.min(availableH * 0.22, 95)}px`;
-      scaleLabel.textContent =
-        macroLevel === "neighborhood"
-          ? `Explorer une molécule ${molecules[s.molecule].formula} →`
-          : macroLevel === "portion"
-            ? "Voir les molécules à l’intérieur →"
-            : `${graph.nodes.get("portion")!.entry.name} · explorer →`;
+      scaleLabel.style.top = `${((1 - anchorPoint.y) * height) / 2 + availableH / 2 - 38}px`;
+      scaleLabel.textContent = explorerNext
+        ? `Explorer ${graph.nodes.get(explorerNext)!.entry.name} →`
+        : `${explorerNode.entry.name} · particule élémentaire`;
       controls.zoomToCursor = !isScale(macroLevel);
       canvas.dataset.scale = macroLevel;
       canvas.dataset.interaction = s.interaction;
@@ -1242,6 +1320,7 @@ export default function Scene({
       canvas.removeEventListener("pointerleave", leave);
       canvas.removeEventListener("dblclick", dbl);
       canvas.removeEventListener("webglcontextlost", lost);
+      effects.dispose();
       macro.dispose();
       portion.dispose();
       neighborhood.dispose();

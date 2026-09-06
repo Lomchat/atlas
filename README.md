@@ -8,9 +8,10 @@ An interactive French-language Three.js atlas of matter, from familiar objects t
 
 - Start with a glass of water, a glass of sparkling water or a methane flask. The collection dialog shows the large object in 3D, with a small molecular illustration and the path between them. Browsing and cancelling preserve the current exploration; entering a different material starts at its object.
 - One camera follows object → sampled volume / CO₂ bubble → molecular neighborhood → one molecule → atom → nucleus → nucleon → quark. The reverse path remains available throughout. Surrounding representations fade with the actual camera scale. An anchored marker connects each large level with the next smaller volume.
+- The exploration button inside the scene continues through every scale to the quarks, shares the current named destination and supports rapid repeated clicks. Elementary particles show an explicit endpoint.
 - The two top buttons name their destinations. Repeated clicks immediately update the requested destination, including a reversal during a flight. Macro transitions interpolate distance logarithmically; all button flights last 300 ms with no animation queue. Reduced motion snaps to the destination.
 - Wheel and pinch remain available. At macroscopic scales, wheel zoom stays centered on the sampled volume. Within the molecule, pointer targeting, remembered branches, fixed child coordinates and adaptive layers remain active.
-- Contextual explanations connect an observable effect to its meaning: attractions between water molecules, gas motion and wall collisions, covalent bonds, nuclear cohesion, gluon exchanges, photon absorption/emission, and the Higgs field. Each has three user-controlled moments, a legend, a limitation and a scientific source. Photon energy levels are shown alongside the 3D representation.
+- Contextual explanations connect an observable effect to its meaning: attractions between water molecules, gas motion and wall collisions, covalent bonds, nuclear cohesion, gluon exchanges, photon absorption/emission, and the Higgs field. Each has three user-controlled moments, a legend, a limitation and a scientific source. Animations loop within the selected moment: moving photons, energy halos, traveling highlights, gas trails and water motion. Pause freezes the animation clock; replay restarts the current moment. Reduced motion uses static diagrams. The 440 px desktop explanation panel uses 15 px body text, and camera framing reserves its actual width. Photon energy levels are shown alongside the 3D representation.
 - The macro objects, molecular neighbors and selected microscopic hierarchy share one renderer. Water, carbon dioxide and methane retain their 88, 204 and 84 microscopic nodes excluding the molecule. The three outer nodes describe sampled scales, not actual counts of molecules.
 - Search, theme selection, orbit, annotations, sharing and the composition tree remain available. There is no unfolding gauge.
 
@@ -43,6 +44,7 @@ npm test
 npm run test:rapid
 npm run test:picker
 npm run test:scales
+npm run test:experience
 ATLAS_URL=https://atlas.chalco.website npm test
 ```
 

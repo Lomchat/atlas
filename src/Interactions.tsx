@@ -3,6 +3,8 @@ import {
   ArrowRight,
   ArrowUpRight,
   RotateCcw,
+  Pause,
+  Play,
   X,
 } from "lucide-react";
 import type { ExplorerState, MatterNode } from "./continuum";
@@ -83,7 +85,7 @@ export const lessons: Record<Interaction, Lesson> = {
     ],
     legend:
       "Doré : liaison covalente sélectionnée. Deux bâtonnets : liaison double.",
-    note: "Les nuages détaillés de l’atlas servent à expliquer les constituants. Ils ne calculent pas les orbitales de la molécule.",
+    note: "Les points lumineux soulignent le partage : ce ne sont pas des trajectoires d’électrons. Les nuages ne calculent pas les orbitales moléculaires.",
     source:
       "https://openstax.org/books/chemistry-2e/pages/7-2-covalent-bonding",
   },
@@ -172,7 +174,7 @@ export const lessons: Record<Interaction, Lesson> = {
     ],
     legend:
       "Points violets : représentation symbolique du champ, pas des bosons de Higgs individuels.",
-    note: "Un boson de Higgs est une excitation du champ. Afficher ces points ne signifie pas produire des bosons.",
+    note: "La pulsation sert à repérer le champ ; elle ne montre pas un fluide en mouvement. Les points ne sont pas des bosons produits dans la scène.",
     source: sources.higgs,
   },
 };
@@ -193,13 +195,20 @@ export default function Interactions({
   phase,
   onPhase,
   onClose,
+  paused,
+  onPause,
+  onReplay,
 }: {
   type: Interaction;
   phase: number;
   onPhase: (phase: number) => void;
   onClose: () => void;
+  paused: boolean;
+  onPause: () => void;
+  onReplay: () => void;
 }) {
   const lesson = lessons[type];
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
   return (
     <aside className="lesson-panel glass" aria-label="Comprendre l’interaction">
       <div className="lesson-header">
@@ -227,6 +236,31 @@ export default function Interactions({
             </span>
           </button>
         ))}
+      </div>
+      <div className="lesson-playback">
+        <button
+          onClick={onPause}
+          disabled={reduced}
+          aria-label={
+            paused ? "Reprendre l’animation" : "Mettre l’animation en pause"
+          }
+        >
+          {paused || reduced ? <Play size={15} /> : <Pause size={15} />}
+          <span>
+            {reduced ? "Mouvements réduits" : paused ? "Reprendre" : "Pause"}
+          </span>
+        </button>
+        <button
+          onClick={onReplay}
+          disabled={reduced}
+          aria-label="Relancer l’animation"
+        >
+          <RotateCcw size={14} />
+          <span>Relancer</span>
+        </button>
+        <small>
+          {reduced ? "Schéma fixe" : paused ? "En pause" : "Boucle ralentie"}
+        </small>
       </div>
       <div className="lesson-copy" aria-live="polite">
         <h3>{lesson.steps[phase][0]}</h3>

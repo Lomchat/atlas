@@ -64,6 +64,8 @@ export interface ExplorerState {
     | "photon"
     | "higgs";
   phase: number;
+  interactionPaused: boolean;
+  interactionReplay: number;
 }
 export interface SceneDetail {
   molecule: MoleculeId;
@@ -92,6 +94,8 @@ export const defaultState: ExplorerState = {
   higgs: false,
   interaction: "none",
   phase: 0,
+  interactionPaused: false,
+  interactionReplay: 0,
 };
 export function createGraph(molecule: MoleculeId): MatterGraph {
   const m = molecules[molecule],

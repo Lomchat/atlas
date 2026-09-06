@@ -257,6 +257,18 @@ export function neighborsModel(id: MoleculeId) {
     });
   const box = new T.LineSegments(boxGeo, boxMat);
   group.add(box);
+  const trailGeo = new T.BufferGeometry();
+  trailGeo.setAttribute(
+    "position",
+    new T.BufferAttribute(new Float32Array(30 * 6), 3),
+  );
+  const trailMat = new T.LineBasicMaterial({
+    color: "#c7d7ea",
+    transparent: true,
+    opacity: 0.45,
+  });
+  const trails = new T.LineSegments(trailGeo, trailMat);
+  group.add(trails);
   function update(
     alpha: number,
     time: number,
@@ -270,25 +282,40 @@ export function neighborsModel(id: MoleculeId) {
     entries.forEach(({ group: g, home, seed }) => {
       g.position.copy(home);
       if (interaction === "motion" && phase > 0) {
-        const t = reduced ? phase * 0.6 : time * 0.8;
+        const t = reduced ? phase * 0.6 : time * 2.3;
         const bounce = (x: number) =>
           22 - Math.abs(((((x + 66) % 88) + 88) % 88) - 44);
+        const attr = trailGeo.getAttribute("position") as T.BufferAttribute;
+        attr.setXYZ(
+          seed * 2,
+          bounce(home.x + (t - 0.65) * (1 + (seed % 4))),
+          bounce(home.y + (t - 0.65) * ((seed % 3) - 1) * 2),
+          bounce(home.z + (t - 0.65) * ((seed % 5) - 2)),
+        );
         g.position.set(
           bounce(home.x + t * (1 + (seed % 4))),
           bounce(home.y + t * ((seed % 3) - 1) * 2),
           bounce(home.z + t * ((seed % 5) - 2)),
         );
+        attr.setXYZ(seed * 2 + 1, g.position.x, g.position.y, g.position.z);
       } else if (interaction === "cohesion" && phase > 0) {
         const t = reduced ? phase : time;
         g.position.add(
           new T.Vector3(
-            Math.sin(t * 0.6 + seed) * 0.4,
-            Math.cos(t * 0.7 + seed) * 0.4,
+            Math.sin(t * 0.8 + seed) * 1.3,
+            Math.cos(t * 0.7 + seed) * 1.3,
             0,
           ),
         );
       }
     });
+    trails.visible = interaction === "motion" && phase > 0;
+    if (trails.visible) {
+      (trailGeo.getAttribute("position") as T.BufferAttribute).needsUpdate =
+        true;
+      trailGeo.computeBoundingSphere();
+      trailMat.opacity = alpha * 0.5;
+    }
     links.visible = interaction === "cohesion" && phase > 0;
     if (links.visible) {
       const attr = linkGeo.getAttribute("position") as T.BufferAttribute;
@@ -307,10 +334,22 @@ export function neighborsModel(id: MoleculeId) {
       }
       attr.needsUpdate = true;
       links.computeLineDistances();
-      linkMat.opacity = alpha * 0.6;
+      linkMat.opacity =
+        alpha * (reduced ? 0.7 : 0.5 + 0.25 * Math.sin(time * 2.2));
     }
     box.visible = interaction === "motion" && phase === 2;
-    boxMat.opacity = alpha * 0.25;
+    boxMat.opacity =
+      alpha *
+      (entries.some(
+        (e) =>
+          Math.max(
+            Math.abs(e.group.position.x),
+            Math.abs(e.group.position.y),
+            Math.abs(e.group.position.z),
+          ) > 20.5,
+      )
+        ? 0.6
+        : 0.25);
   }
   return {
     group,
@@ -320,6 +359,8 @@ export function neighborsModel(id: MoleculeId) {
       cylinder.dispose();
       Object.values(mats).forEach((m) => m.dispose());
       bond.dispose();
+      trailGeo.dispose();
+      trailMat.dispose();
       linkGeo.dispose();
       linkMat.dispose();
       boxGeo.dispose();

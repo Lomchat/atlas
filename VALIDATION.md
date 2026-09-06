@@ -28,3 +28,17 @@ Screenshots are saved under `artifacts/scales-*.png`, `artifacts/picker-*.png` a
 The final production build was staged outside the live directory and deployed by atomic directory exchange. The prior version is retained at `releases/before-continuous-scales-20260906T105416Z`. Caddy serves the new `index-CRWpTIfV.js` and `index-BSXBvkCk.css` assets; HTTPS retrieval succeeded. No server configuration change was needed.
 
 The full scale/interaction suite also passed against the public HTTPS deployment, including all three routes, macro wheel traversal, every contextual lesson, all gallery previews, mobile/landscape layouts, persistent renderer identity and no page errors.
+
+## Persistent exploration button and animated lessons
+
+The scene exploration button now uses the same functional navigation action as the top inward control at every scale. It follows remembered branches, accepts rapid click bursts and stays visible at elementary particles with an explicit disabled endpoint. It remains available when annotations are hidden.
+
+All seven lessons now animate within the selected moment. A shared clock drives photon travel, excited-state halos, moving bond/nuclear/gluon highlights, gas trails and molecular motion. Pause freezes that clock; replay restarts the current moment without changing the phase. Reduced motion uses fixed diagrams. The photon excitation halo is shown only during absorption, not after returning to the initial state. Animated highlights remain schematic reading aids.
+
+The desktop lesson panel is 440 px wide with 15 px body text, versus 292 px and 12 px previously. The ordinary desktop inspector is 320 px wide with 14 px descriptive text. Camera fitting reserves the increased panel widths. Mobile and landscape layouts use larger text, with a compact close/header arrangement on very short screens.
+
+The full existing navigation suite passed locally, including ray picking, orbit centering, wheel reversal, hydrogen pinch, search, themes and persistent renderer. The dedicated normal-motion `npm run test:experience` suite passed locally: the scene button alone traversed all three materials to quarks, synchronous bursts clamped at the endpoint, all seven lessons visibly changed between frames while staying on the same phase, pause and replay worked, and mobile/landscape/reduced-motion behavior passed without page errors. A final targeted 320 × 568 check verified all three larger water-explanation paragraphs fit above the controls and the close button stayed accessible. Screenshots are in `artifacts/experience-*.png`.
+
+The final build passed TypeScript and Vite checks and was deployed by atomic directory exchange. The previous version is retained at `releases/before-animated-lessons-20260906T111653Z`. The public HTTPS document serves `index-DfeblLVq.js` and `index-D7dE0_ZF.css` successfully.
+
+The full experience suite also passed against the public HTTPS deployment, including the remembered non-default hydrogen/quark branch, seven animated lessons, pause/replay, desktop/mobile/landscape layouts, reduced motion, stable renderer and no page errors.
