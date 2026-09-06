@@ -31,21 +31,25 @@ function Flag({ locale }: { locale: Locale }) {
 export default function LanguagePicker() {
   const locale = useLocale();
   return (
-    <label className="language-picker">
-      <Flag locale={locale} />
-      <select
-        data-language-switch
-        aria-label={t("Choose language")}
-        value={locale}
-        onChange={(event) => setLocale(event.target.value as Locale)}
-      >
-        <option value="en" lang="en">
-          English
-        </option>
-        <option value="fr" lang="fr">
-          Français
-        </option>
-      </select>
-    </label>
+    <div
+      className="language-picker"
+      role="group"
+      aria-label={t("Choose language")}
+    >
+      {(["fr", "en"] as const).map((language) => (
+        <button
+          key={language}
+          type="button"
+          data-language-switch={language}
+          lang={language}
+          aria-label={t(language === "fr" ? "Français" : "English")}
+          title={t(language === "fr" ? "Français" : "English")}
+          aria-pressed={locale === language}
+          onClick={() => setLocale(language)}
+        >
+          <Flag locale={language} />
+        </button>
+      ))}
+    </div>
   );
 }

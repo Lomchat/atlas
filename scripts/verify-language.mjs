@@ -39,9 +39,9 @@ const ready = (target) =>
   }, target);
 const change = async (value) => {
   await page
-    .locator("[data-language-switch]:visible")
+    .locator(`[data-language-switch="${value}"]:visible`)
     .last()
-    .selectOption(value);
+    .click();
   await page.waitForFunction(
     (value) =>
       document.documentElement.lang === value &&
@@ -60,16 +60,36 @@ try {
     await page.locator("h1").innerText(),
     locale === "fr" ? "Matière Atlas02" : "Matter Atlas02",
   );
-  assert.equal(
-    await page
-      .locator(".identity [data-language-flag]")
-      .getAttribute("data-language-flag"),
-    locale,
-  );
+  const assertFlags = async (active) => {
+    const picker = page.locator(".language-picker:visible").last();
+    assert.equal(await picker.locator("select").count(), 0);
+    assert.equal(await picker.getByRole("button").count(), 2);
+    for (const language of ["fr", "en"]) {
+      const button = picker.locator(`[data-language-switch="${language}"]`);
+      assert.equal(await button.isVisible(), true);
+      assert.equal(
+        await button.getAttribute("aria-pressed"),
+        String(language === active),
+      );
+      assert.equal(
+        await button.locator(`[data-language-flag="${language}"]`).isVisible(),
+        true,
+      );
+    }
+  };
+  await assertFlags(locale);
   const identity = await canvas().getAttribute("data-scene-id");
   const distance = await canvas().getAttribute("data-camera-distance");
   const nameBefore = await page.locator(".detail-panel h2").innerText();
+  // Both native buttons work from the keyboard without moving the scene.
+  await page.locator(`.identity [data-language-switch="${other}"]`).focus();
+  await page.keyboard.press("Enter");
+  await assertFlags(other);
+  await page.locator(`.identity [data-language-switch="${locale}"]`).focus();
+  await page.keyboard.press("Space");
+  await assertFlags(locale);
   await change(other);
+  await assertFlags(other);
   assert.equal(await canvas().getAttribute("data-scene-id"), identity);
   assert.equal(await canvas().getAttribute("data-camera-distance"), distance);
   assert.equal(await canvas().getAttribute("data-viewpoint"), "atom-1");
@@ -112,6 +132,7 @@ try {
   const previewHandle = await preview.elementHandle();
   const before = await preview.screenshot();
   await change(other);
+  await assertFlags(other);
   assert.equal(
     await previewHandle.evaluate((el) => el.isConnected),
     true,
@@ -154,9 +175,8 @@ try {
     await ready("neighborhood");
     await change(other);
     await change(locale);
-    const flag = await page
-      .locator(".identity [data-language-switch]")
-      .boundingBox();
+    await assertFlags(locale);
+    const flag = await page.locator(".identity .language-picker").boundingBox();
     assert.ok(
       flag &&
         flag.x >= 0 &&
@@ -218,12 +238,12 @@ try {
   });
   await blocked.goto(base, { waitUntil: "networkidle" });
   await assertLocale(blocked);
-  await blocked.locator("[data-language-switch]:visible").selectOption(other);
+  await blocked.locator(`[data-language-switch="${other}"]:visible`).click();
   assert.equal(await blocked.locator("html").getAttribute("lang"), other);
   await blocked.close();
   assert.deepEqual(errors, []);
   console.log(
-    `PASS ${locale}: flags, live state and texture preservation, URL/storage/browser precedence, responsive access and translated fallbacks`,
+    `PASS ${locale}: two visible flag buttons, active state and keyboard access, live state and texture preservation, URL/storage/browser precedence, responsive access and translated fallbacks`,
   );
 } finally {
   await browser.close();

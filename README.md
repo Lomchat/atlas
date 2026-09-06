@@ -6,7 +6,7 @@ An interactive English/French Three.js atlas of matter, from familiar objects to
 
 ## Languages
 
-Choose English or French using the flag selector in the upper-left corner (also available inside dialogs). Language changes preserve your molecule, zoom, orbit, lesson and gallery selection. All UI, scientific explanations, accessibility labels and the flask label update in place.
+Choose English or French using the two always-visible flag buttons in the upper-left corner (also available inside dialogs). Language changes preserve your molecule, zoom, orbit, lesson and gallery selection. All UI, scientific explanations, accessibility labels and the flask label update in place.
 
 A valid `?lang=en` or `?lang=fr` link takes priority over a saved preference, then the browser language; other browser languages default to English. Shared exploration URLs include the language. English and French messages live in `src/locales/en.json` and `src/locales/fr.json` and are accessed through the typed `t()` helper.
 

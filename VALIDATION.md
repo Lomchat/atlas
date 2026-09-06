@@ -74,3 +74,13 @@ Both catalogs contain 369 matching message keys. UI text, accessible names, noti
 The final TypeScript/Vite build and `git diff --check` passed. All six suites passed in both locales (12 successful runs): detailed navigation, rapid navigation, gallery, all scales/interactions, animated explanations, and language switching. The language suite additionally verifies a paused animation remains paused, URL/storage/browser precedence, the absence of renderer replacement, in-place flask texture translation, small-screen access, unavailable storage and the WebGL error UI. Final catalog/UI/test-fixture guards passed. English and French desktop, small mobile and landscape screenshots were inspected.
 
 The build was deployed by atomic directory exchange. The previous version is retained at `releases/before-bilingual-20260906T182926Z`. Public HTTPS serves `index-Dt45TcxO.js` and `index-Dr-4u3d2.css`. The language suite also passed in both directions against production. Full local and public summaries are retained in ignored artifacts as `test-matrix-local.json` and `test-matrix-public.json`. Local deployment configuration remains ignored and absent from the published branch history.
+
+## Always-visible language buttons — 2026-09-06
+
+Replaced the language dropdown with adjacent French and British SVG flag buttons in the identity bar and dialog headers. Both remain visible; the active language has a border and an accessible pressed state. Native buttons support keyboard activation, with translated group labels and language endonyms. Existing language persistence and exploration state are preserved.
+
+The staged TypeScript/production build and whitespace checks passed. All six browser suites passed in English and French: the initial `npm test` completed the experience pair before its process was interrupted (SIGTERM); the remaining five suites were resumed through the same bilingual matrix and all ten runs passed. The language scenario now checks both visible flags, active state, Enter/Space activation, dialog access and small-screen bounds. Desktop, mobile, landscape and gallery screenshots were inspected. The remaining-suite report and log are retained under ignored `artifacts/flag-buttons-remaining-local.json` and `artifacts/flag-buttons-tests.log`.
+
+The atomic release serves `index-Csj4s78w.js` and `index-Bw8CVUrR.css`. The previous live version is retained at `releases/before-flag-buttons-20260906T184551Z`.
+
+The language suite also passed in both languages against public HTTPS after deployment, including keyboard activation, state preservation, responsive access and storage/graphics fallbacks. Results are retained in `artifacts/flag-buttons-public.json`.
