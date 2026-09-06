@@ -244,9 +244,9 @@ export default function App() {
   async function share() {
     try {
       await navigator.clipboard.writeText(location.href);
-      notify("Lien de cette exploration copié");
+      notify("Exploration link copied");
     } catch {
-      notify("Cette exploration est conservée dans l’adresse de la page");
+      notify("This exploration is saved in the page address");
     }
   }
   async function fullscreen() {
@@ -254,7 +254,7 @@ export default function App() {
       if (document.fullscreenElement) await document.exitFullscreen();
       else await document.documentElement.requestFullscreen();
     } catch {
-      notify("Plein écran indisponible sur ce navigateur");
+      notify("Fullscreen is unavailable in this browser");
     }
   }
   useEffect(() => {
@@ -343,7 +343,7 @@ export default function App() {
           <button
             className={"tree-caret " + (expanded ? "expanded" : "")}
             onClick={() => approach(n.id)}
-            aria-label={`Explorer ${n.entry.name}`}
+            aria-label={`Explore ${n.entry.name}`}
             disabled={!n.children.length}
           >
             {n.children.length ? <ChevronRight size={12} /> : <span />}
@@ -400,39 +400,39 @@ export default function App() {
       <div className="vignette" />
       <header className="identity">
         <div className="eyebrow">
-          <span /> EXPLORER LA MATIÈRE
+          <span /> EXPLORE MATTER
         </div>
         <h1>
-          Matière <em>Atlas</em>
+          Matter <em>Atlas</em>
           <sup>02</sup>
         </h1>
-        <p>Du monde visible à l’intérieur des atomes.</p>
+        <p>From the visible world to the inside of atoms.</p>
       </header>
-      <nav className="top-actions" aria-label="Outils de l’atlas">
+      <nav className="top-actions" aria-label="Atlas tools">
         <button
           className="search-trigger"
-          aria-label="Rechercher"
+          aria-label="Search"
           onClick={() => {
             setQuery("");
             setModal("search");
           }}
         >
           <Search size={15} />
-          <span>Rechercher</span>
+          <span>Search</span>
           <kbd>/</kbd>
         </button>
         <IconButton
-          label={state.light ? "Mode sombre" : "Mode clair"}
+          label={state.light ? "Dark mode" : "Light mode"}
           icon={state.light ? Moon : Sun}
           onClick={() => update({ light: !state.light })}
         />
         <IconButton
-          label="Partager cette exploration"
+          label="Share this exploration"
           icon={Share2}
           onClick={share}
         />
         <IconButton
-          label="À propos"
+          label="About"
           icon={CircleHelp}
           onClick={() => setModal("about")}
         />
@@ -440,7 +440,7 @@ export default function App() {
       <div className="subject-selector">
         <button
           className="molecule-trigger"
-          aria-label="Choisir une molécule"
+          aria-label="Choose a molecule"
           aria-haspopup="dialog"
           onClick={() => setModal("molecules")}
         >
@@ -448,23 +448,23 @@ export default function App() {
           <small>{mol.formula}</small>
           <ChevronDown size={13} />
         </button>
-        <div className="breadcrumb" aria-label="Appartenance dans la molécule">
+        <div className="breadcrumb" aria-label="Path through matter">
           {path.map((n, i) => (
             <span key={n.id}>
               {i > 0 && <ChevronRight size={10} />}
               <button onClick={() => approach(n.id)} title={n.entry.name}>
                 {isScale(n.id)
                   ? n.id === "sample"
-                    ? "Objet"
+                    ? "Object"
                     : n.id === "portion"
                       ? "Volume"
-                      : "Voisinage"
+                      : "Neighborhood"
                   : n.kind === "molecule"
                     ? mol.formula
                     : n.kind === "atom"
                       ? n.entry.name
                       : n.kind === "nucleus"
-                        ? "Noyau"
+                        ? "Nucleus"
                         : n.entry.name}
               </button>
             </span>
@@ -473,7 +473,7 @@ export default function App() {
       </div>
       <nav
         className="zoom-navigation glass"
-        aria-label="Naviguer dans la matière"
+        aria-label="Navigate through matter"
       >
         <button
           data-direction="out"
@@ -481,15 +481,13 @@ export default function App() {
           disabled={!parent}
           onClick={() => step("out")}
           aria-label={
-            parent
-              ? `Zoom arrière vers ${parent.entry.name}`
-              : "Zoom arrière · Vue d’ensemble"
+            parent ? `Zoom out to ${parent.entry.name}` : "Zoom out · Overview"
           }
         >
           <Minus size={18} />
           <span>
-            <small>ZOOM ARRIÈRE</small>
-            <strong>{parent?.entry.name || "Vue d’ensemble"}</strong>
+            <small>ZOOM OUT</small>
+            <strong>{parent?.entry.name || "Overview"}</strong>
           </span>
         </button>
         <i />
@@ -500,12 +498,12 @@ export default function App() {
           onClick={() => step("in")}
           aria-label={
             next
-              ? `Zoom avant vers ${next.entry.name}`
-              : `Zoom avant · ${node.entry.name}, particule élémentaire`
+              ? `Zoom in to ${next.entry.name}`
+              : `Zoom in · ${node.entry.name}, elementary particle`
           }
         >
           <span>
-            <small>{next ? "ZOOM AVANT" : "PARTICULE ÉLÉMENTAIRE"}</small>
+            <small>{next ? "ZOOM IN" : "ELEMENTARY PARTICLE"}</small>
             <strong>{next?.entry.name || node.entry.name}</strong>
           </span>
           <Plus size={18} />
@@ -515,34 +513,34 @@ export default function App() {
         className={
           "tree-panel glass " + (panel === "tree" ? "mobile-open" : "")
         }
-        aria-label="Composition imbriquée"
+        aria-label="Nested composition"
       >
         <div className="panel-heading">
-          <span>Du visible à l’infiniment petit</span>
+          <span>From the visible to the subatomic</span>
           <button
             className="mobile-only icon-button"
-            aria-label="Fermer la composition"
+            aria-label="Close composition"
             onClick={() => setPanel(null)}
           >
             <X size={15} />
           </button>
         </div>
         <p className="panel-hint">
-          Suivez un volume, une molécule, puis ses constituants.
+          Follow a volume, a molecule, then its building blocks.
         </p>
         <div className="tree-scroll">{row(graph.nodes.get(graph.root)!)}</div>
         <div className="composition-summary">
           <span className="composition-caption">
-            Dans une molécule {mol.formula}
+            In one molecule of {mol.formula}
           </span>
           <span>
-            <b>{graph.totals.electrons}</b> électrons
+            <b>{graph.totals.electrons}</b> electrons
           </span>
           <span>
-            <b>{graph.totals.nucleons}</b> nucléons
+            <b>{graph.totals.nucleons}</b> nucleons
           </span>
           <span>
-            <b>{graph.totals.quarks}</b> quarks de valence
+            <b>{graph.totals.quarks}</b> valence quarks
           </span>
         </div>
         <div className="display-options">
@@ -552,7 +550,7 @@ export default function App() {
             toggle={() => update({ labels: !state.labels })}
           />
           <Switch
-            label="Enveloppes & nuages"
+            label="Shells & clouds"
             value={state.cloud}
             toggle={() => update({ cloud: !state.cloud })}
           />
@@ -560,25 +558,25 @@ export default function App() {
         <div className="tree-foot">
           <span className="tiny-dot" />
           {isScale(node.id)
-            ? "Un volume repère · molécules illustratives"
-            : `${visibleCount} constituants affichés · Détail adaptatif`}
+            ? "Reference volume · illustrative molecules"
+            : `${visibleCount} constituents shown · Adaptive detail`}
         </div>
       </aside>
       <div className="view-controls glass">
         <IconButton
-          label={state.rotate ? "Arrêter la rotation" : "Rotation automatique"}
+          label={state.rotate ? "Stop rotation" : "Auto-rotate"}
           icon={state.rotate ? Pause : RotateCw}
           active={state.rotate}
           onClick={() => update({ rotate: !state.rotate })}
         />
         <IconButton
-          label="Revenir à l’objet entier"
+          label="Return to the whole object"
           icon={Crosshair}
           onClick={overview}
         />
         {document.fullscreenEnabled && (
           <IconButton
-            label="Plein écran"
+            label="Fullscreen"
             icon={Maximize2}
             onClick={fullscreen}
           />
@@ -590,16 +588,16 @@ export default function App() {
           (panel === "details" ? "mobile-open" : "") +
           (!inspector ? " dismissed" : "")
         }
-        aria-label="Constituant sélectionné"
+        aria-label="Selected constituent"
       >
         <div className="detail-top">
           <span className="eyebrow">
             {node.kind === "molecule"
-              ? "VUE D’ENSEMBLE"
+              ? "OVERVIEW"
               : kindNames[node.kind].toUpperCase()}
           </span>
           <IconButton
-            label="Fermer les détails"
+            label="Close details"
             icon={X}
             onClick={() => {
               setInspector(false);
@@ -618,7 +616,7 @@ export default function App() {
           <button className="belongs-to" onClick={() => approach(node.parent!)}>
             <ArrowLeft size={11} />
             <span>
-              Dans {graph.nodes.get(node.parent)!.entry.name.toLowerCase()}
+              Inside {graph.nodes.get(node.parent)!.entry.name.toLowerCase()}
             </span>
           </button>
         )}
@@ -629,18 +627,20 @@ export default function App() {
             <span>
               {isScale(node.id) ? (
                 <>
-                  Zoom sur <strong>{next?.entry.name}</strong>
+                  Zoom into <strong>{next?.entry.name}</strong>
                 </>
               ) : (
                 <>
-                  Contient <strong>{node.children.length}</strong>{" "}
+                  Contains <strong>{node.children.length}</strong>{" "}
                   {node.kind === "molecule"
-                    ? "atomes"
+                    ? "atoms"
                     : node.kind === "atom"
-                      ? "constituants"
+                      ? "constituents"
                       : node.kind === "nucleus"
-                        ? "nucléons"
-                        : "quarks de valence"}
+                        ? node.children.length === 1
+                          ? "nucleon"
+                          : "nucleons"
+                        : "valence quarks"}
                 </>
               )}
             </span>
@@ -658,14 +658,14 @@ export default function App() {
           {next && (
             <button className="primary-action" onClick={() => step("in")}>
               <Plus size={15} />
-              <span>Explorer {next.entry.name}</span>
+              <span>Explore {next.entry.name}</span>
               <ChevronRight size={13} />
             </button>
           )}
           {parent && (
             <button className="secondary-action" onClick={() => step("out")}>
               <ArrowLeft size={14} />
-              <span>Revenir à {parent.entry.name}</span>
+              <span>Return to {parent.entry.name}</span>
             </button>
           )}
         </div>
@@ -675,7 +675,7 @@ export default function App() {
           target="_blank"
           rel="noreferrer"
         >
-          Source scientifique <ArrowUpRight size={11} />
+          Scientific source <ArrowUpRight size={11} />
         </a>
       </aside>
       <div className="interaction-controls glass">
@@ -690,13 +690,13 @@ export default function App() {
         </button>
         <button
           onClick={() => startInteraction("photon")}
-          aria-label="Comprendre le photon"
+          aria-label="Understand the photon"
         >
-          <span>Lumière</span>
+          <span>Light</span>
         </button>
         <button
           onClick={() => startInteraction("higgs")}
-          aria-label="Comprendre le champ de Higgs"
+          aria-label="Understand the Higgs field"
         >
           <Sparkles size={14} />
           <span>Higgs</span>
@@ -728,17 +728,14 @@ export default function App() {
         <div className="event-status" role="status">
           <span />
           {eventText}
-          <button
-            aria-label="Masquer le message"
-            onClick={() => setEventText("")}
-          >
+          <button aria-label="Dismiss message" onClick={() => setEventText("")}>
             <X size={10} />
           </button>
         </div>
       )}
       <button
         className="composition-trigger glass mobile-only"
-        aria-label="Afficher la composition"
+        aria-label="Show composition"
         onClick={() => {
           setPanel(panel === "tree" ? null : "tree");
           setInspector(true);
@@ -750,11 +747,11 @@ export default function App() {
       <div className="lower-left">
         <span className="mini-formula">{mol.formula}</span>
         <span>
-          {isScale(node.id) ? node.entry.category : "Une molécule repérée."}
+          {isScale(node.id) ? node.entry.category : "One molecule in focus."}
           <br />
           {isScale(node.id)
-            ? "Échelles raccordées · échantillon illustratif"
-            : "Tous ses constituants."}
+            ? "Connected scales · illustrative sample"
+            : "All its building blocks."}
         </span>
       </div>
       <button
@@ -763,18 +760,19 @@ export default function App() {
           setInspector(true);
           setPanel("details");
         }}
-        aria-label="Afficher les détails"
+        aria-label="Show details"
       >
         <CircleHelp size={15} />
-        <span>{node.kind === "molecule" ? "À la loupe" : node.entry.name}</span>
+        <span>
+          {node.kind === "molecule" ? "A closer look" : node.entry.name}
+        </span>
       </button>
       <footer>
         <span>
-          Glisser : tourner <b>·</b> Molette : explorer les couches <b>·</b>{" "}
-          Clic : se rapprocher
+          Drag: rotate <b>·</b> Scroll: explore layers <b>·</b> Click: zoom in
         </span>
         <button onClick={() => setModal("about")}>
-          Schéma pédagogique · Échelles adaptées <ArrowUpRight size={11} />
+          Illustrative model · Adjusted scales <ArrowUpRight size={11} />
         </button>
       </footer>
       {message && (
@@ -803,9 +801,9 @@ export default function App() {
         aria-labelledby="dialog-title"
       >
         <div className="dialog-heading">
-          <span className="eyebrow">MATIÈRE ATLAS</span>
+          <span className="eyebrow">MATTER ATLAS</span>
           <IconButton
-            label="Fermer la fenêtre"
+            label="Close dialog"
             icon={X}
             onClick={() => setModal(null)}
           />
@@ -821,15 +819,15 @@ export default function App() {
           />
         ) : modal === "search" ? (
           <>
-            <h2 id="dialog-title">À l’intérieur de {mol.formula}</h2>
+            <h2 id="dialog-title">Inside {mol.formula}</h2>
             <div className="search-box">
               <Search size={18} />
               <input
                 ref={searchRef}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Oxygène, noyau, proton, électron…"
-                aria-label="Rechercher un constituant"
+                placeholder="Oxygen, nucleus, proton, electron…"
+                aria-label="Search for a constituent"
               />
             </div>
             <div className="search-results">
@@ -853,63 +851,61 @@ export default function App() {
                       {ancestors(graph, n.id)
                         .slice(0, -1)
                         .map((a) => a.entry.name)
-                        .join(" › ") || "La molécule entière"}
+                        .join(" › ") || "The whole molecule"}
                     </small>
                   </span>
                   <Crosshair size={14} />
                 </button>
               ))}
               {!results.length && (
-                <p>Aucun constituant trouvé dans cette molécule.</p>
+                <p>No constituents found in this molecule.</p>
               )}
             </div>
           </>
         ) : (
           <>
-            <h2 id="dialog-title">Tout est lié.</h2>
+            <h2 id="dialog-title">Everything is connected.</h2>
             <p>
-              Le zoom part d’un objet, traverse un volume repère et son
-              voisinage moléculaire, puis suit une seule molécule. Les
-              changements d’échelle sont adaptés ; les molécules visibles
-              constituent un échantillon illustratif. Ses atomes contiennent
-              leurs noyaux et leurs électrons ; les noyaux contiennent leurs
-              nucléons ; les protons et les neutrons révèlent leurs trois quarks
-              de valence.
+              The zoom starts with an object, passes through a reference volume
+              and its molecular neighborhood, then follows a single molecule.
+              Scale changes are adjusted; the visible molecules are an
+              illustrative sample. Atoms contain nuclei and electrons; nuclei
+              contain nucleons; protons and neutrons reveal their three valence
+              quarks.
             </p>
-            <h3>Explorez directement</h3>
+            <h3>Explore freely</h3>
             <p>
-              Utilisez les deux boutons du haut : chacun indique la destination
-              du rapprochement ou du retour. La molette et le pincement
-              permettent aussi de progresser. Cliquez sur un constituant pour
-              centrer le zoom sur lui ; les boutons, la fiche et le fil
-              d’appartenance suivent votre position dans la matière. En
-              reculant, les détails se regroupent dans leur enveloppe.
+              Use the two buttons at the top: each names the destination you
+              will reach by zooming in or out. You can also scroll or pinch to
+              explore. Click a constituent to center the zoom on it; the
+              buttons, information panel and breadcrumb follow your position
+              within the matter. As you zoom out, details merge back into their
+              enclosing structure.
             </p>
-            <h3>Ce que représente la scène</h3>
+            <h3>What the scene represents</h3>
             <p>{node.entry.note}</p>
             <p>
-              Les sphères et leurs enveloppes ne sont pas des parois physiques.
-              Les tailles sont adaptées, les nuages électroniques sont
-              illustratifs et les électrons marqués servent à la sélection. Les
-              quarks restent confinés : leur représentation séparée est un
-              schéma de composition. Les gluons sont figurés par les courbes
-              entre quarks.
+              The spheres and their shells are not physical walls. Sizes are
+              adjusted, electron clouds are illustrative and marked electrons
+              are selection aids. Quarks remain confined: showing them
+              separately is a diagram of composition. Curves between quarks
+              represent gluons.
             </p>
             <p>
-              Le photon et le boson de Higgs ne sont pas des morceaux cachés
-              dans un électron. Le photon illustre un échange d’énergie avec un
-              atome. Le volume du champ de Higgs est une représentation
-              conceptuelle. Les trajets et mouvements sont schématiques.
+              Photons and Higgs bosons are not hidden pieces inside an electron.
+              The photon illustrates an exchange of energy with an atom. The
+              Higgs field volume is a conceptual representation. Paths and
+              movements are schematic.
             </p>
-            <h3>Sources & inspirations</h3>
+            <h3>Sources & inspiration</h3>
             <a href={sources.cern} target="_blank" rel="noreferrer">
-              CERN · Particules et interactions <ArrowUpRight size={12} />
+              CERN · Particles and interactions <ArrowUpRight size={12} />
             </a>
             <a href={sources.atom} target="_blank" rel="noreferrer">
-              OpenStax · Structure atomique <ArrowUpRight size={12} />
+              OpenStax · Atomic structure <ArrowUpRight size={12} />
             </a>
             <p>
-              Interface inspirée de{" "}
+              Interface inspired by{" "}
               <a
                 href="https://github.com/ashemag/human-atlas"
                 target="_blank"
@@ -917,7 +913,7 @@ export default function App() {
               >
                 Human Atlas
               </a>{" "}
-              et{" "}
+              and{" "}
               <a
                 href="https://github.com/ashemag/model-x-studio"
                 target="_blank"
@@ -925,13 +921,11 @@ export default function App() {
               >
                 Model X Studio
               </a>
-              , par ashemag.{" "}
-              <a href="/licenses/human-atlas.txt">Licence MIT de Human Atlas</a>
-              .
+              , by ashemag.{" "}
+              <a href="/licenses/human-atlas.txt">Human Atlas MIT license</a>.
             </p>
             <p className="shortcuts">
-              R : rassembler · L : annotations · Espace : animer · / :
-              rechercher
+              R: reset · L: labels · + / −: zoom · /: search
             </p>
             <div className="particle-reference">
               <Atom size={16} />

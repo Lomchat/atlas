@@ -109,10 +109,7 @@ export default function Scene({
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = T.PCFSoftShadowMap;
     const canvas = renderer.domElement;
-    canvas.setAttribute(
-      "aria-label",
-      "Molécule et constituants imbriqués en 3D",
-    );
+    canvas.setAttribute("aria-label", "Molecule and nested constituents in 3D");
     canvas.dataset.sceneId = crypto.randomUUID();
     el.appendChild(canvas);
     const scene = new T.Scene();
@@ -301,7 +298,7 @@ export default function Scene({
       const label = document.createElement("button");
       label.className = "atom-label";
       label.dataset.node = node.id;
-      label.setAttribute("aria-label", `Inspecter ${node.entry.name}`);
+      label.setAttribute("aria-label", `Inspect ${node.entry.name}`);
       label.innerHTML = `<span class="label-symbol">${node.entry.symbol}</span><span class="label-name">${node.entry.name}</span>`;
       label.style.setProperty("--particle", node.entry.color);
       label.onclick = () => pick.current(node.id);
@@ -621,7 +618,7 @@ export default function Scene({
       if (hover) {
         preferVisible(hover);
         const node = graph.nodes.get(hover)!;
-        tooltip.textContent = `${node.entry.name} · ${node.children.length ? "cliquer pour se rapprocher" : "particule élémentaire"}`;
+        tooltip.textContent = `${node.entry.name} · ${node.children.length ? "click to zoom in" : "elementary particle"}`;
         tooltip.style.left = Math.min(width - 245, e.clientX + 15) + "px";
         tooltip.style.top = Math.min(height - 110, e.clientY + 18) + "px";
       }
@@ -1167,8 +1164,8 @@ export default function Scene({
       scaleLabel.style.left = `${((anchorPoint.x + 1) * width) / 2}px`;
       scaleLabel.style.top = `${((1 - anchorPoint.y) * height) / 2 + availableH / 2 - 38}px`;
       scaleLabel.textContent = explorerNext
-        ? `Explorer ${graph.nodes.get(explorerNext)!.entry.name} →`
-        : `${explorerNode.entry.name} · particule élémentaire`;
+        ? `Explore ${graph.nodes.get(explorerNext)!.entry.name} →`
+        : `${explorerNode.entry.name} · elementary particle`;
       controls.zoomToCursor = !isScale(macroLevel);
       canvas.dataset.scale = macroLevel;
       canvas.dataset.interaction = s.interaction;
@@ -1276,7 +1273,7 @@ export default function Scene({
           open: opened,
           readable,
           count,
-          layer: ["Atomes", "Noyaux & électrons", "Nucléons", "Quarks"][layer],
+          layer: ["Atoms", "Nuclei & electrons", "Nucleons", "Quarks"][layer],
           context: detailContext,
           viewpoint,
           next: nextOf(viewpoint),
@@ -1340,9 +1337,9 @@ export default function Scene({
     <div className="scene" ref={host}>
       {error && (
         <div className="scene-error">
-          <strong>La scène 3D est en pause.</strong>
-          <p>Rechargez l’atlas avec l’accélération graphique activée.</p>
-          <button onClick={() => location.reload()}>Recharger</button>
+          <strong>The 3D scene is paused.</strong>
+          <p>Reload the atlas with graphics acceleration enabled.</p>
+          <button onClick={() => location.reload()}>Reload</button>
         </div>
       )}
     </div>

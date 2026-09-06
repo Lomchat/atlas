@@ -136,15 +136,15 @@ export function createGraph(molecule: MoleculeId): MatterGraph {
       id: "molecule",
       name:
         molecule === "water"
-          ? "Molécule d’eau"
+          ? "Water molecule"
           : molecule === "co2"
-            ? "Molécule de CO₂"
-            : "Molécule de méthane",
+            ? "CO₂ molecule"
+            : "Methane molecule",
       symbol: m.formula,
       color: "#c6cbd4",
-      category: "MOLÉCULE",
-      description: `${m.name} est composée de ${m.atoms.length} atomes liés. Ouvrez un atome pour voir son noyau et ses électrons, puis un nucléon pour révéler ses quarks. Tout reste dans cette même molécule.`,
-      note: "La décomposition est une vue pédagogique de la composition, pas une réaction chimique. Les dimensions sont adaptées pour rendre visibles les structures imbriquées.",
+      category: "MOLECULE",
+      description: `A ${m.name.toLowerCase()} molecule consists of ${m.atoms.length} bonded atoms. Enter an atom to see its nucleus and electrons, then a nucleon to reveal its quarks. You remain inside the same molecule.`,
+      note: "The breakdown illustrates composition, not a chemical reaction. Dimensions are adjusted to reveal the nested structures.",
       facts: m.facts,
       source: m.source,
     },
@@ -179,7 +179,7 @@ export function createGraph(molecule: MoleculeId): MatterGraph {
       entry: {
         ...nucleusEntry(a.element),
         id: nucleus,
-        name: `Noyau ${isotopeSymbol(a.element)}`,
+        name: `Nucleus ${isotopeSymbol(a.element)}`,
       },
     });
     for (let j = 0; j < e.z + e.n; j++) {
@@ -229,7 +229,7 @@ export function createGraph(molecule: MoleculeId): MatterGraph {
         index: j,
         element: a.element,
         children: [],
-        entry: { ...particles.electron, id: eid, name: `Électron ${j + 1}` },
+        entry: { ...particles.electron, id: eid, name: `Electron ${j + 1}` },
       });
       totals.electrons++;
     }
@@ -254,15 +254,15 @@ export function expansion(node: MatterNode, state: ExplorerState): number {
     : 0;
 }
 export const kindNames: Record<Kind, string> = {
-  sample: "objet",
+  sample: "object",
   portion: "volume",
-  neighborhood: "voisinage",
-  molecule: "molécule",
-  atom: "atome",
-  nucleus: "noyau",
+  neighborhood: "neighborhood",
+  molecule: "molecule",
+  atom: "atom",
+  nucleus: "nucleus",
   proton: "proton",
   neutron: "neutron",
-  electron: "électron",
-  up: "quark up",
-  down: "quark down",
+  electron: "electron",
+  up: "up quark",
+  down: "down quark",
 };

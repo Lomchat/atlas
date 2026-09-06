@@ -1168,8 +1168,8 @@ input[type="range"]::-moz-range-thumb {
     width: 30px;
     height: 31px;
   }
-  .top-actions > button[aria-label="Partager cette exploration"],
-  .top-actions > button[aria-label="À propos"],
+  .top-actions > button[aria-label="Share this exploration"],
+  .top-actions > button[aria-label="About"],
   .search-trigger > span,
   .search-trigger kbd {
     display: none;
@@ -1311,7 +1311,7 @@ input[type="range"]::-moz-range-thumb {
     height: 33px;
     width: 31px;
   }
-  .view-controls > button[aria-label="Plein écran"] {
+  .view-controls > button[aria-label="Fullscreen"] {
     display: none;
   }
   .view-controls > i {
@@ -2424,7 +2424,7 @@ input[type="range"]::-moz-range-thumb {
   .interaction-controls button {
     padding: 6px 8px;
   }
-  .interaction-controls button[aria-label="Comprendre le champ de Higgs"] {
+  .interaction-controls button[aria-label="Understand the Higgs field"] {
     display: none;
   }
   .lesson-panel {

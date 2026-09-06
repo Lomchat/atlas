@@ -21,7 +21,7 @@ page.setDefaultTimeout(20000);
 const errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
 const open = () =>
-  page.getByRole("button", { name: "Choisir une molécule" }).click();
+  page.getByRole("button", { name: "Choose a molecule" }).click();
 const canvas = () => page.locator("canvas[data-scene-id]");
 const preview = () => page.locator(".molecule-preview canvas");
 const ready = (id) =>
@@ -74,7 +74,7 @@ try {
   assert.equal(await canvas().getAttribute("data-viewpoint"), "atom-0/nucleus");
   assert.equal(
     await page
-      .getByRole("button", { name: "Choisir une molécule" })
+      .getByRole("button", { name: "Choose a molecule" })
       .evaluate((e) => document.activeElement === e),
     true,
   );
@@ -125,10 +125,10 @@ try {
     assert.equal(await page.locator("canvas").count(), 1);
   }
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.getByRole("button", { name: "Mode clair", exact: true }).click();
+  await page.getByRole("button", { name: "Light mode", exact: true }).click();
   await open();
   await page.screenshot({ path: "artifacts/picker-light.png" });
-  await page.getByRole("button", { name: "Fermer la fenêtre" }).click();
+  await page.getByRole("button", { name: "Close dialog" }).click();
   assert.deepEqual(errors, []);
   console.log(
     "PASS molecule picker: previews, browsing/resume preserves focus, commit, Escape/backdrop/focus restoration, keyboard, mobile/landscape CTA, light theme, renderer cleanup",

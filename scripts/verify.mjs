@@ -68,7 +68,7 @@ async function ready() {
 }
 async function move(direction, target) {
   assert.equal(await nav(direction).getAttribute("data-target"), target);
-  assert.ok((await nav(direction).getAttribute("aria-label")).includes("vers"));
+  assert.ok((await nav(direction).getAttribute("aria-label")).includes("to"));
   await nav(direction).click();
   await view(target);
   await ready();
@@ -79,7 +79,7 @@ async function move(direction, target) {
 }
 async function home() {
   await p
-    .getByRole("button", { name: "Revenir à l’objet entier", exact: true })
+    .getByRole("button", { name: "Return to the whole object", exact: true })
     .click();
   await view("sample");
   for (const target of ["portion", "neighborhood", "molecule"])
@@ -87,10 +87,8 @@ async function home() {
   await ready();
 }
 async function search(term) {
-  await p.getByRole("button", { name: "Rechercher", exact: true }).click();
-  await p
-    .getByRole("textbox", { name: "Rechercher un constituant" })
-    .fill(term);
+  await p.getByRole("button", { name: "Search", exact: true }).click();
+  await p.getByRole("textbox", { name: "Search for a constituent" }).fill(term);
   await p.locator(".search-results>button").first().click();
   await ready();
 }
@@ -134,7 +132,7 @@ try {
     await shot(id.split("/").at(-1));
   }
   assert.equal(await nav("in").isDisabled(), true);
-  assert.ok((await nav("in").innerText()).includes("PARTICULE ÉLÉMENTAIRE"));
+  assert.ok((await nav("in").innerText()).includes("ELEMENTARY PARTICLE"));
   for (const id of [proton, nucleus, atom, "molecule"]) await move("out", id);
   assert.equal(await nav("out").isDisabled(), false);
   assert.equal(
@@ -196,15 +194,15 @@ try {
   await reveal(nucleus, 0);
   await home();
   // Search, photon exchange, themes and the graph all remain in the same renderer.
-  await search("électron 1");
+  await search("electron 1");
   await view("atom-0/electron-0");
   assert.equal(await nav("in").isDisabled(), true);
-  await p.getByRole("button", { name: "Comprendre le photon" }).click();
+  await p.getByRole("button", { name: "Understand the photon" }).click();
   await view(atom);
-  await p.getByRole("button", { name: /Étape 2 :/ }).click();
-  await p.getByRole("button", { name: /Étape 3 :/ }).click();
-  await p.getByRole("button", { name: "Fermer l’explication" }).click();
-  await p.getByRole("button", { name: "Mode clair", exact: true }).click();
+  await p.getByRole("button", { name: /Step 2:/ }).click();
+  await p.getByRole("button", { name: /Step 3:/ }).click();
+  await p.getByRole("button", { name: "Close explanation" }).click();
+  await p.getByRole("button", { name: "Light mode", exact: true }).click();
   await settle();
   assert.equal(await p.locator("html").getAttribute("data-theme"), "light");
   assert.equal(
@@ -212,7 +210,7 @@ try {
     identity,
   );
   await shot("light");
-  await p.getByRole("button", { name: "Mode sombre", exact: true }).click();
+  await p.getByRole("button", { name: "Dark mode", exact: true }).click();
   await p.getByRole("switch", { name: "Annotations", exact: true }).click();
   await settle();
   assert.equal(await p.locator(".atom-label:visible").count(), 0);
@@ -245,7 +243,7 @@ try {
     await shot(`${width}-leaf`);
     for (const id of [proton, nucleus, atom, "molecule"]) await move("out", id);
     if (width < 768) {
-      await p.getByRole("button", { name: "Afficher la composition" }).click();
+      await p.getByRole("button", { name: "Show composition" }).click();
       await p.locator('[data-tree-node="atom-1"] .tree-name').click();
       await view("atom-1");
       await ready();
@@ -301,7 +299,7 @@ try {
     ["co2", 204, 3],
     ["methane", 84, 5],
   ]) {
-    await p.getByRole("button", { name: "Choisir une molécule" }).click();
+    await p.getByRole("button", { name: "Choose a molecule" }).click();
     await p.locator(`[data-molecule-choice="${molecule}"]`).click();
     await p.locator("[data-molecule-enter]").click();
     await view("sample");

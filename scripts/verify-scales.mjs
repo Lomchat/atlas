@@ -77,7 +77,7 @@ try {
     );
     for (let phase = 0; phase < 3; phase++) {
       await page
-        .getByRole("button", { name: new RegExp(`Étape ${phase + 1} :`) })
+        .getByRole("button", { name: new RegExp(`Step ${phase + 1}:`) })
         .click();
       await page.waitForFunction(
         (p) => document.querySelector("canvas")?.dataset.phase === String(p),
@@ -85,8 +85,8 @@ try {
       );
     }
     await shot(molecule + "-interaction");
-    await page.getByRole("button", { name: "Fermer l’explication" }).click();
-    await page.getByRole("button", { name: "Choisir une molécule" }).click();
+    await page.getByRole("button", { name: "Close explanation" }).click();
+    await page.getByRole("button", { name: "Choose a molecule" }).click();
     await page.locator(".molecule-preview canvas").waitFor();
     await shot(molecule + "-gallery");
     await page.keyboard.press("Escape");
@@ -123,16 +123,18 @@ try {
       type,
     );
     const before = await c().screenshot();
-    await page.getByRole("button", { name: /Étape 2 :/ }).click();
+    await page.getByRole("button", { name: /Step 2:/ }).click();
     await page.waitForFunction(
       () => document.querySelector("canvas")?.dataset.phase === "1",
     );
     const after = await c().screenshot();
     assert.equal(before.equals(after), false, `${type} visibly changes scene`);
     await shot(type);
-    await page.getByRole("button", { name: /Étape 3 :/ }).click();
+    await page.getByRole("button", { name: /Step 3:/ }).click();
     assert.ok(await page.locator(".lesson-copy p").textContent());
-    await page.getByRole("button", { name: "Revoir depuis le début" }).click();
+    await page
+      .getByRole("button", { name: "Restart from the beginning" })
+      .click();
     await nav("out").click();
     assert.equal(await page.locator(".lesson-panel").count(), 0);
   }
@@ -148,7 +150,7 @@ try {
     await ready("neighborhood");
     await shot(name + "-lesson");
     const close = await page
-      .getByRole("button", { name: "Fermer l’explication" })
+      .getByRole("button", { name: "Close explanation" })
       .boundingBox();
     assert.ok(
       close.x >= 0 &&
@@ -156,14 +158,14 @@ try {
         close.y >= 0 &&
         close.y + close.height <= height,
     );
-    await page.getByRole("button", { name: /Étape 2 :/ }).click();
+    await page.getByRole("button", { name: /Step 2:/ }).click();
     assert.ok(
       await page
         .locator(".lesson-panel")
         .evaluate((e) => e.scrollWidth <= e.clientWidth + 1),
     );
-    await page.getByRole("button", { name: "Fermer l’explication" }).click();
-    await page.getByRole("button", { name: "Choisir une molécule" }).click();
+    await page.getByRole("button", { name: "Close explanation" }).click();
+    await page.getByRole("button", { name: "Choose a molecule" }).click();
     await shot(name + "-gallery");
     await page.keyboard.press("Escape");
   }

@@ -1,8 +1,8 @@
-# Matière Atlas
+# Matter Atlas
 
-https://atlas.chalco.website
+[Explore the atlas](https://atlas.chalco.website) · [GitHub](https://github.com/Lomchat/atlas)
 
-An interactive French-language Three.js atlas of matter, from familiar objects to valence quarks. The neutral studio and camera-led exploration are inspired by Human Atlas and Model X Studio.
+An interactive English-language Three.js atlas of matter, from familiar objects to valence quarks. The neutral studio and camera-led exploration are inspired by Human Atlas and Model X Studio.
 
 ## Explore
 

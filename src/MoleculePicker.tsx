@@ -219,7 +219,7 @@ function Preview({ id, light }: { id: MoleculeId; light: boolean }) {
     renderer.toneMappingExposure = light ? 1.3 : 1.1;
     renderer.domElement.setAttribute(
       "aria-label",
-      "Aperçu 3D de l’objet, glisser pour tourner",
+      "3D object preview, drag to rotate",
     );
     el.appendChild(renderer.domElement);
     const scene = new T.Scene(),
@@ -341,9 +341,9 @@ export default function MoleculePicker({
   return (
     <>
       <div className="picker-intro">
-        <span className="eyebrow">COLLECTION · 03 MONDES</span>
-        <h2 id="dialog-title">Du visible à l’invisible.</h2>
-        <p>Choisissez un objet. Découvrez la matière qu’il contient.</p>
+        <span className="eyebrow">COLLECTION · 03 WORLDS</span>
+        <h2 id="dialog-title">From the visible to the invisible.</h2>
+        <p>Choose an object. Discover the matter inside.</p>
       </div>
       <div className="picker-body">
         <div className="picker-stage">
@@ -354,18 +354,18 @@ export default function MoleculePicker({
           <div className="molecule-inset">
             <Thumbnail id={selected} />
             <span>
-              À l’intérieur<strong>{m.formula}</strong>
+              Inside<strong>{m.formula}</strong>
             </span>
           </div>
           <span className="preview-hint">
-            <Rotate3D size={14} /> Glisser pour tourner
+            <Rotate3D size={14} /> Drag to rotate
           </span>
           <div className="preview-caption">
             <span>{environments[selected].name}</span>
             <span>≈ cm → nm</span>
           </div>
         </div>
-        <div className="picker-collection" aria-label="Matières disponibles">
+        <div className="picker-collection" aria-label="Available materials">
           {(Object.keys(molecules) as MoleculeId[]).map((id, i) => (
             <button
               key={id}
@@ -380,7 +380,7 @@ export default function MoleculePicker({
                 <strong>{environments[id].name}</strong>
                 <span>
                   {molecules[id].formula} <i>·</i> {molecules[id].atoms.length}{" "}
-                  atomes
+                  atoms
                 </span>
               </span>
               <span className="choice-check">
@@ -391,9 +391,9 @@ export default function MoleculePicker({
           <div className="picker-facts" aria-live="polite">
             <p>{environments[selected].subtitle}</p>
             <div className="picker-route">
-              <span>Objet</span> →{" "}
-              <span>{selected === "co2" ? "Bulle" : "Volume"}</span> →{" "}
-              <span>Voisinage</span> → <strong>{m.formula}</strong>
+              <span>Object</span> →{" "}
+              <span>{selected === "co2" ? "Bubble" : "Volume"}</span> →{" "}
+              <span>Neighborhood</span> → <strong>{m.formula}</strong>
             </div>
             <div className="element-chips">
               {composition.map((e) => (
@@ -417,17 +417,15 @@ export default function MoleculePicker({
       </div>
       <div className="picker-footer">
         <span>
-          De l’objet aux quarks.
-          <small>Le même monde, à chaque échelle.</small>
+          From objects to quarks.
+          <small>The same world, at every scale.</small>
         </span>
         <button
           className="picker-enter"
           data-molecule-enter
           onClick={() => onChoose(selected)}
         >
-          {selected === current
-            ? "Reprendre l’exploration"
-            : "Explorer cet objet"}
+          {selected === current ? "Resume exploration" : "Explore this object"}
           <ArrowRight size={17} />
         </button>
       </div>

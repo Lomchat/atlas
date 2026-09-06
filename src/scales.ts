@@ -19,40 +19,40 @@ export const environments: Record<
   }
 > = {
   water: {
-    name: "Un verre d’eau",
-    subtitle: "Du liquide aux constituants de H₂O.",
-    portion: "Une goutte d’eau",
-    neighborhood: "Molécules voisines",
-    state: "Liquide",
+    name: "A glass of water",
+    subtitle: "From liquid water to the building blocks of H₂O.",
+    portion: "A drop of water",
+    neighborhood: "Neighboring molecules",
+    state: "Liquid",
     color: "#9ebdd6",
     description:
-      "Ce verre contient une multitude de molécules H₂O. Approchez une petite portion du liquide, puis une molécule : ses atomes deviennent visibles.",
+      "This glass contains countless H₂O molecules. Zoom into a small volume of liquid, then into one molecule to reveal its atoms.",
     portionDescription:
-      "On isole par la pensée un volume d’eau de la taille d’une goutte. Sa limite est un repère de lecture : il n’y a pas de membrane à cet endroit dans le verre.",
+      "Imagine selecting a drop-sized volume of water. Its boundary is a visual guide: there is no membrane at this point in the glass.",
   },
   co2: {
-    name: "Un verre d’eau pétillante",
-    subtitle: "À l’intérieur d’une bulle de CO₂.",
-    portion: "Une bulle de CO₂",
-    neighborhood: "Molécules de CO₂",
-    state: "Gaz dans un liquide",
+    name: "A glass of sparkling water",
+    subtitle: "Inside a CO₂ bubble.",
+    portion: "A CO₂ bubble",
+    neighborhood: "CO₂ molecules",
+    state: "Gas in a liquid",
     color: "#b5c7da",
     description:
-      "Nous suivons le CO₂ d’une bulle dans l’eau pétillante. Le verre contient aussi de l’eau : le parcours se concentre sur le gaz de cette bulle.",
+      "We follow the CO₂ inside a bubble in sparkling water. The glass also contains water; this journey focuses on the gas in that bubble.",
     portionDescription:
-      "Cette bulle est une poche de gaz entourée d’eau. Elle contient de nombreuses molécules de CO₂, espacées et en mouvement. Sa surface sépare le gaz du liquide.",
+      "This bubble is a pocket of gas surrounded by water. It contains many CO₂ molecules, spaced apart and in motion. Its surface separates the gas from the liquid.",
   },
   methane: {
-    name: "Un flacon de méthane",
-    subtitle: "Du volume de gaz à la molécule CH₄.",
-    portion: "Un volume de méthane",
-    neighborhood: "Molécules de CH₄",
-    state: "Gaz",
+    name: "A flask of methane",
+    subtitle: "From a volume of gas to a CH₄ molecule.",
+    portion: "A volume of methane",
+    neighborhood: "CH₄ molecules",
+    state: "Gas",
     color: "#b7b6d3",
     description:
-      "Dans ce flacon fermé, le méthane occupe l’espace disponible. Le gaz est invisible à l’œil nu ; les repères colorés permettent de suivre une portion puis une molécule.",
+      "In this sealed flask, methane fills the available space. The gas is invisible to the naked eye; colored markers guide you into a small volume, then a molecule.",
     portionDescription:
-      "Ce volume repère est prélevé par la pensée dans le gaz. Sa surface ne constitue pas une paroi : les molécules passent librement d’une région à l’autre.",
+      "This reference volume is an imaginary sample of the gas. Its surface is not a wall: molecules move freely from one region to another.",
   },
 };
 export function scaleEntry(molecule: MoleculeId, id: ScaleId): Entry {
@@ -67,8 +67,8 @@ export function scaleEntry(molecule: MoleculeId, id: ScaleId): Entry {
     portion: e.portionDescription,
     neighborhood:
       molecule === "water"
-        ? "Dans l’eau liquide, les molécules restent proches et changent de voisines. Les attractions entre elles contribuent à la cohésion du liquide. La molécule repérée au centre est celle que vous allez explorer."
-        : "Les molécules du gaz sont séparées et se déplacent entre leurs collisions. Une seule est repérée au centre pour garder le fil du zoom ; les autres montrent son voisinage.",
+        ? "In liquid water, molecules stay close while changing neighbors. Attractions between them help hold the liquid together. The marked molecule at the center is the one you will explore."
+        : "Gas molecules are spaced apart and move between collisions. One is marked at the center to guide your zoom; the others show its surroundings.",
   };
   return {
     id,
@@ -77,34 +77,34 @@ export function scaleEntry(molecule: MoleculeId, id: ScaleId): Entry {
     color: e.color,
     category:
       id === "sample"
-        ? "À NOTRE ÉCHELLE"
+        ? "AT OUR SCALE"
         : id === "portion"
-          ? "UN PETIT VOLUME"
-          : "ENTRE LES MOLÉCULES",
+          ? "A SMALL VOLUME"
+          : "BETWEEN MOLECULES",
     description: descriptions[id],
-    note: "Les niveaux de zoom sont raccordés avec des dimensions adaptées. Les molécules dessinées sont un échantillon illustratif, pas un décompte réel. Le repère central conserve le lien entre les échelles.",
+    note: "Zoom levels connect using adjusted dimensions. The molecules shown are an illustrative sample, not an actual count. The central marker keeps the scales connected.",
     facts: [
       [
-        "Échelle indicative",
+        "Approximate scale",
         id === "sample"
-          ? "Centimètre"
+          ? "Centimeter"
           : id === "portion"
-            ? "Millimètre"
-            : "Nanomètre",
+            ? "Millimeter"
+            : "Nanometer",
       ],
       [
-        "Matière suivie",
+        "Matter in focus",
         molecule === "water"
-          ? "H₂O liquide"
+          ? "Liquid H₂O"
           : molecule === "co2"
-            ? "CO₂ gazeux"
-            : "CH₄ gazeux",
+            ? "Gaseous CO₂"
+            : "Gaseous CH₄",
       ],
       [
-        "Représentation",
+        "Representation",
         id === "portion" && molecule === "co2"
-          ? "Interface gaz / eau"
-          : "Échantillon pédagogique",
+          ? "Gas / water interface"
+          : "Illustrative sample",
       ],
     ],
     source: matterSource,

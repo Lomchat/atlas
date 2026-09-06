@@ -54,3 +54,11 @@ TypeScript and the staged production build passed. The existing picker suite pas
 The final build was deployed by atomic directory exchange. The previous version is retained at `releases/before-colored-objects-20260906T114630Z`. Public HTTPS serves `index-Dj9S9Gxh.js`; the stylesheet is unchanged.
 
 The picker suite also passed against the public HTTPS deployment after release, including both themes, preview rotation, selection and focus preservation, mobile/small/landscape layouts and renderer cleanup.
+
+## English interface and public repository
+
+All application copy is now English: document language/title/description, object and particle names, generated atom/nucleus descriptions, facts and decimal notation, seven lessons, scene labels/tooltips, gallery, printed flask label, search/empty state, About, notifications, keyboard hints, accessibility labels and graphics fallback. Responsive CSS selectors and existing browser-test locators follow the translated labels. Zero neutrons and single-nucleon descriptions use English pluralization; the About dialog now lists the implemented keyboard shortcuts.
+
+The final TypeScript/Vite build passed, along with the collection and full scale/interaction suites. Source strings were reviewed, and English desktop/mobile gallery and lesson screenshots were visually checked. The GitHub repository is public at https://github.com/Lomchat/atlas and preserves the existing project history and third-party credits.
+
+The full navigation suite also passed: ancestor/child traversal, ray picking, orbit centering, wheel reversal, mobile/landscape, hydrogen pinch, English search, photon controls, themes, sharing and persistent renderer, with no browser or request errors. Production was updated by atomic directory exchange; the previous release is retained at `releases/before-english-20260906T180243Z`. Public HTTPS serves `index-CFOtr1MU.js` and `index-DIdLMtXC.css`. A targeted public-browser check passed for English document metadata, About, search and its empty state, generated hydrogen copy, sharing notifications and the WebGL-loss fallback.
