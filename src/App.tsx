@@ -3,21 +3,17 @@ import {
   ArrowLeft,
   ArrowUpRight,
   Atom,
-  Box,
   Check,
   ChevronDown,
   ChevronRight,
   CircleHelp,
   Crosshair,
-  Expand,
   Layers3,
   Maximize2,
   Minus,
   Moon,
   Pause,
-  Play,
   Plus,
-  RotateCcw,
   RotateCw,
   Search,
   Share2,
@@ -34,35 +30,16 @@ import {
   ancestors,
   createGraph,
   defaultState,
-  descendants,
   expansion,
   kindNames,
-  openBranch,
 } from "./continuum";
 import type { ExplorerState, MatterNode, SceneDetail } from "./continuum";
 function initial(): ExplorerState {
   const p = new URLSearchParams(location.search),
-    s: ExplorerState = { ...defaultState, overrides: {} };
+    s: ExplorerState = { ...defaultState };
   if (p.get("molecule") && Object.hasOwn(molecules, p.get("molecule")!))
     s.molecule = p.get("molecule") as MoleculeId;
-  const old = p.get("level"),
-    d = p.get("depth")
-      ? Number(p.get("depth"))
-      : old === "atom"
-        ? 50
-        : old === "nucleus"
-          ? 78
-          : old === "quarks"
-            ? 100
-            : 0;
-  s.depth = Number.isFinite(d) ? Math.max(0, Math.min(100, d)) : 0;
   const g = createGraph(s.molecule);
-  for (const [key, value] of [
-    ["open", 1],
-    ["closed", 0],
-  ] as const)
-    for (const id of (p.get(key) || "").split(",").slice(0, 180))
-      if (g.nodes.get(id)?.children.length) s.overrides[id] = value;
   if (g.nodes.has(p.get("node") || "")) s.selected = p.get("node");
   if (g.nodes.has(p.get("focus") || "")) s.focus = p.get("focus");
   try {
@@ -123,112 +100,43 @@ export default function App() {
     [query, setQuery] = useState(""),
     [message, setMessage] = useState(""),
     [eventText, setEventText] = useState(""),
-    [automatic, setAutomatic] = useState(false),
     [detail, setDetail] = useState<SceneDetail | null>(null);
   const graph = useMemo(() => createGraph(state.molecule), [state.molecule]),
     mol = molecules[state.molecule],
     sceneDetail = detail?.molecule === state.molecule ? detail : null,
-    contextId = sceneDetail?.context,
-    inspectedId =
-      contextId &&
-      (!state.selected || contextId.startsWith(state.selected + "/"))
-        ? contextId
-        : state.selected,
-    node = graph.nodes.get(inspectedId || graph.root)!,
+    viewpoint = graph.nodes.get(
+      sceneDetail?.viewpoint || state.focus || graph.root,
+    )!,
+    node = viewpoint,
     path = ancestors(graph, node.id),
-    isOpen =
-      node.kind === "molecule"
-        ? expansion(node, state) > 0.5
-        : (sceneDetail?.open.includes(node.id) ?? false),
-    local = Object.keys(state.overrides).length > 0;
+    nextId = sceneDetail?.next ?? node.children[0] ?? null,
+    next = nextId ? graph.nodes.get(nextId)! : null,
+    parent = node.parent ? graph.nodes.get(node.parent)! : null,
+    navigating =
+      !sceneDetail ||
+      sceneDetail.navigation !== state.navigation ||
+      sceneDetail.transitioning;
   const dialog = useRef<HTMLDialogElement>(null),
     searchRef = useRef<HTMLInputElement>(null),
     noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const update = (patch: Partial<ExplorerState>) =>
     setState((s) => ({ ...s, ...patch }));
-  function inspect(id: string, open = true) {
-    const n = graph.nodes.get(id);
-    if (!n) return;
-    const needsApproach =
-      open &&
-      n.children.length > 0 &&
-      n.kind !== "molecule" &&
-      sceneDetail &&
-      !sceneDetail.readable.includes(id);
-    setAutomatic(false);
-    setInspector(true);
-    setPanel(n.children.length ? null : "details");
-    setState((s) => ({
-      ...s,
-      selected: id,
-      zoom: needsApproach ? 0 : s.zoom,
-      reset: needsApproach && s.focus === id ? s.reset + 1 : s.reset,
-      focus: needsApproach
-        ? id
-        : s.focus && id !== s.focus && !id.startsWith(s.focus + "/")
-          ? id === graph.root
-            ? null
-            : id
-          : s.focus,
-      overrides:
-        open && n.children.length ? openBranch(graph, s, id) : s.overrides,
-    }));
-  }
-  function toggleNode(id: string) {
-    setAutomatic(false);
-    const n = graph.nodes.get(id)!;
-    setState((s) => {
-      const overrides = { ...s.overrides };
-      if (
-        n.kind === "molecule"
-          ? expansion(n, s) > 0.5
-          : sceneDetail?.open.includes(id)
-      ) {
-        overrides[id] = 0;
-        return {
-          ...s,
-          overrides,
-          selected: id,
-          focus:
-            s.focus && descendants(graph, id).includes(s.focus) ? id : s.focus,
-        };
-      }
-      const needsApproach =
-        n.kind !== "molecule" &&
-        sceneDetail &&
-        !sceneDetail.readable.includes(id);
-      return {
-        ...s,
-        selected: id,
-        focus: needsApproach ? id : s.focus,
-        zoom: needsApproach ? 0 : s.zoom,
-        overrides: openBranch(graph, s, id),
-      };
-    });
-  }
   function approach(id: string) {
+    if (!graph.nodes.has(id)) return;
     setInspector(true);
     setPanel(null);
-    if (id === graph.root) {
-      update({ focus: null, selected: null, zoom: 0 });
-      return;
-    }
-    const n = graph.nodes.get(id)!;
     setState((s) => ({
       ...s,
-      focus: id,
-      selected: id,
-      zoom: 0,
-      reset: s.reset + 1,
-      overrides: n.parent ? openBranch(graph, s, n.parent) : s.overrides,
+      focus: id === graph.root ? null : id,
+      selected: id === graph.root ? null : id,
+      navigation: s.navigation + 1,
     }));
   }
+  const inspect = approach;
   function overview() {
-    update({ focus: null, selected: null, zoom: 0, reset: state.reset + 1 });
-    setPanel(null);
+    approach(graph.root);
   }
   function reset() {
-    setAutomatic(false);
     setEventText("");
     setState((s) => ({
       ...defaultState,
@@ -239,7 +147,6 @@ export default function App() {
     setPanel(null);
   }
   function changeMolecule(id: MoleculeId) {
-    setAutomatic(false);
     setEventText("");
     setState((s) => ({
       ...defaultState,
@@ -249,23 +156,17 @@ export default function App() {
     }));
     setPanel(null);
   }
-  function globalDepth(depth: number) {
-    setAutomatic(false);
-    update({ depth, overrides: {}, focus: null, zoom: 0 });
-  }
   function photon() {
     const target =
       node.atom >= 0
         ? graph.atoms[node.atom]
         : graph.atoms.find((id) => graph.nodes.get(id)!.element === "H") ||
           graph.atoms[0];
-    setAutomatic(false);
     setState((s) => ({
       ...s,
       selected: target,
       focus: target,
-      zoom: 0,
-      overrides: openBranch(graph, s, target),
+      navigation: s.navigation + 1,
       photon: s.photon + 1,
     }));
     setEventText("Photon incident");
@@ -303,15 +204,6 @@ export default function App() {
   useEffect(() => {
     const p = new URLSearchParams();
     if (state.molecule !== "water") p.set("molecule", state.molecule);
-    if (state.depth) p.set("depth", String(Math.round(state.depth)));
-    const open = Object.entries(state.overrides)
-        .filter(([, v]) => v === 1)
-        .map(([k]) => k),
-      closed = Object.entries(state.overrides)
-        .filter(([, v]) => v === 0)
-        .map(([k]) => k);
-    if (open.length) p.set("open", open.join(","));
-    if (closed.length) p.set("closed", closed.join(","));
     if (state.selected) p.set("node", state.selected);
     if (state.focus) p.set("focus", state.focus);
     history.replaceState(
@@ -319,42 +211,13 @@ export default function App() {
       "",
       location.pathname + (p.size ? "?" + p.toString() : ""),
     );
-  }, [
-    state.molecule,
-    state.depth,
-    state.overrides,
-    state.selected,
-    state.focus,
-  ]);
+  }, [state.molecule, state.selected, state.focus]);
   useEffect(() => {
     if (modal) {
       dialog.current?.showModal();
       if (modal === "search") setTimeout(() => searchRef.current?.focus(), 50);
     } else dialog.current?.close();
   }, [modal]);
-  useEffect(() => {
-    if (!automatic) return;
-    let frame = 0,
-      last = performance.now();
-    const run = (now: number) => {
-      if (now - last > 30) {
-        const dt = Math.max(0, Math.min((now - last) / 1000, 0.1));
-        last = now;
-        setState((s) => ({
-          ...s,
-          depth: Math.min(100, s.depth + dt * 9),
-          overrides: {},
-          focus: null,
-        }));
-      }
-      frame = requestAnimationFrame(run);
-    };
-    frame = requestAnimationFrame(run);
-    return () => cancelAnimationFrame(frame);
-  }, [automatic]);
-  useEffect(() => {
-    if (automatic && state.depth >= 100) setAutomatic(false);
-  }, [state.depth, automatic]);
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if (
@@ -374,9 +237,13 @@ export default function App() {
         overview();
         setPanel(null);
       }
-      if (e.key === " ") {
+      if ((e.key === "+" || e.key === "=") && next && !navigating) {
         e.preventDefault();
-        setAutomatic((a) => !a);
+        approach(next.id);
+      }
+      if (e.key === "-" && parent && !navigating) {
+        e.preventDefault();
+        approach(parent.id);
       }
     };
     window.addEventListener("keydown", key);
@@ -403,10 +270,8 @@ export default function App() {
         >
           <button
             className={"tree-caret " + (expanded ? "expanded" : "")}
-            onClick={() =>
-              n.children.length ? toggleNode(n.id) : inspect(n.id, false)
-            }
-            aria-label={`${expanded ? "Refermer" : "Ouvrir"} ${n.entry.name}`}
+            onClick={() => approach(n.id)}
+            aria-label={`Explorer ${n.entry.name}`}
             disabled={!n.children.length}
           >
             {n.children.length ? <ChevronRight size={12} /> : <span />}
@@ -525,6 +390,46 @@ export default function App() {
           ))}
         </div>
       </div>
+      <nav
+        className="zoom-navigation glass"
+        aria-label="Naviguer dans la matière"
+      >
+        <button
+          data-direction="out"
+          data-target={parent?.id || ""}
+          disabled={!parent || navigating}
+          onClick={() => parent && approach(parent.id)}
+          aria-label={
+            parent
+              ? `Zoom arrière vers ${parent.entry.name}`
+              : "Zoom arrière · Vue d’ensemble"
+          }
+        >
+          <Minus size={18} />
+          <span>
+            <small>ZOOM ARRIÈRE</small>
+            <strong>{parent?.entry.name || "Vue d’ensemble"}</strong>
+          </span>
+        </button>
+        <i />
+        <button
+          data-direction="in"
+          data-target={next?.id || ""}
+          disabled={!next || navigating}
+          onClick={() => next && approach(next.id)}
+          aria-label={
+            next
+              ? `Zoom avant vers ${next.entry.name}`
+              : `Zoom avant · ${node.entry.name}, particule élémentaire`
+          }
+        >
+          <span>
+            <small>{next ? "ZOOM AVANT" : "PARTICULE ÉLÉMENTAIRE"}</small>
+            <strong>{next?.entry.name || node.entry.name}</strong>
+          </span>
+          <Plus size={18} />
+        </button>
+      </nav>
       <aside
         className={
           "tree-panel glass " + (panel === "tree" ? "mobile-open" : "")
@@ -544,7 +449,9 @@ export default function App() {
             {graph.totals.atoms} atomes
           </span>
         </div>
-        <p className="panel-hint">Cliquez sur un constituant pour l’ouvrir.</p>
+        <p className="panel-hint">
+          Pointez ou cliquez sur un constituant à explorer.
+        </p>
         <div className="tree-scroll">{row(graph.nodes.get(graph.root)!)}</div>
         <div className="composition-summary">
           <span>
@@ -575,17 +482,6 @@ export default function App() {
         </div>
       </aside>
       <div className="view-controls glass">
-        <IconButton
-          label="Zoomer"
-          icon={Plus}
-          onClick={() => update({ zoom: state.zoom + 1 })}
-        />
-        <IconButton
-          label="Dézoomer"
-          icon={Minus}
-          onClick={() => update({ zoom: state.zoom - 1 })}
-        />
-        <i />
         <IconButton
           label={state.rotate ? "Arrêter la rotation" : "Rotation automatique"}
           icon={state.rotate ? Pause : RotateCw}
@@ -668,24 +564,25 @@ export default function App() {
           ))}
         </dl>
         <div className="detail-actions">
-          {node.children.length > 0 && (
+          {next && (
             <button
               className="primary-action"
-              onClick={() => toggleNode(node.id)}
+              onClick={() => approach(next.id)}
+              disabled={navigating}
             >
-              {isOpen ? <Box size={15} /> : <Expand size={15} />}
-              <span>
-                {isOpen ? "Refermer ce constituant" : "Ouvrir ce constituant"}
-              </span>
+              <Plus size={15} />
+              <span>Explorer {next.entry.name}</span>
               <ChevronRight size={13} />
             </button>
           )}
-          {node.kind !== "molecule" && (
+          {parent && (
             <button
               className="secondary-action"
-              onClick={() => approach(node.id)}
+              onClick={() => approach(parent.id)}
+              disabled={navigating}
             >
-              <Crosshair size={14} /> Approcher sans perdre le contexte
+              <ArrowLeft size={14} />
+              <span>Revenir à {parent.entry.name}</span>
             </button>
           )}
         </div>
@@ -726,86 +623,17 @@ export default function App() {
           </button>
         </div>
       )}
-      <div className="scene-hint">
-        {state.focus ? (
-          <button onClick={overview}>
-            <ArrowLeft size={13} /> Revoir toute la molécule
-          </button>
-        ) : (
-          <>
-            <span className="hint-line" />
-            <span>{sceneDetail?.layer || "Atomes"} · ZOOMEZ POUR EXPLORER</span>
-            <span className="hint-line" />
-          </>
-        )}
-      </div>
-      <div className="bottom-dock glass">
-        <button
-          className="dock-button mobile-only"
-          aria-label="Afficher la composition"
-          onClick={() => {
-            setPanel(panel === "tree" ? null : "tree");
-            setInspector(true);
-          }}
-        >
-          <Layers3 size={19} />
-          <span>Composition</span>
-        </button>
-        <button
-          className={"dock-button play " + (automatic ? "active" : "")}
-          aria-label={
-            automatic
-              ? "Mettre le dépliage en pause"
-              : "Déplier automatiquement"
-          }
-          onClick={() => {
-            if (state.depth >= 100) update({ depth: 0, overrides: {} });
-            setAutomatic((a) => !a);
-          }}
-        >
-          {automatic ? <Pause size={18} /> : <Play size={18} />}
-          <span className="desktop-only">{automatic ? "Pause" : "Animer"}</span>
-        </button>
-        <div className="depth-control">
-          <div className="depth-label">
-            <label htmlFor="depth">Déplier l’ensemble</label>
-            <output htmlFor="depth">
-              {local ? "Libre" : `${Math.round(state.depth)} %`}
-            </output>
-          </div>
-          <input
-            id="depth"
-            type="range"
-            min="0"
-            max="100"
-            step="1"
-            value={state.depth}
-            style={{ "--progress": `${state.depth}%` } as React.CSSProperties}
-            onChange={(e) => globalDepth(Number(e.target.value))}
-          />
-          <div className="range-labels">
-            <span>Molécule liée</span>
-            <span>Tous les constituants</span>
-          </div>
-        </div>
-        <button
-          className="dock-button"
-          aria-label="Tout déplier"
-          onClick={() => globalDepth(100)}
-        >
-          <Expand size={18} />
-          <span className="desktop-only">Déplier</span>
-        </button>
-        <i />
-        <button
-          className="dock-button"
-          aria-label="Tout rassembler"
-          onClick={reset}
-        >
-          <RotateCcw size={17} />
-          <span className="desktop-only">Rassembler</span>
-        </button>
-      </div>
+      <button
+        className="composition-trigger glass mobile-only"
+        aria-label="Afficher la composition"
+        onClick={() => {
+          setPanel(panel === "tree" ? null : "tree");
+          setInspector(true);
+        }}
+      >
+        <Layers3 size={17} />
+        <span>Composition</span>
+      </button>
       <div className="lower-left">
         <span className="mini-formula">{mol.formula}</span>
         <span>
@@ -828,7 +656,7 @@ export default function App() {
       <footer>
         <span>
           Glisser : tourner <b>·</b> Molette : explorer les couches <b>·</b>{" "}
-          Double clic : approcher
+          Clic : se rapprocher
         </span>
         <button onClick={() => setModal("about")}>
           Schéma pédagogique · Échelles adaptées <ArrowUpRight size={11} />
@@ -872,15 +700,7 @@ export default function App() {
                 <button
                   key={n.id}
                   onClick={() => {
-                    setState((s) => ({
-                      ...s,
-                      selected: n.id,
-                      focus: n.kind === "molecule" ? null : n.id,
-                      overrides: n.parent
-                        ? openBranch(graph, s, n.parent)
-                        : s.overrides,
-                    }));
-                    setInspector(true);
+                    approach(n.id);
                     setModal(null);
                   }}
                 >
@@ -918,13 +738,12 @@ export default function App() {
             </p>
             <h3>Explorez directement</h3>
             <p>
-              Zoomez vers un constituant pour révéler progressivement son
-              contenu. En reculant, les détails se regroupent dans leur
-              enveloppe. Cliquez pour ouvrir une branche ; si elle est trop
-              petite, la caméra s’en approche. Les enveloppes transparentes et
-              l’arbre de composition gardent le lien avec ses parents. Le
-              curseur agit sur toute la molécule ; chaque branche peut aussi
-              être ouverte ou refermée librement.
+              Utilisez les deux boutons du haut : chacun indique la destination
+              du rapprochement ou du retour. La molette et le pincement
+              permettent aussi de progresser. Cliquez sur un constituant pour
+              centrer le zoom sur lui ; les boutons, la fiche et le fil
+              d’appartenance suivent votre position dans la matière. En
+              reculant, les détails se regroupent dans leur enveloppe.
             </p>
             <h3>Ce que représente la scène</h3>
             <p>{node.entry.note}</p>

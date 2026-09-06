@@ -6,16 +6,15 @@ An interactive French-language 3D atlas of matter. A single molecule stays in th
 
 ## Explore
 
-- Zoom toward a constituent to reveal successive layers automatically: atom, nucleus, nucleons, quarks. Zooming out restores the enclosing shells. Detail thresholds use the available viewport size, including on mobile.
-- Click an atom, nucleus or nucleon to open its branch. If it is too small to read, the camera approaches it. Explicitly closing a branch keeps it closed until reopened.
-- Drag the global slider to unfold the hierarchy continuously, or play its animation. Requested contents are shown when large enough to read; even a fully unfolded molecule simplifies at a distance.
-- Double-click / approach a constituent to zoom into it. Context remains visible as ghosted surrounding structures; breadcrumbs and the composition tree preserve ancestry.
-- Reassemble the molecule, orbit, zoom, toggle annotations and envelopes, or switch light / dark mode without rebuilding the scene.
-- Observe a photon exchange or display an illustrative Higgs field in the same scene. Gluon curves appear inside opened nucleons.
-- Search the constituents of the current molecule and share its exact open branches, selection and focus via URL.
-- Water, carbon dioxide and methane. Respectively 88, 204 and 84 total nested constituents excluding the molecule root (not all are displayed simultaneously); electrons and valence quarks are counted individually.
+- Two buttons at the top name the next inward destination and the outward parent. They move the camera through the same scene: molecule → atom → nucleus → nucleon → quark, with the reverse route always available.
+- Point at a different visible child to choose it as the inward destination. That choice stays in place when moving to the button. Clicking a constituent or a composition-tree entry approaches that exact object.
+- Wheel and pinch gestures also reveal successive layers. Geometry stays at fixed local coordinates, and detail uses camera distance rather than projected depth. Only the targeted branch opens automatically; its surroundings remain as faint context.
+- Elementary particles have no deeper destination; the inward button indicates that limit. The outward button is disabled at the molecule overview.
+- There is no unfolding gauge, automatic unfolding animation or separate expansion mode.
+- Orbit, return to the molecule, toggle annotations and envelopes, or change the theme. Search, a photon exchange and the illustrative Higgs field remain available.
+- Water, carbon dioxide and methane contain 88, 204 and 84 nested graph nodes excluding the root; only readable layers are displayed. A focused constituent can be shared via its URL.
 
-Keyboard: `R` reassemble, `L` annotations, Space animate/pause, `/` search, Escape return to the full molecule.
+Keyboard: `R` reset, `L` annotations, `+` / `−` move to the named destination, `/` search, Escape return to the molecule.
 
 ## Development
 
@@ -35,7 +34,7 @@ To build without changing the live site:
 npm run build -- --outDir .next-dist
 ```
 
-`src/continuum.ts` defines the persistent composition graph, ancestor paths and expansion state. `src/Scene.tsx` builds that graph once per molecule and interpolates its existing objects. Projected closed-shell size controls automatic opening and gates manually requested detail. The measured radius is independent of the interpolated shell radius, and camera fitting uses stable dimensions to avoid feedback loops. Nearby branches retain emphasis while their surroundings fade into context. Only changing the molecule recreates the renderer; opening nodes, scrubbing, focusing, changing theme and playing interactions do not.
+`src/continuum.ts` defines the persistent graph and the current navigation target. `src/Scene.tsx` constructs it once per molecule. Child positions are fixed; opening envelopes does not move their contents. Camera fitting targets the selected constituent's center and bounds, while a stable branch preference determines the next destination. Layer thresholds use camera-to-object distance and scale with the available viewport. A small hysteresis keeps layer boundaries stable.
 
 ## Verification
 
@@ -46,7 +45,7 @@ ATLAS_URL=https://atlas.chalco.website npm test
 
 The local suite expects `npm run dev` to be running. Set `CHROMIUM_PATH` if needed, or install Chromium with `npx playwright install chromium`.
 
-The browser suite checks zoom-driven opening and reverse collapse, wheel navigation, detail suppression in fully unfolded overviews, focused near/far views, persistent canvas identity, actual ray picking, manual branch opening and closure, photon interaction, search, theme, shared URLs, mobile adaptive detail, composition totals and invalid URL handling. Screenshots are saved to `artifacts/`.
+The browser suite checks the named inward/outward destination chain, disabled endpoint buttons, a pointed sibling remaining selected, exact ray picking, centered camera targets after orbiting, wheel reversal, mobile and landscape layouts, pinch targeting a hydrogen atom, absence of the gauge, persistent scene identity, photons, search, themes, shared URLs and graph composition totals. Screenshots are saved to `artifacts/navigation-*.png`.
 
 ## Scientific conventions
 

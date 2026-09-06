@@ -39,8 +39,6 @@ export interface MatterGraph {
 }
 export interface ExplorerState {
   molecule: MoleculeId;
-  depth: number;
-  overrides: Record<string, number>;
   selected: string | null;
   focus: string | null;
   labels: boolean;
@@ -48,7 +46,7 @@ export interface ExplorerState {
   light: boolean;
   rotate: boolean;
   reset: number;
-  zoom: number;
+  navigation: number;
   photon: number;
   higgs: boolean;
 }
@@ -59,11 +57,13 @@ export interface SceneDetail {
   count: number;
   layer: string;
   context: string | null;
+  viewpoint: string;
+  next: string | null;
+  navigation: number;
+  transitioning: boolean;
 }
 export const defaultState: ExplorerState = {
   molecule: "water",
-  depth: 0,
-  overrides: {},
   selected: null,
   focus: null,
   labels: true,
@@ -71,7 +71,7 @@ export const defaultState: ExplorerState = {
   light: false,
   rotate: false,
   reset: 0,
-  zoom: 0,
+  navigation: 0,
   photon: 0,
   higgs: false,
 };
@@ -207,37 +207,12 @@ export function ancestors(graph: MatterGraph, id: string): MatterNode[] {
   return result;
 }
 export function expansion(node: MatterNode, state: ExplorerState): number {
-  if (!node.children.length) return 0;
-  if (Object.hasOwn(state.overrides, node.id)) return state.overrides[node.id];
-  const [start, end] =
-    node.kind === "molecule"
-      ? [0, 24]
-      : node.kind === "atom"
-        ? [15, 50]
-        : node.kind === "nucleus"
-          ? [45, 78]
-          : [72, 100];
-  const x = Math.min(1, Math.max(0, (state.depth - start) / (end - start)));
-  return x * x * (3 - 2 * x);
-}
-export function openBranch(
-  graph: MatterGraph,
-  state: ExplorerState,
-  id: string,
-): Record<string, number> {
-  const overrides = { ...state.overrides };
-  for (const n of ancestors(graph, id))
-    if (n.children.length) overrides[n.id] = 1;
-  return overrides;
-}
-export function descendants(graph: MatterGraph, id: string): string[] {
-  const result: string[] = [];
-  const visit = (nid: string) => {
-    result.push(nid);
-    graph.nodes.get(nid)?.children.forEach(visit);
-  };
-  visit(id);
-  return result;
+  return node.kind !== "molecule" &&
+    node.children.length > 0 &&
+    state.focus &&
+    (state.focus === node.id || state.focus.startsWith(node.id + "/"))
+    ? 1
+    : 0;
 }
 export const kindNames: Record<Kind, string> = {
   molecule: "molécule",

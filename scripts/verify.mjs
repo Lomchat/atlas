@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { chromium } from "playwright";
-const base = process.env.ATLAS_URL || "http://127.0.0.1:3017";
-const executable =
-  process.env.CHROMIUM_PATH ||
-  "/root/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome";
-const browser = await chromium.launch({
+const base = process.env.ATLAS_URL || "http://127.0.0.1:3017",
+  executable =
+    process.env.CHROMIUM_PATH ||
+    "/root/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome";
+const b = await chromium.launch({
   ...(fs.existsSync(executable) ? { executablePath: executable } : {}),
   args: [
     "--no-sandbox",
@@ -14,9 +14,10 @@ const browser = await chromium.launch({
     "--enable-unsafe-swiftshader",
   ],
 });
-const context = await browser.newContext({
-    viewport: { width: 1366, height: 960 },
+const context = await b.newContext({
+    viewport: { width: 1440, height: 1000 },
     reducedMotion: "reduce",
+    hasTouch: true,
   }),
   p = await context.newPage(),
   errors = [],
@@ -34,153 +35,167 @@ const atom = "atom-0",
   nucleus = atom + "/nucleus",
   proton = nucleus + "/proton-0",
   quark = proton + "/up-0";
-const label = (id) => p.locator(`.atom-label[data-node="${id}"]`);
-const shot = (name) => p.screenshot({ path: `artifacts/adaptive-${name}.png` });
-const settle = () => p.waitForTimeout(650);
-const value = async (id, key) =>
-  Number(await label(id).getAttribute(`data-${key}`));
-const reveal = (id, wanted) =>
+const nav = (d) => p.locator(`.zoom-navigation [data-direction="${d}"]`),
+  label = (id) => p.locator(`.atom-label[data-node="${id}"]`),
+  settle = () => p.waitForTimeout(650),
+  shot = (name) => p.screenshot({ path: `artifacts/navigation-${name}.png` });
+const view = (id) =>
   p.waitForFunction(
-    ({ id, wanted }) =>
+    (id) => document.querySelector("canvas")?.dataset.viewpoint === id,
+    id,
+  );
+const reveal = (id, v) =>
+  p.waitForFunction(
+    ({ id, v }) =>
       Math.abs(
         Number(
           document.querySelector(`.atom-label[data-node="${id}"]`)?.dataset
             .reveal,
-        ) - wanted,
-      ) < 0.01,
-    { id, wanted },
+        ) - v,
+      ) < 0.02,
+    { id, v },
   );
-const countIs = (n) =>
-  p.waitForFunction(
-    (n) => Number(document.querySelector("canvas")?.dataset.visibleNodes) === n,
-    n,
+const anchor = (id) =>
+  label(id).evaluate((e) => ({
+    x: Number(e.dataset.anchorX),
+    y: Number(e.dataset.anchorY),
+  }));
+async function ready() {
+  await p.waitForFunction(() =>
+    document.querySelector(".zoom-navigation button:not(:disabled)"),
   );
-async function zoom(n) {
-  for (let i = 0; i < Math.abs(n); i++) {
-    await p
-      .getByRole("button", { name: n > 0 ? "Zoomer" : "Dézoomer", exact: true })
-      .click();
-    await p.waitForTimeout(100);
-  }
   await settle();
 }
-async function search(text) {
+async function move(direction, target) {
+  assert.equal(await nav(direction).getAttribute("data-target"), target);
+  assert.ok((await nav(direction).getAttribute("aria-label")).includes("vers"));
+  await nav(direction).click();
+  await view(target);
+  await ready();
+  assert.equal(
+    await p.locator("canvas").getAttribute("data-viewpoint"),
+    target,
+  );
+}
+async function home() {
+  await p
+    .getByRole("button", { name: "Revoir toute la molécule", exact: true })
+    .click();
+  await view("molecule");
+  await ready();
+}
+async function search(term) {
   await p.getByRole("button", { name: "Rechercher", exact: true }).click();
   await p
     .getByRole("textbox", { name: "Rechercher un constituant" })
-    .fill(text);
+    .fill(term);
   await p.locator(".search-results>button").first().click();
-  await settle();
-}
-async function reset() {
-  await p.getByRole("button", { name: "Tout rassembler", exact: true }).click();
-  await countIs(3);
-  await settle();
+  await ready();
 }
 try {
   await p.goto(base, { waitUntil: "networkidle" });
-  await countIs(3);
-  await settle();
-  const canvas = p.locator("canvas"),
-    identity = await canvas.getAttribute("data-scene-id");
-  assert.ok(identity);
-  await shot("atoms");
-  // Zoom alone opens the hierarchy; reversing the same movement restores shells.
-  await zoom(4);
-  await reveal(nucleus, 1);
-  await reveal(quark, 0);
-  assert.ok((await value(atom, "open")) > 0.5);
-  await shot("zoom-nucleus");
-  await zoom(5);
-  await p.waitForFunction(() =>
-    [...document.querySelectorAll('.atom-label[data-node*="/up-"]')].some(
-      (e) => Number(e.dataset.reveal) > 0.5,
-    ),
-  );
-  assert.equal(
-    await p.getByRole("slider", { name: "Déplier l’ensemble" }).inputValue(),
-    "0",
-  );
-  assert.equal(await canvas.getAttribute("data-scene-id"), identity);
-  await shot("zoom-quarks");
-  await zoom(-9);
-  await countIs(3);
-  await reveal(nucleus, 0);
-  await reveal(quark, 0);
-  await shot("zoom-back");
-  // Real wheel gestures also reveal details without a scene or page change.
-  const at = await label(atom).evaluate((e) => ({
-    x: Number(e.dataset.anchorX),
-    y: Number(e.dataset.anchorY),
-  }));
-  await p.mouse.move(at.x, at.y);
-  for (let i = 0; i < 8; i++) {
-    await p.mouse.wheel(0, -450);
-    await p.waitForTimeout(100);
+  await view("molecule");
+  await ready();
+  const identity = await p.locator("canvas").getAttribute("data-scene-id");
+  assert.equal(await p.getByRole("slider").count(), 0);
+  assert.equal(await p.locator(".bottom-dock").count(), 0);
+  assert.equal(await p.locator(".zoom-navigation button").count(), 2);
+  assert.equal(await nav("out").isDisabled(), true);
+  await shot("overview");
+  for (const id of [atom, nucleus, proton, quark]) {
+    await move("in", id);
+    const pos = await anchor(id);
+    assert.ok(
+      pos.x > 300 && pos.x < 1115 && pos.y > 260 && pos.y < 905,
+      "destination centered in unobstructed scene",
+    );
+    assert.equal(
+      await p.locator("canvas").getAttribute("data-scene-id"),
+      identity,
+    );
+    if (id === atom) {
+      await reveal(nucleus, 1);
+      await reveal(proton, 0);
+    }
+    if (id === nucleus) {
+      await reveal(proton, 1);
+      await reveal(quark, 0);
+      assert.ok(
+        (await p.locator(".atom-label:visible").count()) < 8,
+        "dense nucleus annotations remain readable",
+      );
+    }
+    if (id === proton) {
+      await reveal(quark, 1);
+      await reveal(nucleus + "/proton-1/up-0", 0);
+    }
+    await shot(id.split("/").at(-1));
   }
-  await reveal(nucleus, 1);
-  assert.equal(await canvas.getAttribute("data-scene-id"), identity);
-  await shot("wheel");
-  await reset();
-  // Explicit opening remains independent, and an unreadably small branch is approached.
-  const point = await label(atom).evaluate((e) => ({
-    x: Number(e.dataset.anchorX),
-    y: Number(e.dataset.anchorY),
-  }));
-  await p.mouse.click(point.x, point.y);
-  await reveal(nucleus, 1);
-  await reveal("atom-1/nucleus", 0);
-  await reveal(quark, 0);
-  await settle();
-  await label(nucleus).click();
-  await reveal(proton, 1);
-  await settle();
-  await p.locator(`[data-tree-node="${proton}"] .tree-name`).click();
-  await reveal(quark, 1);
-  await settle();
-  assert.equal(await canvas.getAttribute("data-focus"), proton);
-  assert.ok(
-    (await p.locator(".breadcrumb").textContent()).includes("Proton 1"),
-  );
-  assert.equal(await canvas.getAttribute("data-scene-id"), identity);
-  await shot("branch-quarks");
-  await p.getByRole("button", { name: "Refermer ce constituant" }).click();
-  await reveal(quark, 0);
-  await reveal(proton, 1);
-  await reset();
-  // Full expansion is an intent, not permission to draw microscopic quarks everywhere.
-  await p.getByRole("button", { name: "Tout déplier", exact: true }).click();
-  await settle();
-  await reveal(quark, 0);
-  assert.equal(await p.locator(".atom-label").count(), 88);
-  assert.ok(Number(await canvas.getAttribute("data-visible-nodes")) < 88);
-  await shot("expanded-overview");
-  await search("proton 1");
-  await reveal(quark, 1);
-  await shot("expanded-close");
-  await zoom(-12);
-  await reveal(quark, 0);
+  assert.equal(await nav("in").isDisabled(), true);
+  assert.ok((await nav("in").innerText()).includes("PARTICULE ÉLÉMENTAIRE"));
+  for (const id of [proton, nucleus, atom, "molecule"]) await move("out", id);
+  assert.equal(await nav("out").isDisabled(), true);
   assert.equal(
-    await p.getByRole("slider", { name: "Déplier l’ensemble" }).inputValue(),
-    "100",
+    await p.locator("canvas").getAttribute("data-visible-nodes"),
+    "3",
   );
-  await shot("expanded-far");
-  await p
-    .getByRole("button", { name: "Approcher sans perdre le contexte" })
-    .click();
-  await reveal(quark, 1);
-  // Search, photons, theme and display options still use the same scene.
-  await search("électron 1");
-  await reveal("atom-0/electron-0", 1);
-  await p.getByRole("button", { name: "Envoyer un photon" }).click();
+  // A pointed sibling remains the named destination after moving to the button.
+  await label("atom-1").hover();
   await p.waitForFunction(
     () =>
-      document
-        .querySelector(".event-status")
-        ?.textContent.includes("Énergie absorbée"),
-    null,
-    { timeout: 30000 },
+      document.querySelector('[data-direction="in"]').dataset.target ===
+      "atom-1",
   );
+  await nav("in").hover();
+  await settle();
+  assert.equal(await nav("in").getAttribute("data-target"), "atom-1");
+  await move("in", "atom-1");
+  await move("in", "atom-1/nucleus");
+  await reveal("atom-1/nucleus/proton-0", 1);
+  await reveal("atom-0/nucleus", 0);
+  await home();
+  // Ray picking reaches the exact atom, and orbiting keeps its camera target centered.
+  const at = await anchor(atom);
+  await p.mouse.click(at.x, at.y);
+  await view(atom);
+  await ready();
+  const before = await anchor(atom);
+  await p.mouse.move(975, 700);
+  await p.mouse.down();
+  await p.mouse.move(1030, 750, { steps: 12 });
+  await p.mouse.up();
+  await settle();
+  const after = await anchor(atom);
+  assert.ok(Math.hypot(before.x - after.x, before.y - after.y) < 3);
+  await reveal(nucleus, 1);
+  await reveal(proton, 0);
+  await home();
+  // Real wheel navigation follows the pointed branch and reverses to its outer shells.
+  const pos = await anchor(atom);
+  await p.mouse.move(pos.x, pos.y);
+  for (let i = 0; i < 7; i++) {
+    await p.mouse.wheel(0, -500);
+    await p.waitForTimeout(130);
+  }
+  await settle();
+  assert.ok(
+    (await p.locator("canvas").getAttribute("data-viewpoint")).startsWith(atom),
+  );
+  await reveal(nucleus, 1);
+  await shot("wheel");
+  for (let i = 0; i < 10; i++) {
+    await p.mouse.wheel(0, 500);
+    await p.waitForTimeout(130);
+  }
+  await view("molecule");
+  await reveal(nucleus, 0);
+  await home();
+  // Search, photon exchange, themes and the graph all remain in the same renderer.
+  await search("électron 1");
+  await view("atom-0/electron-0");
+  assert.equal(await nav("in").isDisabled(), true);
+  await p.getByRole("button", { name: "Envoyer un photon" }).click();
+  await view(atom);
   await p.waitForFunction(
     () =>
       document
@@ -192,50 +207,94 @@ try {
   await p.getByRole("button", { name: "Mode clair", exact: true }).click();
   await settle();
   assert.equal(await p.locator("html").getAttribute("data-theme"), "light");
+  assert.equal(
+    await p.locator("canvas").getAttribute("data-scene-id"),
+    identity,
+  );
   await shot("light");
-  assert.equal(await canvas.getAttribute("data-scene-id"), identity);
+  await p.getByRole("button", { name: "Mode sombre", exact: true }).click();
   await p.getByRole("switch", { name: "Annotations", exact: true }).click();
   await settle();
   assert.equal(await p.locator(".atom-label:visible").count(), 0);
-  await p.getByRole("button", { name: "Mode sombre", exact: true }).click();
-  await reset();
-  assert.equal(await p.locator(".event-status").count(), 0);
-  // Mobile thresholds scale with the available scene, not the desktop pixel width.
+  await p.keyboard.press("r");
+  await view("molecule");
+  await ready();
   for (const [width, height] of [
     [390, 844],
     [320, 568],
+    [844, 390],
   ]) {
     await p.setViewportSize({ width, height });
     await p.goto(base, { waitUntil: "networkidle" });
-    await countIs(3);
-    await settle();
-    await zoom(5);
-    await reveal(nucleus, 1);
-    assert.equal(await p.locator(".detail-panel:visible").count(), 0);
-    await shot(`${width}-zoom`);
-    await zoom(-5);
-    await countIs(3);
-    await p.getByRole("button", { name: "Tout déplier", exact: true }).click();
-    await settle();
-    await reveal(quark, 0);
-    await p.getByRole("button", { name: "Afficher la composition" }).click();
-    await p.locator(`[data-tree-node="${proton}"] .tree-name`).click();
-    await reveal(quark, 1);
-    await settle();
-    assert.equal(await p.locator(".tree-panel:visible").count(), 0);
-    await shot(`${width}-quarks`);
+    await view("molecule");
+    await ready();
+    const box = await p.locator(".zoom-navigation").boundingBox();
+    assert.ok(
+      box.x >= 0 &&
+        box.x + box.width <= width &&
+        box.y + box.height < height / 2 + 20,
+    );
+    for (const id of [atom, nucleus, proton, quark]) await move("in", id);
+    assert.equal(await nav("in").isDisabled(), true);
     assert.ok(
       await p.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth,
       ),
     );
+    await shot(`${width}-leaf`);
+    for (const id of [proton, nucleus, atom, "molecule"]) await move("out", id);
+    if (width < 768) {
+      await p.getByRole("button", { name: "Afficher la composition" }).click();
+      await p.locator('[data-tree-node="atom-1"] .tree-name').click();
+      await view("atom-1");
+      await ready();
+      assert.equal(await p.locator(".tree-panel:visible").count(), 0);
+      await home();
+    }
   }
-  await p.setViewportSize({ width: 1366, height: 960 });
+  // Pinching toward a hydrogen atom must use that branch, not the default oxygen.
+  await p.setViewportSize({ width: 390, height: 844 });
+  await p.goto(base, { waitUntil: "networkidle" });
+  await ready();
+  const h = await anchor("atom-1"),
+    cdp = await context.newCDPSession(p);
+  await cdp.send("Input.dispatchTouchEvent", {
+    type: "touchStart",
+    touchPoints: [
+      { x: h.x - 5, y: h.y, id: 1 },
+      { x: h.x + 5, y: h.y, id: 2 },
+    ],
+  });
+  for (let i = 1; i <= 8; i++) {
+    await cdp.send("Input.dispatchTouchEvent", {
+      type: "touchMove",
+      touchPoints: [
+        { x: h.x - 5 - i * 5, y: h.y, id: 1 },
+        { x: h.x + 5 + i * 5, y: h.y, id: 2 },
+      ],
+    });
+    await p.waitForTimeout(100);
+  }
+  await cdp.send("Input.dispatchTouchEvent", {
+    type: "touchEnd",
+    touchPoints: [],
+  });
+  await settle();
+  await reveal("atom-1/nucleus", 1);
+  assert.ok(
+    (await p.locator("canvas").getAttribute("data-viewpoint")).startsWith(
+      "atom-1",
+    ),
+  );
+  await shot("pinch-hydrogen");
+  await p.setViewportSize({ width: 1440, height: 1000 });
   await p.goto(
     base +
-      "/?depth=100&focus=atom-0%2Fnucleus%2Fproton-0&node=atom-0%2Fnucleus%2Fproton-0",
+      "/?focus=atom-0%2Fnucleus%2Fproton-0&node=atom-0%2Fnucleus%2Fproton-0",
     { waitUntil: "networkidle" },
   );
+  await view(proton);
+  await ready();
   await reveal(quark, 1);
   for (const [molecule, total, atoms] of [
     ["co2", 204, 3],
@@ -244,32 +303,37 @@ try {
     await p
       .getByRole("combobox", { name: "Choisir une molécule" })
       .selectOption(molecule);
-    await countIs(atoms);
+    await view("molecule");
+    await ready();
     assert.equal(await p.locator(".atom-label").count(), total);
-    await p.getByRole("button", { name: "Tout déplier", exact: true }).click();
-    await settle();
-    assert.ok(
-      Number(await p.locator("canvas").getAttribute("data-visible-nodes")) <
-        total,
+    assert.equal(
+      await p.locator("canvas").getAttribute("data-visible-nodes"),
+      String(atoms),
     );
-    await reveal(quark, 0);
+    await move("in", atom);
     await shot(molecule);
   }
   await p.goto(
-    base + "/?molecule=__proto__&depth=NaN&open=not-a-node&focus=constructor",
+    base + "/?molecule=__proto__&depth=100&open=atom-0&focus=constructor",
     { waitUntil: "networkidle" },
   );
-  await countIs(3);
+  await view("molecule");
+  await ready();
+  assert.equal(
+    await p.locator("canvas").getAttribute("data-visible-nodes"),
+    "3",
+  );
+  assert.equal(await p.getByRole("slider").count(), 0);
   assert.deepEqual(errors, []);
   assert.deepEqual(failures, []);
   console.log(
-    "PASS: zoom-driven layers and reverse collapse; real wheel navigation; size-gated full expansion; close/far focused branches; real ray picking; independent manual opening; same canvas; photon; search; theme; mobile adaptive detail; shared links; molecule composition totals; no browser/request errors.",
+    "PASS: two named destinations; exact ancestor/child chain; end states; stable pointed choices; centered targets and orbit; wheel reversal; mobile/landscape navigation; hydrogen pinch targeting; no gauge; search/photon/theme/share; all molecules; persistent renderer; no browser/request errors.",
   );
 } catch (e) {
   await shot("failure");
   console.error(e);
-  console.error({ errors, failures, url: p.url() });
+  console.error({ url: p.url(), errors, failures });
   process.exitCode = 1;
 } finally {
-  await browser.close();
+  await b.close();
 }

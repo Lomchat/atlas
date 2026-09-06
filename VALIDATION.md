@@ -1,22 +1,22 @@
-# Validation — 6 September 2026 — zoom-adaptive detail
+# Validation — 6 September 2026 — named zoom navigation
 
 Production: https://atlas.chalco.website
 
 ## Behavior
 
-- A constituent's projected size now controls which layer is drawn. Zooming in progressively opens atoms, nuclei and nucleons; zooming out restores their envelopes.
-- Manual expansion is also gated by readability. A fully unfolded overview no longer displays microscopic quarks. Clicking a branch that is too small approaches it, and explicitly closing a branch remains respected.
-- The central branch stays prominent while surrounding structures fade. The inspector, breadcrumb, labels and displayed-constituent count follow the visible detail.
-- Total graph sizes remain 88 (water), 204 (carbon dioxide), and 84 (methane), excluding the molecule root. These are composition totals, not counts that must all be rendered simultaneously.
-- Deep zoom remains available. The near clipping plane adapts to camera distance, and wheel changes invalidate the rendered frame even for tiny movements.
+- The unfolding gauge, full-expansion controls and automatic unfolding mode have been removed.
+- Exactly two main navigation buttons name the outward parent and inward child. They follow molecule → atom → nucleus → nucleon → elementary particle, with the same path back. Endpoint buttons are disabled with an explicit label.
+- Pointing at a visible sibling changes the inward destination, which remains selected when moving the pointer to the button. Clicking an object, its label or a tree entry targets that exact constituent.
+- Child coordinates remain fixed throughout exploration. Camera fitting uses the selected object's center and bounds. Readability uses camera-to-object distance instead of projected depth, with hysteresis and one targeted branch. Orbiting no longer shifts the annotation coordinates behind the camera update.
+- Wheel and pinch navigation remain available. A pinch over a hydrogen atom follows that branch instead of the default oxygen branch.
+- The underlying graph retains 88 (water), 204 (carbon dioxide) and 84 (methane) nodes excluding the root. Only the readable hierarchy is displayed, in the same renderer.
 
 ## Checks
 
-- TypeScript and the production build passed. The new bundle was built separately and deployed with an atomic directory exchange. Previous versions are retained in `releases/`; older asset hashes remain available for clients loading an earlier document.
-- The Playwright suite passed locally and against the public HTTPS site, without browser errors or failed application requests: zoom alone reveals layers; reversing the movement restores three closed atoms; actual wheel events open contents; microscopic detail disappears from fully expanded and distant focused views; approaching restores it; branch opening/closing, actual ray picking, search, photon absorption/emission, theme and shared links still work without recreating the canvas.
-- Mobile checks at 390 × 844 and 320 × 568 passed: zoom-driven layers, reverse collapse, detail suppression in the overview, and approaching a quark-containing branch without a covering drawer. Desktop checks use 1366 × 960.
-- The suite checks composition totals, molecule changes, invalid URL values, browser errors and failed application requests.
-- A separate check at 1440 × 1000 with normal motion passed locally and on the public site: intermediate opening values, stable detail after the camera settles, reverse collapse, persistent canvas identity and no page errors.
-- Screenshots are in `artifacts/adaptive-*.png`. Caddy serves `/srv/explode/dist` over HTTPS.
+- TypeScript and production build passed. The build is staged outside the live directory before an atomic directory exchange. Older releases and hashed assets remain available.
+- The complete local Playwright suite passed: named inward/outward chain; elementary and overview endpoints; no gauge; remembered sibling choice; actual mesh picking; centered targets after orbit; wheel progression and reversal; photon exchange; search; themes; shared focus; invalid URLs; all molecule graph totals; persistent renderer; no browser errors or failed application requests.
+- Layout and navigation passed at 1440 × 1000, 390 × 844, 320 × 568 and 844 × 390. Mobile composition selection closes the drawer. A two-touch gesture was injected through Chromium's touch input protocol to verify hydrogen pinch targeting.
+- A separate normal-motion check passed both locally and on the public HTTPS site: named camera destinations, stable centered targets after transitions, outward navigation and persistent renderer identity.
+- Screenshots are in `artifacts/navigation-*.png`. Production is served statically by Caddy from `/srv/explode/dist`.
 
-Browser checks use headless Chromium with software WebGL. They verify behavior and layout, not physical-device frame rates or actual touchscreen hardware. Geometry remains a schematic composition model, not a quantum simulation.
+Checks use headless Chromium and software WebGL. Touch events are emulated; these tests do not measure physical-device frame rates or touchscreen hardware. The geometry remains a schematic composition model, not a quantum simulation.

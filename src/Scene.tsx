@@ -113,7 +113,7 @@ export default function Scene({
     const camera = new T.PerspectiveCamera(36, 1, 0.015, 180);
     camera.position.set(0.5, 2.9, 12);
     const controls = new OrbitControls(camera, canvas);
-    controls.enableDamping = true;
+    controls.enableDamping = !reduced;
     controls.dampingFactor = 0.075;
     // Let the camera approach even the smallest nested constituents.
     controls.minDistance = 0.00001;
@@ -298,6 +298,7 @@ export default function Scene({
       label.innerHTML = `<span class="label-symbol">${node.entry.symbol}</span><span class="label-name">${node.entry.name}</span>`;
       label.style.setProperty("--particle", node.entry.color);
       label.onclick = () => pick.current(node.id);
+      label.onpointerenter = () => preferVisible(node.id);
       label.ondblclick = (e) => {
         e.preventDefault();
         focus.current(node.id);
@@ -424,9 +425,9 @@ export default function Scene({
       fitTime = 1,
       lastFocus: string | null = null,
       lastReset = -1,
-      lastZoom = 0,
+      lastNavigation = -1,
       lastTheme: boolean | undefined,
-      rootOpen = 0,
+      zoomAnchor: string | null = state.focus,
       lastDetail = "",
       detailContext: string | null = null,
       contextStrength = 0,
@@ -438,8 +439,8 @@ export default function Scene({
         landscape = height < 520 && width > height;
       const left = mobile ? 16 : landscape ? 215 : width < 1150 ? 260 : 300,
         right = mobile ? width - 52 : width - 325,
-        top = landscape ? 135 : mobile ? 148 : 178,
-        bottom = height - (landscape ? 116 : mobile ? 220 : 205);
+        top = landscape ? 160 : mobile ? (height < 650 ? 210 : 250) : 260,
+        bottom = height - (landscape ? 60 : mobile ? 150 : 95);
       availableW = Math.max(180, right - left);
       availableH = Math.max(90, bottom - top);
       renderer.setSize(width, height);
@@ -468,6 +469,35 @@ export default function Scene({
       hover: string | null = null;
     const pointers = new Set<number>();
     let hoverTime = 0;
+    const preferred = new Map<string, string>();
+    function remember(id: string) {
+      for (const n of ancestors(graph, id))
+        if (n.parent) preferred.set(n.parent, n.id);
+    }
+    function nextOf(id: string): string | null {
+      const children = graph.nodes.get(id)!.children;
+      return preferred.get(id) || children[0] || null;
+    }
+    function preferVisible(id: string) {
+      const path = ancestors(graph, id),
+        currentId = detailContext || graph.root;
+      const index = path.findIndex((n) => n.id === currentId);
+      if (index >= 0 && path[index + 1])
+        preferred.set(currentId, path[index + 1].id);
+    }
+    function wheelTarget(e: WheelEvent) {
+      if (e.deltaY < 0) {
+        const id = hit(e.clientX, e.clientY);
+        if (id) {
+          zoomAnchor = id;
+          remember(id);
+        }
+      }
+    }
+    canvas.addEventListener("wheel", wheelTarget, {
+      capture: true,
+      passive: true,
+    });
     function hit(x: number, y: number) {
       const box = canvas.getBoundingClientRect();
       pointer.set(
@@ -477,20 +507,25 @@ export default function Scene({
       raycaster.setFromCamera(pointer, camera);
       return raycaster.intersectObjects(pickers, false).find((h) => {
         const view = views.get(h.object.userData.nodeId)!;
-        const fid = current.current.focus;
         return (
           view.reveal > 0.2 &&
-          (!fid ||
-            view.node.id === fid ||
-            view.node.id.startsWith(fid + "/")) &&
+          view.skin.material.opacity > 0.05 &&
           (!view.node.children.length || view.open < 0.45)
         );
       })?.object.userData.nodeId as string | undefined;
     }
     function pointerDown(e: PointerEvent) {
       pointers.add(e.pointerId);
-      if (pointers.size > 1) multitouch = true;
-      else {
+      if (pointers.size > 1) {
+        multitouch = true;
+        if (down) {
+          const id = hit((e.clientX + down.x) / 2, (e.clientY + down.y) / 2);
+          if (id) {
+            zoomAnchor = id;
+            remember(id);
+          }
+        }
+      } else {
         multitouch = false;
         down = { x: e.clientX, y: e.clientY, id: e.pointerId };
       }
@@ -520,8 +555,9 @@ export default function Scene({
       canvas.style.cursor = hover ? "pointer" : "grab";
       tooltip.hidden = !hover;
       if (hover) {
+        preferVisible(hover);
         const node = graph.nodes.get(hover)!;
-        tooltip.textContent = `${node.entry.name} · ${node.children.length ? "cliquer pour ouvrir" : "particule élémentaire"}`;
+        tooltip.textContent = `${node.entry.name} · ${node.children.length ? "cliquer pour se rapprocher" : "particule élémentaire"}`;
         tooltip.style.left = Math.min(width - 245, e.clientX + 15) + "px";
         tooltip.style.top = Math.min(height - 110, e.clientY + 18) + "px";
       }
@@ -572,40 +608,36 @@ export default function Scene({
       clock += dt;
       const s = current.current;
       let moving = false;
-      const nextRoot = expansion(graph.nodes.get(graph.root)!, s);
-      rootOpen = reduced
-        ? nextRoot
-        : T.MathUtils.damp(rootOpen, nextRoot, 7, dt);
-      if (Math.abs(rootOpen - nextRoot) > 0.0001) moving = true;
       if (lastTheme !== s.light) {
         lastTheme = s.light;
         scene.background = color.set(s.light ? "#edf0f5" : "#111318").clone();
         platformMat.color.set(s.light ? "#c8cdd7" : "#1b1e26");
         renderer.toneMappingExposure = s.light ? 1.05 : 1;
-        fitTime = 1;
       }
-      if (s.focus !== lastFocus || s.reset !== lastReset) {
+      if (
+        s.focus !== lastFocus ||
+        s.reset !== lastReset ||
+        s.navigation !== lastNavigation
+      ) {
         fitTime = 1;
         lastFocus = s.focus;
+        lastNavigation = s.navigation;
+        zoomAnchor = s.focus;
+        if (s.focus) remember(s.focus);
         if (s.reset !== lastReset) {
           lastReset = s.reset;
           camera.position.set(0.5, 2.9, 12);
           controls.target.set(0, 0, 0);
         }
       }
-      if (s.zoom !== lastZoom) {
-        camera.position
-          .sub(controls.target)
-          .multiplyScalar(Math.pow(0.8, s.zoom - lastZoom))
-          .add(controls.target);
-        lastZoom = s.zoom;
-        fitTime = 0;
-      }
-      if (oldState?.depth !== s.depth || oldState?.overrides !== s.overrides)
-        fitTime = 1;
       camera.updateMatrixWorld();
       const detailUnit = Math.max(120, Math.min(availableW, availableH));
-      const aim = controls.target.clone().project(camera);
+      const route = new Set<string>();
+      let cursor = nextOf(graph.root);
+      while (cursor) {
+        route.add(cursor);
+        cursor = nextOf(cursor);
+      }
       for (const view of views.values()) {
         const n = view.node,
           parent = n.parent === graph.root ? null : views.get(n.parent!)!;
@@ -613,10 +645,10 @@ export default function Scene({
         // projected size. Opening a shell must not inflate its own LOD metric.
         if (n.kind === "atom") {
           const home = molecules[s.molecule].atoms[n.atom].pos;
-          view.group.position.set(...home).multiplyScalar(1 + 2.35 * rootOpen);
+          view.group.position.set(...home);
         } else if (n.kind === "nucleus") {
           view.group.position.set(0, 0, 0);
-          view.group.scale.setScalar(T.MathUtils.lerp(0.3, 1, parent!.open));
+          view.group.scale.setScalar(1);
         } else if (n.kind === "electron") {
           const count = elements[n.element].z,
             angle = n.index * 2.39996,
@@ -627,52 +659,39 @@ export default function Scene({
             Math.sin(angle * 1.9) * r * 0.42,
           );
         } else if (n.kind === "proton" || n.kind === "neutron") {
-          view.group.position
-            .copy(nucleiPositions.get(n.parent!)![n.index])
-            .multiplyScalar(T.MathUtils.lerp(0.28, 1, parent!.open));
+          view.group.position.copy(nucleiPositions.get(n.parent!)![n.index]);
         } else {
           const angle = (n.index / 3) * Math.PI * 2 + Math.PI / 2,
             r = parent!.openRadius * 0.58;
-          view.group.position
-            .set(Math.cos(angle) * r, Math.sin(angle) * r, 0)
-            .multiplyScalar(0.4 + parent!.open * 0.6);
+          view.group.position.set(Math.cos(angle) * r, Math.sin(angle) * r, 0);
         }
         view.group.updateWorldMatrix(true, false);
         view.group.getWorldPosition(view.world);
         const worldRadius =
           view.closedRadius * view.group.getWorldScale(point).x;
-        point.copy(view.world).applyMatrix4(camera.matrixWorldInverse);
-        const cameraDepth = -point.z;
+        // A true distance metric and fixed local positions keep the same
+        // zoom zone when orbiting; off-axis and behind-camera nodes cannot pop open.
         view.screenSize =
-          cameraDepth > 0 ||
-          camera.position.distanceTo(view.world) < worldRadius
-            ? (height * worldRadius) /
-              (Math.tan(T.MathUtils.degToRad(camera.fov / 2)) *
-                Math.max(camera.near, cameraDepth))
-            : 0;
-        point.copy(view.world).project(camera);
-        const offset = Math.hypot(
-            ((point.x - aim.x) * width) / 2,
-            ((point.y - aim.y) * height) / 2,
-          ),
-          attention =
-            1 - smooth(0.5, 1.25, offset / Math.max(1, view.screenSize / 2)),
-          sizeRatio = view.screenSize / detailUnit,
+          (height * worldRadius) /
+          (Math.tan(T.MathUtils.degToRad(camera.fov / 2)) *
+            Math.max(camera.near, camera.position.distanceTo(view.world)));
+        const sizeRatio = view.screenSize / detailUnit,
           atom = n.kind === "atom",
           nucleus = n.kind === "nucleus",
-          readableStart = atom ? 0.06 : nucleus ? 0.12 : 0.14,
-          readableEnd = atom ? 0.14 : nucleus ? 0.25 : 0.3,
-          requested = expansion(n, s),
-          automatic = smooth(
-            atom ? 0.7 : nucleus ? 0.6 : 0.45,
-            atom ? 1.25 : nucleus ? 1.05 : 0.85,
-            sizeRatio,
-          ),
-          goal =
-            !n.children.length || s.overrides[n.id] === 0
-              ? 0
-              : Math.max(requested, automatic * attention) *
-                smooth(readableStart, readableEnd, sizeRatio);
+          readableStart = atom ? 0.07 : 0.1,
+          readableEnd = atom ? 0.18 : nucleus ? 0.2 : 0.25,
+          requested = route.has(n.id) ? expansion(n, s) : 0,
+          automatic = route.has(n.id)
+            ? smooth(
+                atom ? 0.7 : nucleus ? 0.6 : 0.45,
+                atom ? 1.25 : nucleus ? 1.05 : 0.85,
+                sizeRatio,
+              )
+            : 0,
+          goal = n.children.length
+            ? Math.max(requested, automatic) *
+              smooth(readableStart, readableEnd, sizeRatio)
+            : 0;
         view.readable = sizeRatio >= readableEnd;
         const previousOpen = view.open,
           previousReveal = view.reveal;
@@ -694,9 +713,8 @@ export default function Scene({
         );
         view.skin.scale.setScalar(view.radius);
         view.wire.scale.setScalar(view.radius * 1.01);
-        const inFocus =
-            !s.focus || n.id === s.focus || n.id.startsWith(s.focus + "/"),
-          context = inFocus ? 1 : 0.025;
+        const inFocus = true,
+          context = 1;
         view.skin.material.opacity =
           view.reveal * (1 - smooth(0.05, 0.7, view.open) * 0.975) * context;
         view.skin.material.depthWrite = view.skin.material.opacity > 0.95;
@@ -717,8 +735,7 @@ export default function Scene({
           (inFocus || related ? 1 : 0.12);
         view.wire.visible = view.open > 0.01 && s.cloud;
         if (view.cloud) {
-          view.cloud.visible =
-            s.cloud && view.open > 0.05 && (!s.focus || s.focus === n.id);
+          view.cloud.visible = s.cloud && view.open > 0.05;
           (view.cloud.material as T.PointsMaterial).opacity = view.open * 0.2;
         }
         for (let i = 0; i < view.links.length; i++) {
@@ -748,32 +765,21 @@ export default function Scene({
         previousStrength = contextStrength;
       detailContext = null;
       contextStrength = 0;
-      let candidates = s.focus ? [s.focus] : graph.atoms;
-      while (candidates.length) {
-        let closest: View | undefined,
-          best = Infinity;
-        for (const id of candidates) {
-          const candidate = views.get(id)!;
-          if (!candidate.node.children.length || candidate.reveal < 0.5)
-            continue;
-          point.copy(candidate.world).project(camera);
-          if (point.z > 1) continue;
-          const distance =
-            ((point.x - aim.x) * width) ** 2 +
-            ((point.y - aim.y) * height) ** 2;
-          if (distance < best) {
-            best = distance;
-            closest = candidate;
-          }
+      for (const id of route) {
+        const candidate = views.get(id)!;
+        if (candidate.reveal < 0.5) break;
+        if (candidate.node.children.length) {
+          const threshold = id === previousContext ? 0.4 : 0.62;
+          if (candidate.open < threshold) break;
+          detailContext = id;
+          contextStrength = smooth(0.25, 0.65, candidate.open);
+        } else if (
+          candidate.screenSize / detailUnit > 0.42 &&
+          (s.focus === id || zoomAnchor === id)
+        ) {
+          detailContext = id;
+          contextStrength = 1;
         }
-        if (!closest) break;
-        const strength =
-          smooth(0.3, 0.6, closest.screenSize / detailUnit) *
-          smooth(0.1, 0.35, closest.open);
-        if (strength < 0.01) break;
-        detailContext = closest.node.id;
-        contextStrength = strength;
-        candidates = closest.node.children;
       }
       if (
         previousContext !== detailContext ||
@@ -812,9 +818,7 @@ export default function Scene({
         mesh.scale.y = direction.length();
         mesh.quaternion.setFromUnitVectors(v(0, 1, 0), direction.normalize());
         mesh.material.opacity =
-          (1 - smooth(0, 0.65, rootOpen)) *
-          (1 - atomOpening) *
-          (1 - contextStrength * 0.97);
+          (1 - atomOpening) * (1 - contextStrength * 0.97);
         mesh.visible = mesh.material.opacity > 0.01;
       });
       bondTraces.forEach(({ line, a, b }) => {
@@ -827,13 +831,11 @@ export default function Scene({
         attr.setXYZ(1, q.x, q.y, q.z);
         attr.needsUpdate = true;
         line.geometry.computeBoundingSphere();
-        (line.material as T.LineBasicMaterial).opacity = rootOpen * 0.18;
+        (line.material as T.LineBasicMaterial).opacity = atomOpening * 0.09;
         line.visible = s.cloud;
       });
-      platform.visible = rim.visible =
-        rootOpen < 0.45 && atomOpening < 0.45 && !s.focus;
-      platformMat.opacity =
-        1 - smooth(0, 0.45, Math.max(rootOpen, atomOpening));
+      platform.visible = rim.visible = atomOpening < 0.45 && !s.focus;
+      platformMat.opacity = 1 - smooth(0, 0.45, atomOpening);
       (rim.material as T.LineBasicMaterial).opacity =
         platformMat.opacity * 0.25;
       if (s.photon !== lastPhoton) {
@@ -890,7 +892,7 @@ export default function Scene({
           center.copy(focused.world);
           const worldScale = focused.group.getWorldScale(point).x,
             r = Math.max(
-              0.16,
+              0.02,
               (focused.node.children.length
                 ? focused.openRadius
                 : focused.closedRadius) * worldScale,
@@ -900,11 +902,7 @@ export default function Scene({
         } else {
           for (const id of graph.atoms) {
             const a = views.get(id)!;
-            const radius = T.MathUtils.lerp(
-              a.closedRadius,
-              a.openRadius,
-              expansion(a.node, s),
-            );
+            const radius = a.closedRadius;
             bounds.expandByPoint(a.world.clone().addScalar(radius));
             bounds.expandByPoint(a.world.clone().addScalar(-radius));
           }
@@ -929,6 +927,7 @@ export default function Scene({
       }
       controls.autoRotate = s.rotate && !reduced;
       const cameraChanged = controls.update(dt);
+      camera.updateMatrixWorld();
       // Keep close details visible without sacrificing depth precision at overview scale.
       const near = T.MathUtils.clamp(
         controls.getDistance() * 0.01,
@@ -946,7 +945,7 @@ export default function Scene({
         let layer = 0;
         const opened: string[] = [],
           readable: string[] = [];
-        const focusId = detailContext || s.focus;
+        const focusId = detailContext;
         const focused = focusId ? graph.nodes.get(focusId) : null;
         views.forEach((view) => {
           point.copy(view.world).project(camera);
@@ -978,7 +977,11 @@ export default function Scene({
           }
           const direct =
             focused &&
-            (view.node.parent === focused.id || view.node.id === focused.id);
+            (view.node.id === focused.id ||
+              (view.node.parent === focused.id &&
+                (focused.children.length <= 4 ||
+                  view.node.id === nextOf(focused.id) ||
+                  view.node.id === hover)));
           const selected = s.selected === view.node.id;
           let eligible =
             selected ||
@@ -1000,8 +1003,15 @@ export default function Scene({
             view.reveal > 0.45 &&
             eligible &&
             point.z < 1 &&
-            y > (height < 650 ? 150 : width < 768 ? 205 : 220) &&
-            y < height - 165 &&
+            y >
+              (width < 768
+                ? height < 650
+                  ? 220
+                  : 265
+                : height < 520
+                  ? 170
+                  : 260) &&
+            y < height - (width < 768 ? 150 : 90) &&
             x > 12 &&
             x < width - 30;
           view.label.hidden = !show;
@@ -1010,7 +1020,10 @@ export default function Scene({
           if (view.reveal > 0.45) count++;
         });
         canvas.dataset.visibleNodes = String(count);
-        canvas.dataset.depth = s.depth.toFixed(2);
+        const viewpoint =
+          fitTime > 0 ? s.focus || graph.root : detailContext || graph.root;
+        canvas.dataset.viewpoint = viewpoint;
+        canvas.dataset.cameraDistance = controls.getDistance().toFixed(6);
         canvas.dataset.focus = s.focus || "";
         const snapshot: SceneDetail = {
           molecule: s.molecule,
@@ -1019,6 +1032,10 @@ export default function Scene({
           count,
           layer: ["Atomes", "Noyaux & électrons", "Nucléons", "Quarks"][layer],
           context: detailContext,
+          viewpoint,
+          next: nextOf(viewpoint),
+          navigation: s.navigation,
+          transitioning: fitTime > 0,
         };
         const signature = JSON.stringify(snapshot);
         canvas.dataset.detailLayer = snapshot.layer;
@@ -1050,6 +1067,7 @@ export default function Scene({
       cancelAnimationFrame(raf);
       observer.disconnect();
       controls.dispose();
+      canvas.removeEventListener("wheel", wheelTarget, true);
       canvas.removeEventListener("pointerdown", pointerDown);
       canvas.removeEventListener("pointerup", pointerUp);
       canvas.removeEventListener("pointermove", pointerMove);
