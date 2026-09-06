@@ -1,19 +1,22 @@
-# Validation — 6 September 2026 — continuous hierarchy
+# Validation — 6 September 2026 — zoom-adaptive detail
 
 Production: https://atlas.chalco.website
 
-- TypeScript checking and the production build passed. The build was staged separately, then exchanged atomically with the live directory; the previous version is retained in `releases/`. Existing asset hashes were preserved for clients already loading the old document.
-- The complete Playwright suite passed both locally and against the public HTTPS site, with no browser errors or failed application requests: persistent canvas identity, actual ray picking, independent atom/nucleus/nucleon opening, nested quark visibility, parent collapse, continuous global expansion, focus with surrounding context, photon absorption/emission in the same scene, theme changes without remounting, search, shared hierarchy URLs, invalid query handling and all three molecules.
-- Fully expanded constituent counts excluding the molecule root: water 88, carbon dioxide 204, methane 84. These include atoms, nuclei, nucleons, electrons and valence quarks at their respective nesting levels.
-- Mobile checks at 390 × 844 and 320 × 568 verify direct opening without a covering details drawer, tree-based opening and full expansion. Desktop checks use 1366 × 960.
-- A separate check with normal motion at 1440 × 1000 passed: intermediate opening values, automatic unfolding, pause, persistent scene identity and no page errors. The main suite uses reduced motion for deterministic geometry assertions.
-- The interface uses a neutral charcoal palette and a light theme. Screenshots of the assembled molecule, nested expansion, individual branches, focused quarks and mobile layouts are in `artifacts/continuum-*.png`.
-- HTTPS returns 200; HTTP redirects to HTTPS. Caddy serves `/srv/explode/dist` without an application process.
+## Behavior
 
-Browser checks use headless Chromium with software WebGL. They verify behavior and layout, not physical-device frame rates or actual touchscreen hardware. Geometry is a schematic composition model, not a quantum simulation.
+- A constituent's projected size now controls which layer is drawn. Zooming in progressively opens atoms, nuclei and nucleons; zooming out restores their envelopes.
+- Manual expansion is also gated by readability. A fully unfolded overview no longer displays microscopic quarks. Clicking a branch that is too small approaches it, and explicitly closing a branch remains respected.
+- The central branch stays prominent while surrounding structures fade. The inspector, breadcrumb, labels and displayed-constituent count follow the visible detail.
+- Total graph sizes remain 88 (water), 204 (carbon dioxide), and 84 (methane), excluding the molecule root. These are composition totals, not counts that must all be rendered simultaneously.
+- Deep zoom remains available. The near clipping plane adapts to camera distance, and wheel changes invalidate the rendered frame even for tiny movements.
 
-## Deep zoom correction
+## Checks
 
-The camera can approach to 0.00001 scene units (previously 0.28). Its near clipping plane now adapts to the current distance. Control changes also invalidate the rendered frame so small wheel movements remain visible at extreme magnification.
+- TypeScript and the production build passed. The new bundle was built separately and deployed with an atomic directory exchange. Previous versions are retained in `releases/`; older asset hashes remain available for clients loading an earlier document.
+- The Playwright suite passed locally and against the public HTTPS site, without browser errors or failed application requests: zoom alone reveals layers; reversing the movement restores three closed atoms; actual wheel events open contents; microscopic detail disappears from fully expanded and distant focused views; approaching restores it; branch opening/closing, actual ray picking, search, photon absorption/emission, theme and shared links still work without recreating the canvas.
+- Mobile checks at 390 × 844 and 320 × 568 passed: zoom-driven layers, reverse collapse, detail suppression in the overview, and approaching a quark-containing branch without a covering drawer. Desktop checks use 1366 × 960.
+- The suite checks composition totals, molecule changes, invalid URL values, browser errors and failed application requests.
+- A separate check at 1440 × 1000 with normal motion passed locally and on the public site: intermediate opening values, stable detail after the camera settles, reverse collapse, persistent canvas identity and no page errors.
+- Screenshots are in `artifacts/adaptive-*.png`. Caddy serves `/srv/explode/dist` over HTTPS.
 
-TypeScript and production build passed. A targeted Chromium check exercised 40 zoom-button clicks, then wheel zoom beyond the former limit: distance reached 0.00119 with an adaptive near plane. Rendering, zooming back out, reset, persistent canvas identity and absence of page errors were checked. The production HTML references the new bundle, which was fetched through public HTTPS and matched byte for byte against the tested build.
+Browser checks use headless Chromium with software WebGL. They verify behavior and layout, not physical-device frame rates or actual touchscreen hardware. Geometry remains a schematic composition model, not a quantum simulation.

@@ -52,6 +52,14 @@ export interface ExplorerState {
   photon: number;
   higgs: boolean;
 }
+export interface SceneDetail {
+  molecule: MoleculeId;
+  open: string[];
+  readable: string[];
+  count: number;
+  layer: string;
+  context: string | null;
+}
 export const defaultState: ExplorerState = {
   molecule: "water",
   depth: 0,

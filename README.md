@@ -6,13 +6,14 @@ An interactive French-language 3D atlas of matter. A single molecule stays in th
 
 ## Explore
 
-- Click an atom, nucleus or nucleon to reveal its contents in place. Each branch can be opened or closed independently.
-- Drag the global slider to unfold the entire hierarchy continuously, or play its animation.
+- Zoom toward a constituent to reveal successive layers automatically: atom, nucleus, nucleons, quarks. Zooming out restores the enclosing shells. Detail thresholds use the available viewport size, including on mobile.
+- Click an atom, nucleus or nucleon to open its branch. If it is too small to read, the camera approaches it. Explicitly closing a branch keeps it closed until reopened.
+- Drag the global slider to unfold the hierarchy continuously, or play its animation. Requested contents are shown when large enough to read; even a fully unfolded molecule simplifies at a distance.
 - Double-click / approach a constituent to zoom into it. Context remains visible as ghosted surrounding structures; breadcrumbs and the composition tree preserve ancestry.
 - Reassemble the molecule, orbit, zoom, toggle annotations and envelopes, or switch light / dark mode without rebuilding the scene.
 - Observe a photon exchange or display an illustrative Higgs field in the same scene. Gluon curves appear inside opened nucleons.
 - Search the constituents of the current molecule and share its exact open branches, selection and focus via URL.
-- Water, carbon dioxide and methane. Respectively 88, 204 and 84 nested constituents excluding the molecule root; electrons and valence quarks are counted individually.
+- Water, carbon dioxide and methane. Respectively 88, 204 and 84 total nested constituents excluding the molecule root (not all are displayed simultaneously); electrons and valence quarks are counted individually.
 
 Keyboard: `R` reassemble, `L` annotations, Space animate/pause, `/` search, Escape return to the full molecule.
 
@@ -34,7 +35,7 @@ To build without changing the live site:
 npm run build -- --outDir .next-dist
 ```
 
-`src/continuum.ts` defines the persistent composition graph, ancestor paths and expansion state. `src/Scene.tsx` builds that graph once per molecule and interpolates its existing objects. Only changing the molecule recreates the renderer; opening nodes, scrubbing, focusing, changing theme and playing interactions do not.
+`src/continuum.ts` defines the persistent composition graph, ancestor paths and expansion state. `src/Scene.tsx` builds that graph once per molecule and interpolates its existing objects. Projected closed-shell size controls automatic opening and gates manually requested detail. The measured radius is independent of the interpolated shell radius, and camera fitting uses stable dimensions to avoid feedback loops. Nearby branches retain emphasis while their surroundings fade into context. Only changing the molecule recreates the renderer; opening nodes, scrubbing, focusing, changing theme and playing interactions do not.
 
 ## Verification
 
@@ -45,7 +46,7 @@ ATLAS_URL=https://atlas.chalco.website npm test
 
 The local suite expects `npm run dev` to be running. Set `CHROMIUM_PATH` if needed, or install Chromium with `npx playwright install chromium`.
 
-The browser suite checks persistent canvas identity, actual ray picking, independent branch opening, parent/child visibility, collapse, continuous global scrubbing, context-preserving focus, photon interaction in the same scene, theme changes without remounting, shared hierarchy URLs, mobile direct manipulation, constituent totals for all molecules and invalid URL handling. Screenshots are saved to `artifacts/`.
+The browser suite checks zoom-driven opening and reverse collapse, wheel navigation, detail suppression in fully unfolded overviews, focused near/far views, persistent canvas identity, actual ray picking, manual branch opening and closure, photon interaction, search, theme, shared URLs, mobile adaptive detail, composition totals and invalid URL handling. Screenshots are saved to `artifacts/`.
 
 ## Scientific conventions
 

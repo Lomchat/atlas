@@ -4,7 +4,12 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { elements, molecules } from "./data";
 import { ancestors, expansion } from "./continuum";
-import type { ExplorerState, MatterGraph, MatterNode } from "./continuum";
+import type {
+  ExplorerState,
+  MatterGraph,
+  MatterNode,
+  SceneDetail,
+} from "./continuum";
 
 type Props = {
   state: ExplorerState;
@@ -12,6 +17,7 @@ type Props = {
   onPick: (id: string) => void;
   onFocus: (id: string) => void;
   onEvent: (text: string) => void;
+  onDetail: (detail: SceneDetail) => void;
 };
 type View = {
   node: MatterNode;
@@ -27,6 +33,8 @@ type View = {
   cloud?: T.Points;
   links: T.Line[];
   world: T.Vector3;
+  screenSize: number;
+  readable: boolean;
 };
 const v = (x = 0, y = 0, z = 0) => new T.Vector3(x, y, z);
 const smooth = (a: number, b: number, x: number) =>
@@ -55,16 +63,19 @@ export default function Scene({
   onPick,
   onFocus,
   onEvent,
+  onDetail,
 }: Props) {
   const host = useRef<HTMLDivElement>(null),
     current = useRef(state),
     pick = useRef(onPick),
     focus = useRef(onFocus),
-    event = useRef(onEvent);
+    event = useRef(onEvent),
+    detail = useRef(onDetail);
   current.current = state;
   pick.current = onPick;
   focus.current = onFocus;
   event.current = onEvent;
+  detail.current = onDetail;
   const [error, setError] = useState(false);
   useEffect(() => {
     const el = host.current!;
@@ -107,6 +118,7 @@ export default function Scene({
     // Let the camera approach even the smallest nested constituents.
     controls.minDistance = 0.00001;
     controls.maxDistance = 90;
+    controls.zoomToCursor = true;
     let controlsDirty = true;
     controls.addEventListener("change", () => {
       controlsDirty = true;
@@ -304,6 +316,8 @@ export default function Scene({
         openRadius,
         links: [],
         world: v(),
+        screenSize: 0,
+        readable: false,
       };
       if (node.kind === "atom") {
         view.cloud = points(
@@ -413,6 +427,9 @@ export default function Scene({
       lastZoom = 0,
       lastTheme: boolean | undefined,
       rootOpen = 0,
+      lastDetail = "",
+      detailContext: string | null = null,
+      contextStrength = 0,
       oldState: ExplorerState | undefined;
     function resize() {
       width = el.clientWidth;
@@ -586,45 +603,14 @@ export default function Scene({
       }
       if (oldState?.depth !== s.depth || oldState?.overrides !== s.overrides)
         fitTime = 1;
+      camera.updateMatrixWorld();
+      const detailUnit = Math.max(120, Math.min(availableW, availableH));
+      const aim = controls.target.clone().project(camera);
       for (const view of views.values()) {
         const n = view.node,
-          goal = expansion(n, s),
           parent = n.parent === graph.root ? null : views.get(n.parent!)!;
-        view.open = reduced ? goal : T.MathUtils.damp(view.open, goal, 8, dt);
-        if (Math.abs(view.open - goal) > 0.0002) moving = true;
-        view.reveal = parent
-          ? parent.reveal * smooth(0.08, 0.65, parent.open)
-          : 1;
-        view.group.visible = view.reveal > 0.004;
-        view.radius = T.MathUtils.lerp(
-          view.closedRadius,
-          view.openRadius,
-          view.open,
-        );
-        view.skin.scale.setScalar(view.radius);
-        view.wire.scale.setScalar(view.radius * 1.01);
-        const inFocus =
-            !s.focus || n.id === s.focus || n.id.startsWith(s.focus + "/"),
-          context = inFocus ? 1 : 0.025;
-        view.skin.material.opacity =
-          view.reveal * (1 - view.open * 0.965) * context;
-        view.skin.material.depthWrite = view.skin.material.opacity > 0.95;
-        const selected = s.selected === n.id,
-          related = s.selected
-            ? ancestors(graph, s.selected).some((a) => a.id === n.id)
-            : false;
-        view.skin.material.emissive.set(n.entry.color);
-        view.skin.material.emissiveIntensity = selected
-          ? 0.14
-          : hover === n.id
-            ? 0.09
-            : 0;
-        (view.wire.material as T.LineBasicMaterial).opacity =
-          view.reveal *
-          (selected ? 0.55 : related ? 0.32 : 0.13) *
-          view.open *
-          (inFocus || related ? 1 : 0.12);
-        view.wire.visible = view.open > 0.01 && s.cloud;
+        // Place children inside their existing parent before measuring their
+        // projected size. Opening a shell must not inflate its own LOD metric.
         if (n.kind === "atom") {
           const home = molecules[s.molecule].atoms[n.atom].pos;
           view.group.position.set(...home).multiplyScalar(1 + 2.35 * rootOpen);
@@ -651,6 +637,85 @@ export default function Scene({
             .set(Math.cos(angle) * r, Math.sin(angle) * r, 0)
             .multiplyScalar(0.4 + parent!.open * 0.6);
         }
+        view.group.updateWorldMatrix(true, false);
+        view.group.getWorldPosition(view.world);
+        const worldRadius =
+          view.closedRadius * view.group.getWorldScale(point).x;
+        point.copy(view.world).applyMatrix4(camera.matrixWorldInverse);
+        const cameraDepth = -point.z;
+        view.screenSize =
+          cameraDepth > 0 ||
+          camera.position.distanceTo(view.world) < worldRadius
+            ? (height * worldRadius) /
+              (Math.tan(T.MathUtils.degToRad(camera.fov / 2)) *
+                Math.max(camera.near, cameraDepth))
+            : 0;
+        point.copy(view.world).project(camera);
+        const offset = Math.hypot(
+            ((point.x - aim.x) * width) / 2,
+            ((point.y - aim.y) * height) / 2,
+          ),
+          attention =
+            1 - smooth(0.5, 1.25, offset / Math.max(1, view.screenSize / 2)),
+          sizeRatio = view.screenSize / detailUnit,
+          atom = n.kind === "atom",
+          nucleus = n.kind === "nucleus",
+          readableStart = atom ? 0.06 : nucleus ? 0.12 : 0.14,
+          readableEnd = atom ? 0.14 : nucleus ? 0.25 : 0.3,
+          requested = expansion(n, s),
+          automatic = smooth(
+            atom ? 0.7 : nucleus ? 0.6 : 0.45,
+            atom ? 1.25 : nucleus ? 1.05 : 0.85,
+            sizeRatio,
+          ),
+          goal =
+            !n.children.length || s.overrides[n.id] === 0
+              ? 0
+              : Math.max(requested, automatic * attention) *
+                smooth(readableStart, readableEnd, sizeRatio);
+        view.readable = sizeRatio >= readableEnd;
+        const previousOpen = view.open,
+          previousReveal = view.reveal;
+        view.open = reduced ? goal : T.MathUtils.damp(view.open, goal, 8, dt);
+        if (Math.abs(view.open - goal) > 0.0002) moving = true;
+        view.reveal = parent
+          ? parent.reveal * smooth(0.08, 0.65, parent.open)
+          : 1;
+        if (
+          Math.abs(view.open - previousOpen) > 0.0001 ||
+          Math.abs(view.reveal - previousReveal) > 0.0001
+        )
+          moving = true;
+        view.group.visible = view.reveal > 0.004;
+        view.radius = T.MathUtils.lerp(
+          view.closedRadius,
+          view.openRadius,
+          view.open,
+        );
+        view.skin.scale.setScalar(view.radius);
+        view.wire.scale.setScalar(view.radius * 1.01);
+        const inFocus =
+            !s.focus || n.id === s.focus || n.id.startsWith(s.focus + "/"),
+          context = inFocus ? 1 : 0.025;
+        view.skin.material.opacity =
+          view.reveal * (1 - smooth(0.05, 0.7, view.open) * 0.975) * context;
+        view.skin.material.depthWrite = view.skin.material.opacity > 0.95;
+        const selected = s.selected === n.id,
+          related = s.selected
+            ? ancestors(graph, s.selected).some((a) => a.id === n.id)
+            : false;
+        view.skin.material.emissive.set(n.entry.color);
+        view.skin.material.emissiveIntensity = selected
+          ? 0.14
+          : hover === n.id
+            ? 0.09
+            : 0;
+        (view.wire.material as T.LineBasicMaterial).opacity =
+          view.reveal *
+          (selected ? 0.55 : related ? 0.32 : 0.13) *
+          view.open *
+          (inFocus || related ? 1 : 0.12);
+        view.wire.visible = view.open > 0.01 && s.cloud;
         if (view.cloud) {
           view.cloud.visible =
             s.cloud && view.open > 0.05 && (!s.focus || s.focus === n.id);
@@ -677,6 +742,67 @@ export default function Scene({
       }
       world.updateMatrixWorld(true);
       views.forEach((view) => view.group.getWorldPosition(view.world));
+      // As a container fills the view, keep its surroundings as faint context.
+      // Follow the branch nearest the orbit target without moving the camera.
+      const previousContext = detailContext,
+        previousStrength = contextStrength;
+      detailContext = null;
+      contextStrength = 0;
+      let candidates = s.focus ? [s.focus] : graph.atoms;
+      while (candidates.length) {
+        let closest: View | undefined,
+          best = Infinity;
+        for (const id of candidates) {
+          const candidate = views.get(id)!;
+          if (!candidate.node.children.length || candidate.reveal < 0.5)
+            continue;
+          point.copy(candidate.world).project(camera);
+          if (point.z > 1) continue;
+          const distance =
+            ((point.x - aim.x) * width) ** 2 +
+            ((point.y - aim.y) * height) ** 2;
+          if (distance < best) {
+            best = distance;
+            closest = candidate;
+          }
+        }
+        if (!closest) break;
+        const strength =
+          smooth(0.3, 0.6, closest.screenSize / detailUnit) *
+          smooth(0.1, 0.35, closest.open);
+        if (strength < 0.01) break;
+        detailContext = closest.node.id;
+        contextStrength = strength;
+        candidates = closest.node.children;
+      }
+      if (
+        previousContext !== detailContext ||
+        Math.abs(previousStrength - contextStrength) > 0.001
+      )
+        moving = true;
+      if (detailContext) {
+        for (const view of views.values()) {
+          const inside =
+              view.node.id === detailContext ||
+              view.node.id.startsWith(detailContext + "/"),
+            ancestor = detailContext.startsWith(view.node.id + "/");
+          if (!inside) {
+            view.skin.material.opacity *= 1 - contextStrength * 0.975;
+            view.skin.material.depthWrite = view.skin.material.opacity > 0.95;
+            (view.wire.material as T.LineBasicMaterial).opacity *=
+              1 - contextStrength * (ancestor ? 0.4 : 0.9);
+            if (view.cloud)
+              (view.cloud.material as T.PointsMaterial).opacity *=
+                1 - contextStrength * 0.95;
+            for (const line of view.links)
+              (line.material as T.LineBasicMaterial).opacity *=
+                1 - contextStrength * 0.975;
+          }
+        }
+      }
+      const atomOpening = Math.max(
+        ...graph.atoms.map((id) => views.get(id)!.open),
+      );
       bonds.forEach(({ mesh, a, b, offset }) => {
         const p = views.get(graph.atoms[a])!.world,
           q = views.get(graph.atoms[b])!.world;
@@ -685,8 +811,11 @@ export default function Scene({
         direction.copy(q).sub(p);
         mesh.scale.y = direction.length();
         mesh.quaternion.setFromUnitVectors(v(0, 1, 0), direction.normalize());
-        mesh.material.opacity = 1 - smooth(0, 0.65, rootOpen);
-        mesh.visible = rootOpen < 0.65;
+        mesh.material.opacity =
+          (1 - smooth(0, 0.65, rootOpen)) *
+          (1 - atomOpening) *
+          (1 - contextStrength * 0.97);
+        mesh.visible = mesh.material.opacity > 0.01;
       });
       bondTraces.forEach(({ line, a, b }) => {
         const attr = line.geometry.getAttribute(
@@ -701,8 +830,10 @@ export default function Scene({
         (line.material as T.LineBasicMaterial).opacity = rootOpen * 0.18;
         line.visible = s.cloud;
       });
-      platform.visible = rim.visible = rootOpen < 0.45 && !s.focus;
-      platformMat.opacity = 1 - smooth(0, 0.45, rootOpen);
+      platform.visible = rim.visible =
+        rootOpen < 0.45 && atomOpening < 0.45 && !s.focus;
+      platformMat.opacity =
+        1 - smooth(0, 0.45, Math.max(rootOpen, atomOpening));
       (rim.material as T.LineBasicMaterial).opacity =
         platformMat.opacity * 0.25;
       if (s.photon !== lastPhoton) {
@@ -758,14 +889,24 @@ export default function Scene({
         if (focused) {
           center.copy(focused.world);
           const worldScale = focused.group.getWorldScale(point).x,
-            r = Math.max(0.16, focused.radius * worldScale);
+            r = Math.max(
+              0.16,
+              (focused.node.children.length
+                ? focused.openRadius
+                : focused.closedRadius) * worldScale,
+            );
           size.setScalar(r * 2.65);
           target.copy(center);
         } else {
           for (const id of graph.atoms) {
             const a = views.get(id)!;
-            bounds.expandByPoint(a.world.clone().addScalar(a.radius));
-            bounds.expandByPoint(a.world.clone().addScalar(-a.radius));
+            const radius = T.MathUtils.lerp(
+              a.closedRadius,
+              a.openRadius,
+              expansion(a.node, s),
+            );
+            bounds.expandByPoint(a.world.clone().addScalar(radius));
+            bounds.expandByPoint(a.world.clone().addScalar(-radius));
           }
           bounds.getSize(size);
           bounds.getCenter(target);
@@ -789,7 +930,11 @@ export default function Scene({
       controls.autoRotate = s.rotate && !reduced;
       const cameraChanged = controls.update(dt);
       // Keep close details visible without sacrificing depth precision at overview scale.
-      const near = T.MathUtils.clamp(controls.getDistance() * 0.01, 1e-7, 0.015);
+      const near = T.MathUtils.clamp(
+        controls.getDistance() * 0.01,
+        1e-7,
+        0.015,
+      );
       const projectionChanged = Math.abs(camera.near - near) > near * 0.001;
       if (projectionChanged) {
         camera.near = near;
@@ -798,13 +943,39 @@ export default function Scene({
       if (now - labelTime > 50) {
         labelTime = now;
         let count = 0;
-        const focused = s.focus ? graph.nodes.get(s.focus) : null;
+        let layer = 0;
+        const opened: string[] = [],
+          readable: string[] = [];
+        const focusId = detailContext || s.focus;
+        const focused = focusId ? graph.nodes.get(focusId) : null;
         views.forEach((view) => {
           point.copy(view.world).project(camera);
           view.label.dataset.anchorX = String(((point.x + 1) * width) / 2);
           view.label.dataset.anchorY = String(((1 - point.y) * height) / 2);
           view.label.dataset.open = view.open.toFixed(3);
           view.label.dataset.reveal = view.reveal.toFixed(3);
+          view.label.dataset.screenSize = view.screenSize.toFixed(1);
+          if (view.open > 0.5) opened.push(view.node.id);
+          if (view.readable) readable.push(view.node.id);
+          if (
+            view.reveal > 0.5 &&
+            view.screenSize > detailUnit * 0.035 &&
+            point.z < 1 &&
+            Math.abs(point.x) < 1 &&
+            Math.abs(point.y) < 1
+          ) {
+            const k = view.node.kind;
+            layer = Math.max(
+              layer,
+              k === "up" || k === "down"
+                ? 3
+                : k === "proton" || k === "neutron"
+                  ? 2
+                  : k === "nucleus" || k === "electron"
+                    ? 1
+                    : 0,
+            );
+          }
           const direct =
             focused &&
             (view.node.parent === focused.id || view.node.id === focused.id);
@@ -841,6 +1012,21 @@ export default function Scene({
         canvas.dataset.visibleNodes = String(count);
         canvas.dataset.depth = s.depth.toFixed(2);
         canvas.dataset.focus = s.focus || "";
+        const snapshot: SceneDetail = {
+          molecule: s.molecule,
+          open: opened,
+          readable,
+          count,
+          layer: ["Atomes", "Noyaux & électrons", "Nucléons", "Quarks"][layer],
+          context: detailContext,
+        };
+        const signature = JSON.stringify(snapshot);
+        canvas.dataset.detailLayer = snapshot.layer;
+        canvas.dataset.detailContext = detailContext || "";
+        if (signature !== lastDetail) {
+          lastDetail = signature;
+          detail.current(snapshot);
+        }
       }
       if (
         cameraChanged ||

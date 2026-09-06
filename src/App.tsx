@@ -39,7 +39,7 @@ import {
   kindNames,
   openBranch,
 } from "./continuum";
-import type { ExplorerState, MatterNode } from "./continuum";
+import type { ExplorerState, MatterNode, SceneDetail } from "./continuum";
 function initial(): ExplorerState {
   const p = new URLSearchParams(location.search),
     s: ExplorerState = { ...defaultState, overrides: {} };
@@ -123,12 +123,23 @@ export default function App() {
     [query, setQuery] = useState(""),
     [message, setMessage] = useState(""),
     [eventText, setEventText] = useState(""),
-    [automatic, setAutomatic] = useState(false);
+    [automatic, setAutomatic] = useState(false),
+    [detail, setDetail] = useState<SceneDetail | null>(null);
   const graph = useMemo(() => createGraph(state.molecule), [state.molecule]),
     mol = molecules[state.molecule],
-    node = graph.nodes.get(state.selected || graph.root)!,
+    sceneDetail = detail?.molecule === state.molecule ? detail : null,
+    contextId = sceneDetail?.context,
+    inspectedId =
+      contextId &&
+      (!state.selected || contextId.startsWith(state.selected + "/"))
+        ? contextId
+        : state.selected,
+    node = graph.nodes.get(inspectedId || graph.root)!,
     path = ancestors(graph, node.id),
-    isOpen = expansion(node, state) > 0.5,
+    isOpen =
+      node.kind === "molecule"
+        ? expansion(node, state) > 0.5
+        : (sceneDetail?.open.includes(node.id) ?? false),
     local = Object.keys(state.overrides).length > 0;
   const dialog = useRef<HTMLDialogElement>(null),
     searchRef = useRef<HTMLInputElement>(null),
@@ -138,14 +149,23 @@ export default function App() {
   function inspect(id: string, open = true) {
     const n = graph.nodes.get(id);
     if (!n) return;
+    const needsApproach =
+      open &&
+      n.children.length > 0 &&
+      n.kind !== "molecule" &&
+      sceneDetail &&
+      !sceneDetail.readable.includes(id);
     setAutomatic(false);
     setInspector(true);
     setPanel(n.children.length ? null : "details");
     setState((s) => ({
       ...s,
       selected: id,
-      focus:
-        s.focus && id !== s.focus && !id.startsWith(s.focus + "/")
+      zoom: needsApproach ? 0 : s.zoom,
+      reset: needsApproach && s.focus === id ? s.reset + 1 : s.reset,
+      focus: needsApproach
+        ? id
+        : s.focus && id !== s.focus && !id.startsWith(s.focus + "/")
           ? id === graph.root
             ? null
             : id
@@ -159,7 +179,11 @@ export default function App() {
     const n = graph.nodes.get(id)!;
     setState((s) => {
       const overrides = { ...s.overrides };
-      if (expansion(n, s) > 0.5) {
+      if (
+        n.kind === "molecule"
+          ? expansion(n, s) > 0.5
+          : sceneDetail?.open.includes(id)
+      ) {
         overrides[id] = 0;
         return {
           ...s,
@@ -169,7 +193,17 @@ export default function App() {
             s.focus && descendants(graph, id).includes(s.focus) ? id : s.focus,
         };
       }
-      return { ...s, selected: id, overrides: openBranch(graph, s, id) };
+      const needsApproach =
+        n.kind !== "molecule" &&
+        sceneDetail &&
+        !sceneDetail.readable.includes(id);
+      return {
+        ...s,
+        selected: id,
+        focus: needsApproach ? id : s.focus,
+        zoom: needsApproach ? 0 : s.zoom,
+        overrides: openBranch(graph, s, id),
+      };
     });
   }
   function approach(id: string) {
@@ -185,6 +219,7 @@ export default function App() {
       focus: id,
       selected: id,
       zoom: 0,
+      reset: s.reset + 1,
       overrides: n.parent ? openBranch(graph, s, n.parent) : s.overrides,
     }));
   }
@@ -353,19 +388,16 @@ export default function App() {
     },
     [],
   );
-  const visibleCount = [...graph.nodes.values()].filter(
-    (n) =>
-      n.kind !== "molecule" &&
-      ancestors(graph, n.id)
-        .slice(1, -1)
-        .every((a) => expansion(a, state) > 0.35),
-  ).length;
+  const visibleCount = sceneDetail?.count ?? graph.atoms.length;
   function row(n: MatterNode, depth = 0): React.ReactNode {
-    const expanded = n.kind === "molecule" || expansion(n, state) > 0.25;
+    const expanded =
+      n.kind === "molecule" ||
+      expansion(n, state) > 0.25 ||
+      sceneDetail?.open.includes(n.id);
     return (
       <div key={n.id} className="tree-branch">
         <div
-          className={"tree-row " + (state.selected === n.id ? "selected" : "")}
+          className={"tree-row " + (node.id === n.id ? "selected" : "")}
           style={{ "--indent": Math.min(depth, 4) } as React.CSSProperties}
           data-tree-node={n.id}
         >
@@ -419,6 +451,7 @@ export default function App() {
         onPick={inspect}
         onFocus={approach}
         onEvent={setEventText}
+        onDetail={setDetail}
       />
       <div className="vignette" />
       <header className="identity">
@@ -538,7 +571,7 @@ export default function App() {
         </div>
         <div className="tree-foot">
           <span className="tiny-dot" />
-          {visibleCount} constituants révélés
+          {visibleCount} constituants affichés · Détail adaptatif
         </div>
       </aside>
       <div className="view-controls glass">
@@ -701,15 +734,7 @@ export default function App() {
         ) : (
           <>
             <span className="hint-line" />
-            <span>
-              {local
-                ? "EXPLORATION LIBRE"
-                : state.depth > 90
-                  ? "TOUT EST LÀ, IMBRIQUÉ"
-                  : state.depth > 0
-                    ? "LA MOLÉCULE SE DÉPLIE"
-                    : "CLIQUEZ SUR UN ATOME POUR L’OUVRIR"}
-            </span>
+            <span>{sceneDetail?.layer || "Atomes"} · ZOOMEZ POUR EXPLORER</span>
             <span className="hint-line" />
           </>
         )}
@@ -802,8 +827,8 @@ export default function App() {
       </button>
       <footer>
         <span>
-          Glisser : tourner <b>·</b> Molette : zoomer <b>·</b> Double clic :
-          approcher
+          Glisser : tourner <b>·</b> Molette : explorer les couches <b>·</b>{" "}
+          Double clic : approcher
         </span>
         <button onClick={() => setModal("about")}>
           Schéma pédagogique · Échelles adaptées <ArrowUpRight size={11} />
@@ -893,11 +918,13 @@ export default function App() {
             </p>
             <h3>Explorez directement</h3>
             <p>
-              Cliquez sur un constituant pour l’ouvrir sur place. Double-cliquez
-              pour vous en approcher. Les enveloppes transparentes et l’arbre de
-              composition gardent le lien avec ses parents. Le curseur agit sur
-              toute la molécule ; chaque branche peut aussi être ouverte ou
-              refermée librement.
+              Zoomez vers un constituant pour révéler progressivement son
+              contenu. En reculant, les détails se regroupent dans leur
+              enveloppe. Cliquez pour ouvrir une branche ; si elle est trop
+              petite, la caméra s’en approche. Les enveloppes transparentes et
+              l’arbre de composition gardent le lien avec ses parents. Le
+              curseur agit sur toute la molécule ; chaque branche peut aussi
+              être ouverte ou refermée librement.
             </p>
             <h3>Ce que représente la scène</h3>
             <p>{node.entry.note}</p>
