@@ -30,3 +30,13 @@ Camera transitions use a 300 ms wall-clock cubic easing. New requests retarget f
 The dedicated `npm run test:rapid` suite passed both locally and on the public HTTPS site with normal motion at 1440 × 1000 and 390 × 844: synchronous click bursts, actual quadruple mouse clicks, immediate labels and enabled buttons, excess-click endpoint clamping, reversing mid-flight, no later replay of queued motion, rapid keyboard events, remembered non-default siblings, persistent renderer and no page errors.
 
 The complete existing navigation suite also passed after this change, including wheel reversal and hydrogen pinch targeting. TypeScript and the staged production build passed; the live site returns HTTP 200.
+
+## Visual molecule collection
+
+The native select is replaced with an accessible modal containing one draggable Three.js molecule preview, SVG choice illustrations generated from the same molecular coordinates, composition, geometry and an explicit entry button. Preview selection stays local to the dialog. Closing, Escape, backdrop dismissal and resuming the current molecule preserve the main renderer and focused constituent. Selecting a different molecule commits only on entry. The preview renderer, controls, animation frame and GPU resources are released on close. Reduced-motion preferences disable automatic rotation.
+
+TypeScript and the staged production build passed. The existing full navigation and rapid-navigation suites passed with the new selector. The dedicated `npm run test:picker` suite passed locally, covering actual preview drag, preview switching without changing the exploration URL or renderer, resuming a focused nucleus, committing a new molecule, keyboard selection, Escape/backdrop dismissal, focus restoration, preview cleanup, light mode and accessible entry-button placement at 1440 × 1000, 390 × 844, 320 × 568 and 844 × 390. Screenshots in `artifacts/picker-*.png` were visually inspected; the landscape preview remains fully visible alongside the scrolling choices.
+
+The production build was deployed by atomic directory exchange, with the previous version retained under `releases/before-molecule-picker-20260906T103448Z`. No outward layers beyond the molecule have been implemented in this change; these remain a proposed extension.
+
+The same picker suite also passed against the public HTTPS site after deployment. The live document successfully serves the new `index-BeqyAMrY.js` and `index-CdJgIv66.css` assets.

@@ -300,9 +300,9 @@ try {
     ["co2", 204, 3],
     ["methane", 84, 5],
   ]) {
-    await p
-      .getByRole("combobox", { name: "Choisir une molécule" })
-      .selectOption(molecule);
+    await p.getByRole("button", { name: "Choisir une molécule" }).click();
+    await p.locator(`[data-molecule-choice="${molecule}"]`).click();
+    await p.locator("[data-molecule-enter]").click();
     await view("molecule");
     await ready();
     assert.equal(await p.locator(".atom-label").count(), total);

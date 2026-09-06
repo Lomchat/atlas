@@ -6,6 +6,8 @@ An interactive French-language 3D atlas of matter. A single molecule stays in th
 
 ## Explore
 
+- The molecule selector opens a visual collection with a draggable 3D preview, illustrated choices, composition and geometry. Browsing is local to the dialog; Escape, closing or resuming preserves the current exploration. A different molecule is loaded only on confirmation. The layout adapts to mobile with an always-visible confirmation button.
+
 - Two buttons at the top name the next inward destination and the outward parent. They remain usable during camera motion: repeated clicks immediately advance the requested destination, and changing direction retargets from the current camera position. Transitions use a 300 ms wall-clock easing instead of queuing animations. They move the camera through the same scene: molecule → atom → nucleus → nucleon → quark, with the reverse route always available.
 - Point at a different visible child to choose it as the inward destination. That choice stays in place when moving to the button. Clicking a constituent or a composition-tree entry approaches that exact object.
 - Wheel and pinch gestures also reveal successive layers. Geometry stays at fixed local coordinates, and detail uses camera distance rather than projected depth. Only the targeted branch opens automatically; its surroundings remain as faint context.
@@ -41,6 +43,7 @@ npm run build -- --outDir .next-dist
 ```sh
 npm test
 npm run test:rapid
+npm run test:picker
 ATLAS_URL=https://atlas.chalco.website npm test
 ```
 

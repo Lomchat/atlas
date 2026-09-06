@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import Scene from "./Scene";
+import MoleculePicker from "./MoleculePicker";
 import { molecules, particles, sources } from "./data";
 import type { MoleculeId } from "./data";
 import {
@@ -96,7 +97,7 @@ export default function App() {
   const [state, setState] = useState<ExplorerState>(initial),
     [panel, setPanel] = useState<"tree" | "details" | null>(null),
     [inspector, setInspector] = useState(true),
-    [modal, setModal] = useState<"about" | "search" | null>(null),
+    [modal, setModal] = useState<"about" | "search" | "molecules" | null>(null),
     [query, setQuery] = useState(""),
     [message, setMessage] = useState(""),
     [eventText, setEventText] = useState(""),
@@ -400,20 +401,16 @@ export default function App() {
         />
       </nav>
       <div className="subject-selector">
-        <label>
-          <span className="sr-only">Choisir une molécule</span>
-          <select
-            value={state.molecule}
-            onChange={(e) => changeMolecule(e.target.value as MoleculeId)}
-          >
-            {Object.entries(molecules).map(([id, m]) => (
-              <option value={id} key={id}>
-                {m.name} · {m.formula}
-              </option>
-            ))}
-          </select>
+        <button
+          className="molecule-trigger"
+          aria-label="Choisir une molécule"
+          aria-haspopup="dialog"
+          onClick={() => setModal("molecules")}
+        >
+          <span>{mol.name}</span>
+          <small>{mol.formula}</small>
           <ChevronDown size={13} />
-        </label>
+        </button>
         <div className="breadcrumb" aria-label="Appartenance dans la molécule">
           {path.map((n, i) => (
             <span key={n.id}>
@@ -704,7 +701,20 @@ export default function App() {
       <dialog
         ref={dialog}
         onCancel={() => setModal(null)}
-        className="atlas-dialog"
+        className={
+          "atlas-dialog" + (modal === "molecules" ? " molecule-dialog" : "")
+        }
+        onClick={(e) => {
+          if (e.target !== e.currentTarget) return;
+          const r = e.currentTarget.getBoundingClientRect();
+          if (
+            e.clientX < r.left ||
+            e.clientX > r.right ||
+            e.clientY < r.top ||
+            e.clientY > r.bottom
+          )
+            setModal(null);
+        }}
         aria-labelledby="dialog-title"
       >
         <div className="dialog-heading">
@@ -715,7 +725,16 @@ export default function App() {
             onClick={() => setModal(null)}
           />
         </div>
-        {modal === "search" ? (
+        {modal === "molecules" ? (
+          <MoleculePicker
+            current={state.molecule}
+            light={state.light}
+            onChoose={(id) => {
+              if (id !== state.molecule) changeMolecule(id);
+              setModal(null);
+            }}
+          />
+        ) : modal === "search" ? (
           <>
             <h2 id="dialog-title">À l’intérieur de {mol.formula}</h2>
             <div className="search-box">
