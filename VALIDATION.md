@@ -20,3 +20,13 @@ Production: https://atlas.chalco.website
 - Screenshots are in `artifacts/navigation-*.png`. Production is served statically by Caddy from `/srv/explode/dist`.
 
 Checks use headless Chromium and software WebGL. Touch events are emulated; these tests do not measure physical-device frame rates or touchscreen hardware. The geometry remains a schematic composition model, not a quantum simulation.
+
+## Rapid navigation
+
+Navigation controls now remain active during movement, except at actual hierarchy endpoints. Each click resolves against the latest requested destination using a functional state update, so even multiple events in the same browser task advance separately. Previously chosen branches survive a rapid return and re-entry. Keyboard repeat and the inspector's navigation actions use the same behavior.
+
+Camera transitions use a 300 ms wall-clock cubic easing. New requests retarget from the current camera position, without queuing intermediate flights. Manual wheel/orbit input cancels the flight. The displayed destination remains stable while the camera and detail settle.
+
+The dedicated `npm run test:rapid` suite passed both locally and on the public HTTPS site with normal motion at 1440 × 1000 and 390 × 844: synchronous click bursts, actual quadruple mouse clicks, immediate labels and enabled buttons, excess-click endpoint clamping, reversing mid-flight, no later replay of queued motion, rapid keyboard events, remembered non-default siblings, persistent renderer and no page errors.
+
+The complete existing navigation suite also passed after this change, including wheel reversal and hydrogen pinch targeting. TypeScript and the staged production build passed; the live site returns HTTP 200.

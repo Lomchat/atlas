@@ -47,6 +47,7 @@ export interface ExplorerState {
   rotate: boolean;
   reset: number;
   navigation: number;
+  destinations: Record<string, string>;
   photon: number;
   higgs: boolean;
 }
@@ -72,6 +73,7 @@ export const defaultState: ExplorerState = {
   rotate: false,
   reset: 0,
   navigation: 0,
+  destinations: {},
   photon: 0,
   higgs: false,
 };

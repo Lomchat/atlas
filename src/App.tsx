@@ -104,33 +104,74 @@ export default function App() {
   const graph = useMemo(() => createGraph(state.molecule), [state.molecule]),
     mol = molecules[state.molecule],
     sceneDetail = detail?.molecule === state.molecule ? detail : null,
-    viewpoint = graph.nodes.get(
-      sceneDetail?.viewpoint || state.focus || graph.root,
-    )!,
-    node = viewpoint,
-    path = ancestors(graph, node.id),
-    nextId = sceneDetail?.next ?? node.children[0] ?? null,
-    next = nextId ? graph.nodes.get(nextId)! : null,
-    parent = node.parent ? graph.nodes.get(node.parent)! : null,
     navigating =
       !sceneDetail ||
       sceneDetail.navigation !== state.navigation ||
-      sceneDetail.transitioning;
+      sceneDetail.transitioning,
+    viewpoint = graph.nodes.get(
+      navigating ? state.focus || graph.root : sceneDetail.viewpoint,
+    )!,
+    node = viewpoint,
+    path = ancestors(graph, node.id),
+    nextId =
+      sceneDetail?.navigation === state.navigation &&
+      sceneDetail.viewpoint === node.id
+        ? sceneDetail.next
+        : state.destinations[node.id] || node.children[0] || null,
+    next = nextId ? graph.nodes.get(nextId)! : null,
+    parent = node.parent ? graph.nodes.get(node.parent)! : null;
   const dialog = useRef<HTMLDialogElement>(null),
     searchRef = useRef<HTMLInputElement>(null),
     noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const update = (patch: Partial<ExplorerState>) =>
     setState((s) => ({ ...s, ...patch }));
+  function destinationState(
+    s: ExplorerState,
+    id: string,
+    from = s.focus || graph.root,
+  ): ExplorerState {
+    const destinations = { ...s.destinations };
+    for (const n of ancestors(graph, from))
+      if (n.parent) destinations[n.parent] = n.id;
+    for (const n of ancestors(graph, id))
+      if (n.parent) destinations[n.parent] = n.id;
+    return {
+      ...s,
+      focus: id === graph.root ? null : id,
+      selected: id === graph.root ? null : id,
+      destinations,
+      navigation: s.navigation + 1,
+    };
+  }
+  function step(direction: "in" | "out") {
+    setInspector(true);
+    setPanel(null);
+    setState((s) => {
+      // Resolve each click against the latest requested destination, including
+      // clicks React batches before the renderer receives another frame.
+      const currentDetail =
+        sceneDetail?.molecule === s.molecule ? sceneDetail : null;
+      const pending =
+        !currentDetail ||
+        currentDetail.navigation !== s.navigation ||
+        currentDetail.transitioning;
+      const currentNode = graph.nodes.get(
+        pending ? s.focus || graph.root : currentDetail.viewpoint,
+      )!;
+      const child =
+        currentDetail?.navigation === s.navigation &&
+        currentDetail.viewpoint === currentNode.id
+          ? currentDetail.next
+          : s.destinations[currentNode.id] || currentNode.children[0];
+      const target = direction === "out" ? currentNode.parent : child;
+      return target ? destinationState(s, target, currentNode.id) : s;
+    });
+  }
   function approach(id: string) {
     if (!graph.nodes.has(id)) return;
     setInspector(true);
     setPanel(null);
-    setState((s) => ({
-      ...s,
-      focus: id === graph.root ? null : id,
-      selected: id === graph.root ? null : id,
-      navigation: s.navigation + 1,
-    }));
+    setState((s) => destinationState(s, id));
   }
   const inspect = approach;
   function overview() {
@@ -237,13 +278,13 @@ export default function App() {
         overview();
         setPanel(null);
       }
-      if ((e.key === "+" || e.key === "=") && next && !navigating) {
+      if (e.key === "+" || e.key === "=") {
         e.preventDefault();
-        approach(next.id);
+        step("in");
       }
-      if (e.key === "-" && parent && !navigating) {
+      if (e.key === "-") {
         e.preventDefault();
-        approach(parent.id);
+        step("out");
       }
     };
     window.addEventListener("keydown", key);
@@ -397,8 +438,8 @@ export default function App() {
         <button
           data-direction="out"
           data-target={parent?.id || ""}
-          disabled={!parent || navigating}
-          onClick={() => parent && approach(parent.id)}
+          disabled={!parent}
+          onClick={() => step("out")}
           aria-label={
             parent
               ? `Zoom arrière vers ${parent.entry.name}`
@@ -415,8 +456,8 @@ export default function App() {
         <button
           data-direction="in"
           data-target={next?.id || ""}
-          disabled={!next || navigating}
-          onClick={() => next && approach(next.id)}
+          disabled={!next}
+          onClick={() => step("in")}
           aria-label={
             next
               ? `Zoom avant vers ${next.entry.name}`
@@ -565,22 +606,14 @@ export default function App() {
         </dl>
         <div className="detail-actions">
           {next && (
-            <button
-              className="primary-action"
-              onClick={() => approach(next.id)}
-              disabled={navigating}
-            >
+            <button className="primary-action" onClick={() => step("in")}>
               <Plus size={15} />
               <span>Explorer {next.entry.name}</span>
               <ChevronRight size={13} />
             </button>
           )}
           {parent && (
-            <button
-              className="secondary-action"
-              onClick={() => approach(parent.id)}
-              disabled={navigating}
-            >
+            <button className="secondary-action" onClick={() => step("out")}>
               <ArrowLeft size={14} />
               <span>Revenir à {parent.entry.name}</span>
             </button>

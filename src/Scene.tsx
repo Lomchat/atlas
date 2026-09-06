@@ -422,7 +422,10 @@ export default function Scene({
       height = 1,
       availableW = 1,
       availableH = 1,
-      fitTime = 1,
+      fitTime = 0,
+      fitPending = true,
+      fitStarted = 0,
+      navigationActive = true,
       lastFocus: string | null = null,
       lastReset = -1,
       lastNavigation = -1,
@@ -432,6 +435,9 @@ export default function Scene({
       detailContext: string | null = null,
       contextStrength = 0,
       oldState: ExplorerState | undefined;
+    const fitFromPosition = v(),
+      fitFromTarget = v(),
+      fitDirection = v();
     function resize() {
       width = el.clientWidth;
       height = el.clientHeight;
@@ -454,13 +460,15 @@ export default function Scene({
         height,
       );
       camera.updateProjectionMatrix();
-      fitTime = 1;
+      fitPending = true;
     }
     const observer = new ResizeObserver(resize);
     observer.observe(el);
     resize();
     controls.addEventListener("start", () => {
       fitTime = 0;
+      fitPending = false;
+      navigationActive = false;
     });
     const raycaster = new T.Raycaster(),
       pointer = new T.Vector2();
@@ -619,7 +627,8 @@ export default function Scene({
         s.reset !== lastReset ||
         s.navigation !== lastNavigation
       ) {
-        fitTime = 1;
+        fitPending = true;
+        navigationActive = true;
         lastFocus = s.focus;
         lastNavigation = s.navigation;
         zoomAnchor = s.focus;
@@ -629,6 +638,14 @@ export default function Scene({
           camera.position.set(0.5, 2.9, 12);
           controls.target.set(0, 0, 0);
         }
+      }
+      if (fitPending) {
+        fitStarted = now;
+        fitFromPosition.copy(camera.position);
+        fitFromTarget.copy(controls.target);
+        fitDirection.copy(camera.position).sub(controls.target).normalize();
+        fitTime = 1;
+        fitPending = false;
       }
       camera.updateMatrixWorld();
       const detailUnit = Math.max(120, Math.min(availableW, availableH));
@@ -917,13 +934,19 @@ export default function Scene({
             ((size.x / (2 * tan * camera.aspect)) * width) / availableW,
             size.z * 1.2,
           );
-        direction.copy(camera.position).sub(controls.target).normalize();
-        controls.target.lerp(target, reduced ? 1 : 1 - Math.exp(-dt * 6));
-        camera.position.lerp(
-          target.clone().addScaledVector(direction, distance),
-          reduced ? 1 : 1 - Math.exp(-dt * 6),
+        // Retarget from the current camera position; rapid clicks replace the
+        // destination instead of waiting for a queue of full-length flights.
+        const progress = reduced
+            ? 1
+            : T.MathUtils.clamp((now - fitStarted) / 300, 0, 1),
+          eased = 1 - Math.pow(1 - progress, 3);
+        controls.target.lerpVectors(fitFromTarget, target, eased);
+        camera.position.lerpVectors(
+          fitFromPosition,
+          target.clone().addScaledVector(fitDirection, distance),
+          eased,
         );
-        fitTime = reduced ? 0 : Math.max(0, fitTime - dt * 0.8);
+        fitTime = progress < 1 ? 1 : 0;
       }
       controls.autoRotate = s.rotate && !reduced;
       const cameraChanged = controls.update(dt);
@@ -1020,10 +1043,12 @@ export default function Scene({
           if (view.reveal > 0.45) count++;
         });
         canvas.dataset.visibleNodes = String(count);
-        const viewpoint =
-          fitTime > 0 ? s.focus || graph.root : detailContext || graph.root;
+        const viewpoint = navigationActive
+          ? s.focus || graph.root
+          : detailContext || graph.root;
         canvas.dataset.viewpoint = viewpoint;
         canvas.dataset.cameraDistance = controls.getDistance().toFixed(6);
+        canvas.dataset.transitioning = String(fitTime > 0);
         canvas.dataset.focus = s.focus || "";
         const snapshot: SceneDetail = {
           molecule: s.molecule,

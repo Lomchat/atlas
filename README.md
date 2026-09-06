@@ -6,7 +6,7 @@ An interactive French-language 3D atlas of matter. A single molecule stays in th
 
 ## Explore
 
-- Two buttons at the top name the next inward destination and the outward parent. They move the camera through the same scene: molecule → atom → nucleus → nucleon → quark, with the reverse route always available.
+- Two buttons at the top name the next inward destination and the outward parent. They remain usable during camera motion: repeated clicks immediately advance the requested destination, and changing direction retargets from the current camera position. Transitions use a 300 ms wall-clock easing instead of queuing animations. They move the camera through the same scene: molecule → atom → nucleus → nucleon → quark, with the reverse route always available.
 - Point at a different visible child to choose it as the inward destination. That choice stays in place when moving to the button. Clicking a constituent or a composition-tree entry approaches that exact object.
 - Wheel and pinch gestures also reveal successive layers. Geometry stays at fixed local coordinates, and detail uses camera distance rather than projected depth. Only the targeted branch opens automatically; its surroundings remain as faint context.
 - Elementary particles have no deeper destination; the inward button indicates that limit. The outward button is disabled at the molecule overview.
@@ -40,12 +40,13 @@ npm run build -- --outDir .next-dist
 
 ```sh
 npm test
+npm run test:rapid
 ATLAS_URL=https://atlas.chalco.website npm test
 ```
 
 The local suite expects `npm run dev` to be running. Set `CHROMIUM_PATH` if needed, or install Chromium with `npx playwright install chromium`.
 
-The browser suite checks the named inward/outward destination chain, disabled endpoint buttons, a pointed sibling remaining selected, exact ray picking, centered camera targets after orbiting, wheel reversal, mobile and landscape layouts, pinch targeting a hydrogen atom, absence of the gauge, persistent scene identity, photons, search, themes, shared URLs and graph composition totals. Screenshots are saved to `artifacts/navigation-*.png`.
+The rapid-navigation suite uses normal motion to check batched clicks, actual quadruple clicks, mid-flight reversal, endpoint clamping, keyboard repeat, remembered siblings and mobile behavior. The main browser suite checks the named inward/outward destination chain, disabled endpoint buttons, a pointed sibling remaining selected, exact ray picking, centered camera targets after orbiting, wheel reversal, mobile and landscape layouts, pinch targeting a hydrogen atom, absence of the gauge, persistent scene identity, photons, search, themes, shared URLs and graph composition totals. Screenshots are saved to `artifacts/navigation-*.png`.
 
 ## Scientific conventions
 
