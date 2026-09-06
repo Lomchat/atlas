@@ -104,8 +104,13 @@ export default function Scene({
     const controls = new OrbitControls(camera, canvas);
     controls.enableDamping = true;
     controls.dampingFactor = 0.075;
-    controls.minDistance = 0.28;
+    // Let the camera approach even the smallest nested constituents.
+    controls.minDistance = 0.00001;
     controls.maxDistance = 90;
+    let controlsDirty = true;
+    controls.addEventListener("change", () => {
+      controlsDirty = true;
+    });
     controls.autoRotateSpeed = 0.5;
     controls.maxPolarAngle = Math.PI * 0.87;
     const room = new RoomEnvironment(),
@@ -783,6 +788,13 @@ export default function Scene({
       }
       controls.autoRotate = s.rotate && !reduced;
       const cameraChanged = controls.update(dt);
+      // Keep close details visible without sacrificing depth precision at overview scale.
+      const near = T.MathUtils.clamp(controls.getDistance() * 0.01, 1e-7, 0.015);
+      const projectionChanged = Math.abs(camera.near - near) > near * 0.001;
+      if (projectionChanged) {
+        camera.near = near;
+        camera.updateProjectionMatrix();
+      }
       if (now - labelTime > 50) {
         labelTime = now;
         let count = 0;
@@ -832,6 +844,8 @@ export default function Scene({
       }
       if (
         cameraChanged ||
+        controlsDirty ||
+        projectionChanged ||
         moving ||
         fitTime > 0 ||
         oldState !== s ||
@@ -840,6 +854,7 @@ export default function Scene({
         clock < 0.5
       ) {
         renderer.render(scene, camera);
+        controlsDirty = false;
       }
       oldState = s;
     }

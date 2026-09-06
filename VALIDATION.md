@@ -11,3 +11,9 @@ Production: https://atlas.chalco.website
 - HTTPS returns 200; HTTP redirects to HTTPS. Caddy serves `/srv/explode/dist` without an application process.
 
 Browser checks use headless Chromium with software WebGL. They verify behavior and layout, not physical-device frame rates or actual touchscreen hardware. Geometry is a schematic composition model, not a quantum simulation.
+
+## Deep zoom correction
+
+The camera can approach to 0.00001 scene units (previously 0.28). Its near clipping plane now adapts to the current distance. Control changes also invalidate the rendered frame so small wheel movements remain visible at extreme magnification.
+
+TypeScript and production build passed. A targeted Chromium check exercised 40 zoom-button clicks, then wheel zoom beyond the former limit: distance reached 0.00119 with an adaptive near plane. Rendering, zooming back out, reset, persistent canvas identity and absence of page errors were checked. The production HTML references the new bundle, which was fetched through public HTTPS and matched byte for byte against the tested build.
