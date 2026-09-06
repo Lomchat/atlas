@@ -1,3 +1,6 @@
+import LanguagePicker from "./LanguagePicker";
+import type { MessageKey } from "./i18n";
+import { t, useLocale } from "./i18n";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
@@ -56,16 +59,19 @@ function IconButton({
   icon: Icon,
   onClick,
   active = false,
+  action,
 }: {
   label: string;
   icon: LucideIcon;
   onClick: () => void;
   active?: boolean;
+  action?: string;
 }) {
   return (
     <button
       className={"icon-button " + (active ? "active" : "")}
       onClick={onClick}
+      data-action={action}
       title={label}
       aria-label={label}
     >
@@ -97,12 +103,13 @@ function Switch({
   );
 }
 export default function App() {
+  const locale = useLocale();
   const [state, setState] = useState<ExplorerState>(initial),
     [panel, setPanel] = useState<"tree" | "details" | null>(null),
     [inspector, setInspector] = useState(true),
     [modal, setModal] = useState<"about" | "search" | "molecules" | null>(null),
     [query, setQuery] = useState(""),
-    [message, setMessage] = useState(""),
+    [message, setMessage] = useState<MessageKey | "">(""),
     [eventText, setEventText] = useState(""),
     [detail, setDetail] = useState<SceneDetail | null>(null);
   const graph = useMemo(() => createGraph(state.molecule), [state.molecule]),
@@ -236,7 +243,7 @@ export default function App() {
       higgs: type === "higgs",
     }));
   }
-  function notify(text: string) {
+  function notify(text: MessageKey) {
     setMessage(text);
     if (noticeTimer.current) clearTimeout(noticeTimer.current);
     noticeTimer.current = setTimeout(() => setMessage(""), 3000);
@@ -268,6 +275,7 @@ export default function App() {
   }, [state.light]);
   useEffect(() => {
     const p = new URLSearchParams();
+    p.set("lang", locale);
     if (state.molecule !== "water") p.set("molecule", state.molecule);
     if (state.selected) p.set("node", state.selected);
     if (state.focus) p.set("focus", state.focus);
@@ -276,7 +284,7 @@ export default function App() {
       "",
       location.pathname + (p.size ? "?" + p.toString() : ""),
     );
-  }, [state.molecule, state.selected, state.focus]);
+  }, [state.molecule, state.selected, state.focus, locale]);
   useEffect(() => {
     if (modal) {
       dialog.current?.showModal();
@@ -343,7 +351,7 @@ export default function App() {
           <button
             className={"tree-caret " + (expanded ? "expanded" : "")}
             onClick={() => approach(n.id)}
-            aria-label={`Explore ${n.entry.name}`}
+            aria-label={t("Explore {name}", { name: n.entry.name })}
             disabled={!n.children.length}
           >
             {n.children.length ? <ChevronRight size={12} /> : <span />}
@@ -400,39 +408,42 @@ export default function App() {
       <div className="vignette" />
       <header className="identity">
         <div className="eyebrow">
-          <span /> EXPLORE MATTER
+          <LanguagePicker />{" "}
+          <span className="identity-tagline">{t("EXPLORE MATTER")}</span>{" "}
         </div>
         <h1>
-          Matter <em>Atlas</em>
+          {t("Matter")} <em>{t("Atlas")}</em>
           <sup>02</sup>
         </h1>
-        <p>From the visible world to the inside of atoms.</p>
+        <p>{t("From the visible world to the inside of atoms.")}</p>
       </header>
-      <nav className="top-actions" aria-label="Atlas tools">
+      <nav className="top-actions" aria-label={t("Atlas tools")}>
         <button
           className="search-trigger"
-          aria-label="Search"
+          aria-label={t("Search")}
           onClick={() => {
             setQuery("");
             setModal("search");
           }}
         >
           <Search size={15} />
-          <span>Search</span>
+          <span>{t("Search")}</span>
           <kbd>/</kbd>
         </button>
         <IconButton
-          label={state.light ? "Dark mode" : "Light mode"}
+          label={state.light ? t("Dark mode") : t("Light mode")}
           icon={state.light ? Moon : Sun}
           onClick={() => update({ light: !state.light })}
         />
         <IconButton
-          label="Share this exploration"
+          label={t("Share this exploration")}
+          action="share"
           icon={Share2}
           onClick={share}
         />
         <IconButton
-          label="About"
+          label={t("About")}
+          action="about"
           icon={CircleHelp}
           onClick={() => setModal("about")}
         />
@@ -440,7 +451,7 @@ export default function App() {
       <div className="subject-selector">
         <button
           className="molecule-trigger"
-          aria-label="Choose a molecule"
+          aria-label={t("Choose a molecule")}
           aria-haspopup="dialog"
           onClick={() => setModal("molecules")}
         >
@@ -448,23 +459,23 @@ export default function App() {
           <small>{mol.formula}</small>
           <ChevronDown size={13} />
         </button>
-        <div className="breadcrumb" aria-label="Path through matter">
+        <div className="breadcrumb" aria-label={t("Path through matter")}>
           {path.map((n, i) => (
             <span key={n.id}>
               {i > 0 && <ChevronRight size={10} />}
               <button onClick={() => approach(n.id)} title={n.entry.name}>
                 {isScale(n.id)
                   ? n.id === "sample"
-                    ? "Object"
+                    ? t("Object")
                     : n.id === "portion"
-                      ? "Volume"
-                      : "Neighborhood"
+                      ? t("Volume")
+                      : t("Neighborhood")
                   : n.kind === "molecule"
                     ? mol.formula
                     : n.kind === "atom"
                       ? n.entry.name
                       : n.kind === "nucleus"
-                        ? "Nucleus"
+                        ? t("Nucleus")
                         : n.entry.name}
               </button>
             </span>
@@ -473,7 +484,7 @@ export default function App() {
       </div>
       <nav
         className="zoom-navigation glass"
-        aria-label="Navigate through matter"
+        aria-label={t("Navigate through matter")}
       >
         <button
           data-direction="out"
@@ -481,12 +492,14 @@ export default function App() {
           disabled={!parent}
           onClick={() => step("out")}
           aria-label={
-            parent ? `Zoom out to ${parent.entry.name}` : "Zoom out · Overview"
+            parent
+              ? t("Zoom out to {name}", { name: parent.entry.name })
+              : t("Zoom out · Overview")
           }
         >
           <Minus size={18} />
           <span>
-            <small>ZOOM OUT</small>
+            <small>{t("ZOOM OUT")}</small>
             <strong>{parent?.entry.name || "Overview"}</strong>
           </span>
         </button>
@@ -498,12 +511,14 @@ export default function App() {
           onClick={() => step("in")}
           aria-label={
             next
-              ? `Zoom in to ${next.entry.name}`
-              : `Zoom in · ${node.entry.name}, elementary particle`
+              ? t("Zoom in to {name}", { name: next.entry.name })
+              : t("Zoom in · {name}, elementary particle", {
+                  name: node.entry.name,
+                })
           }
         >
           <span>
-            <small>{next ? "ZOOM IN" : "ELEMENTARY PARTICLE"}</small>
+            <small>{next ? t("ZOOM IN") : t("ELEMENTARY PARTICLE")}</small>
             <strong>{next?.entry.name || node.entry.name}</strong>
           </span>
           <Plus size={18} />
@@ -513,44 +528,44 @@ export default function App() {
         className={
           "tree-panel glass " + (panel === "tree" ? "mobile-open" : "")
         }
-        aria-label="Nested composition"
+        aria-label={t("Nested composition")}
       >
         <div className="panel-heading">
-          <span>From the visible to the subatomic</span>
+          <span>{t("From the visible to the subatomic")}</span>
           <button
             className="mobile-only icon-button"
-            aria-label="Close composition"
+            aria-label={t("Close composition")}
             onClick={() => setPanel(null)}
           >
             <X size={15} />
           </button>
         </div>
         <p className="panel-hint">
-          Follow a volume, a molecule, then its building blocks.
+          {t("Follow a volume, a molecule, then its building blocks.")}{" "}
         </p>
         <div className="tree-scroll">{row(graph.nodes.get(graph.root)!)}</div>
         <div className="composition-summary">
           <span className="composition-caption">
-            In one molecule of {mol.formula}
+            {t("In one molecule of")} {mol.formula}
           </span>
           <span>
-            <b>{graph.totals.electrons}</b> electrons
+            <b>{graph.totals.electrons}</b> {t("electrons")}{" "}
           </span>
           <span>
-            <b>{graph.totals.nucleons}</b> nucleons
+            <b>{graph.totals.nucleons}</b> {t("nucleons")}{" "}
           </span>
           <span>
-            <b>{graph.totals.quarks}</b> valence quarks
+            <b>{graph.totals.quarks}</b> {t("valence quarks")}{" "}
           </span>
         </div>
         <div className="display-options">
           <Switch
-            label="Annotations"
+            label={t("Annotations")}
             value={state.labels}
             toggle={() => update({ labels: !state.labels })}
           />
           <Switch
-            label="Shells & clouds"
+            label={t("Shells & clouds")}
             value={state.cloud}
             toggle={() => update({ cloud: !state.cloud })}
           />
@@ -558,25 +573,28 @@ export default function App() {
         <div className="tree-foot">
           <span className="tiny-dot" />
           {isScale(node.id)
-            ? "Reference volume · illustrative molecules"
-            : `${visibleCount} constituents shown · Adaptive detail`}
+            ? t("Reference volume · illustrative molecules")
+            : t("{count} constituents shown · Adaptive detail", {
+                count: visibleCount,
+              })}
         </div>
       </aside>
       <div className="view-controls glass">
         <IconButton
-          label={state.rotate ? "Stop rotation" : "Auto-rotate"}
+          label={state.rotate ? t("Stop rotation") : t("Auto-rotate")}
           icon={state.rotate ? Pause : RotateCw}
           active={state.rotate}
           onClick={() => update({ rotate: !state.rotate })}
         />
         <IconButton
-          label="Return to the whole object"
+          label={t("Return to the whole object")}
           icon={Crosshair}
           onClick={overview}
         />
         {document.fullscreenEnabled && (
           <IconButton
-            label="Fullscreen"
+            label={t("Fullscreen")}
+            action="fullscreen"
             icon={Maximize2}
             onClick={fullscreen}
           />
@@ -588,16 +606,16 @@ export default function App() {
           (panel === "details" ? "mobile-open" : "") +
           (!inspector ? " dismissed" : "")
         }
-        aria-label="Selected constituent"
+        aria-label={t("Selected constituent")}
       >
         <div className="detail-top">
           <span className="eyebrow">
             {node.kind === "molecule"
-              ? "OVERVIEW"
+              ? t("OVERVIEW")
               : kindNames[node.kind].toUpperCase()}
           </span>
           <IconButton
-            label="Close details"
+            label={t("Close details")}
             icon={X}
             onClick={() => {
               setInspector(false);
@@ -616,7 +634,9 @@ export default function App() {
           <button className="belongs-to" onClick={() => approach(node.parent!)}>
             <ArrowLeft size={11} />
             <span>
-              Inside {graph.nodes.get(node.parent)!.entry.name.toLowerCase()}
+              {t("Inside {name}", {
+                name: graph.nodes.get(node.parent)!.entry.name,
+              })}
             </span>
           </button>
         )}
@@ -627,20 +647,20 @@ export default function App() {
             <span>
               {isScale(node.id) ? (
                 <>
-                  Zoom into <strong>{next?.entry.name}</strong>
+                  {t("Zoom into")} <strong>{next?.entry.name}</strong>
                 </>
               ) : (
                 <>
-                  Contains <strong>{node.children.length}</strong>{" "}
+                  {t("Contains")} <strong>{node.children.length}</strong>{" "}
                   {node.kind === "molecule"
-                    ? "atoms"
+                    ? t("atoms")
                     : node.kind === "atom"
-                      ? "constituents"
+                      ? t("constituents")
                       : node.kind === "nucleus"
                         ? node.children.length === 1
-                          ? "nucleon"
-                          : "nucleons"
-                        : "valence quarks"}
+                          ? t("nucleon")
+                          : t("nucleons")
+                        : t("valence quarks")}
                 </>
               )}
             </span>
@@ -658,14 +678,14 @@ export default function App() {
           {next && (
             <button className="primary-action" onClick={() => step("in")}>
               <Plus size={15} />
-              <span>Explore {next.entry.name}</span>
+              <span>{t("Explore {name}", { name: next.entry.name })}</span>
               <ChevronRight size={13} />
             </button>
           )}
           {parent && (
             <button className="secondary-action" onClick={() => step("out")}>
               <ArrowLeft size={14} />
-              <span>Return to {parent.entry.name}</span>
+              <span>{t("Return to {name}", { name: parent.entry.name })}</span>
             </button>
           )}
         </div>
@@ -675,7 +695,7 @@ export default function App() {
           target="_blank"
           rel="noreferrer"
         >
-          Scientific source <ArrowUpRight size={11} />
+          {t("Scientific source")} <ArrowUpRight size={11} />
         </a>
       </aside>
       <div className="interaction-controls glass">
@@ -690,16 +710,17 @@ export default function App() {
         </button>
         <button
           onClick={() => startInteraction("photon")}
-          aria-label="Understand the photon"
+          aria-label={t("Understand the photon")}
         >
-          <span>Light</span>
+          <span>{t("Light")}</span>
         </button>
         <button
           onClick={() => startInteraction("higgs")}
-          aria-label="Understand the Higgs field"
+          aria-label={t("Understand the Higgs field")}
+          data-action="higgs"
         >
           <Sparkles size={14} />
-          <span>Higgs</span>
+          <span>{t("Higgs")}</span>
         </button>
       </div>
       {state.interaction !== "none" && (
@@ -728,30 +749,33 @@ export default function App() {
         <div className="event-status" role="status">
           <span />
           {eventText}
-          <button aria-label="Dismiss message" onClick={() => setEventText("")}>
+          <button
+            aria-label={t("Dismiss message")}
+            onClick={() => setEventText("")}
+          >
             <X size={10} />
           </button>
         </div>
       )}
       <button
         className="composition-trigger glass mobile-only"
-        aria-label="Show composition"
+        aria-label={t("Show composition")}
         onClick={() => {
           setPanel(panel === "tree" ? null : "tree");
           setInspector(true);
         }}
       >
         <Layers3 size={17} />
-        <span>Composition</span>
+        <span>{t("Composition")}</span>
       </button>
       <div className="lower-left">
         <span className="mini-formula">{mol.formula}</span>
         <span>
-          {isScale(node.id) ? node.entry.category : "One molecule in focus."}
+          {isScale(node.id) ? node.entry.category : t("One molecule in focus.")}
           <br />
           {isScale(node.id)
-            ? "Connected scales · illustrative sample"
-            : "All its building blocks."}
+            ? t("Connected scales · illustrative sample")
+            : t("All its building blocks.")}
         </span>
       </div>
       <button
@@ -760,25 +784,26 @@ export default function App() {
           setInspector(true);
           setPanel("details");
         }}
-        aria-label="Show details"
+        aria-label={t("Show details")}
       >
         <CircleHelp size={15} />
         <span>
-          {node.kind === "molecule" ? "A closer look" : node.entry.name}
+          {node.kind === "molecule" ? t("A closer look") : node.entry.name}
         </span>
       </button>
       <footer>
         <span>
-          Drag: rotate <b>·</b> Scroll: explore layers <b>·</b> Click: zoom in
+          {t("Drag: rotate")} <b>·</b> {t("Scroll: explore layers")} <b>·</b>{" "}
+          {t("Click: zoom in")}{" "}
         </span>
         <button onClick={() => setModal("about")}>
-          Illustrative model · Adjusted scales <ArrowUpRight size={11} />
+          {t("Illustrative model · Adjusted scales")} <ArrowUpRight size={11} />
         </button>
       </footer>
       {message && (
         <div className="toast glass" role="status">
           <Check size={14} />
-          {message}
+          {t(message)}
         </div>
       )}
       <dialog
@@ -801,9 +826,10 @@ export default function App() {
         aria-labelledby="dialog-title"
       >
         <div className="dialog-heading">
-          <span className="eyebrow">MATTER ATLAS</span>
+          <LanguagePicker />
+          <span className="eyebrow">{t("MATTER ATLAS")}</span>
           <IconButton
-            label="Close dialog"
+            label={t("Close dialog")}
             icon={X}
             onClick={() => setModal(null)}
           />
@@ -819,15 +845,17 @@ export default function App() {
           />
         ) : modal === "search" ? (
           <>
-            <h2 id="dialog-title">Inside {mol.formula}</h2>
+            <h2 id="dialog-title">
+              {t("Inside {formula}", { formula: mol.formula })}
+            </h2>
             <div className="search-box">
               <Search size={18} />
               <input
                 ref={searchRef}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Oxygen, nucleus, proton, electron…"
-                aria-label="Search for a constituent"
+                placeholder={t("Oxygen, nucleus, proton, electron…")}
+                aria-label={t("Search for a constituent")}
               />
             </div>
             <div className="search-results">
@@ -858,54 +886,46 @@ export default function App() {
                 </button>
               ))}
               {!results.length && (
-                <p>No constituents found in this molecule.</p>
+                <p>{t("No constituents found in this molecule.")}</p>
               )}
             </div>
           </>
         ) : (
           <>
-            <h2 id="dialog-title">Everything is connected.</h2>
+            <h2 id="dialog-title">{t("Everything is connected.")}</h2>
             <p>
-              The zoom starts with an object, passes through a reference volume
-              and its molecular neighborhood, then follows a single molecule.
-              Scale changes are adjusted; the visible molecules are an
-              illustrative sample. Atoms contain nuclei and electrons; nuclei
-              contain nucleons; protons and neutrons reveal their three valence
-              quarks.
+              {t(
+                "The zoom starts with an object, passes through a reference volume and its molecular neighborhood, then follows a single molecule. Scale changes are adjusted; the visible molecules are an illustrative sample. Atoms contain nuclei and electrons; nuclei contain nucleons; protons and neutrons reveal their three valence quarks.",
+              )}{" "}
             </p>
-            <h3>Explore freely</h3>
+            <h3>{t("Explore freely")}</h3>
             <p>
-              Use the two buttons at the top: each names the destination you
-              will reach by zooming in or out. You can also scroll or pinch to
-              explore. Click a constituent to center the zoom on it; the
-              buttons, information panel and breadcrumb follow your position
-              within the matter. As you zoom out, details merge back into their
-              enclosing structure.
+              {t(
+                "Use the two buttons at the top: each names the destination you will reach by zooming in or out. You can also scroll or pinch to explore. Click a constituent to center the zoom on it; the buttons, information panel and breadcrumb follow your position within the matter. As you zoom out, details merge back into their enclosing structure.",
+              )}{" "}
             </p>
-            <h3>What the scene represents</h3>
+            <h3>{t("What the scene represents")}</h3>
             <p>{node.entry.note}</p>
             <p>
-              The spheres and their shells are not physical walls. Sizes are
-              adjusted, electron clouds are illustrative and marked electrons
-              are selection aids. Quarks remain confined: showing them
-              separately is a diagram of composition. Curves between quarks
-              represent gluons.
+              {t(
+                "The spheres and their shells are not physical walls. Sizes are adjusted, electron clouds are illustrative and marked electrons are selection aids. Quarks remain confined: showing them separately is a diagram of composition. Curves between quarks represent gluons.",
+              )}{" "}
             </p>
             <p>
-              Photons and Higgs bosons are not hidden pieces inside an electron.
-              The photon illustrates an exchange of energy with an atom. The
-              Higgs field volume is a conceptual representation. Paths and
-              movements are schematic.
+              {t(
+                "Photons and Higgs bosons are not hidden pieces inside an electron. The photon illustrates an exchange of energy with an atom. The Higgs field volume is a conceptual representation. Paths and movements are schematic.",
+              )}{" "}
             </p>
-            <h3>Sources & inspiration</h3>
+            <h3>{t("Sources & inspiration")}</h3>
             <a href={sources.cern} target="_blank" rel="noreferrer">
-              CERN · Particles and interactions <ArrowUpRight size={12} />
+              {t("CERN · Particles and interactions")}{" "}
+              <ArrowUpRight size={12} />
             </a>
             <a href={sources.atom} target="_blank" rel="noreferrer">
-              OpenStax · Atomic structure <ArrowUpRight size={12} />
+              {t("OpenStax · Atomic structure")} <ArrowUpRight size={12} />
             </a>
             <p>
-              Interface inspired by{" "}
+              {t("Interface inspired by")}{" "}
               <a
                 href="https://github.com/ashemag/human-atlas"
                 target="_blank"
@@ -913,7 +933,7 @@ export default function App() {
               >
                 Human Atlas
               </a>{" "}
-              and{" "}
+              {t("and")}{" "}
               <a
                 href="https://github.com/ashemag/model-x-studio"
                 target="_blank"
@@ -921,11 +941,14 @@ export default function App() {
               >
                 Model X Studio
               </a>
-              , by ashemag.{" "}
-              <a href="/licenses/human-atlas.txt">Human Atlas MIT license</a>.
+              {t(", by ashemag.")}{" "}
+              <a href="/licenses/human-atlas.txt">
+                {t("Human Atlas MIT license")}
+              </a>
+              .
             </p>
             <p className="shortcuts">
-              R: reset · L: labels · + / −: zoom · /: search
+              {t("R: reset · L: labels · + / −: zoom · /: search")}{" "}
             </p>
             <div className="particle-reference">
               <Atom size={16} />

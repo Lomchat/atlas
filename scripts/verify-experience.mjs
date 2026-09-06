@@ -1,3 +1,11 @@
+import {
+  locale,
+  browserLocale,
+  text,
+  stepName,
+  artifact,
+  assertLocale,
+} from "./locale-fixture.mjs";
 import assert from "node:assert/strict";
 import { chromium } from "playwright";
 import fs from "node:fs";
@@ -14,6 +22,7 @@ const browser = await chromium.launch({
   ],
 });
 const p = await browser.newPage({
+  locale: browserLocale,
   viewport: { width: 1440, height: 1000 },
   reducedMotion: "no-preference",
 });
@@ -32,10 +41,11 @@ const go = async (molecule = "water", focus = "") => {
     `${base}/?molecule=${molecule}${focus ? "&focus=" + encodeURIComponent(focus) : ""}`,
     { waitUntil: "networkidle" },
   );
+  await assertLocale(p);
   await ready(focus || "sample");
 };
 const shot = (name) =>
-  p.screenshot({ path: `artifacts/experience-${name}.png` });
+  p.screenshot({ path: artifact(`experience-${name}.png`) });
 fs.mkdirSync("artifacts", { recursive: true });
 try {
   for (const molecule of ["water", "co2", "methane"]) {
@@ -61,7 +71,9 @@ try {
         await shot(molecule + "-proton");
     }
     assert.equal(await cta().isDisabled(), true);
-    assert.match(await cta().textContent(), /elementary particle/);
+    assert.ok(
+      (await cta().textContent()).includes(text("elementary particle")),
+    );
     assert.equal(await c().getAttribute("data-scene-id"), scene);
   }
   await go();
@@ -80,7 +92,7 @@ try {
   ]) {
     await go(molecule, focus);
     await p.locator(".context-interaction").click();
-    await p.getByRole("button", { name: /Step 2:/ }).click();
+    await p.getByRole("button", { name: stepName(2) }).click();
     await p.waitForFunction(
       () =>
         document.querySelector("canvas")?.dataset.transitioning === "false" &&
@@ -95,7 +107,7 @@ try {
       `${type} animates while staying on the same phase`,
     );
     assert.equal(await c().getAttribute("data-phase"), "1");
-    await p.getByRole("button", { name: "Pause animation" }).click();
+    await p.getByRole("button", { name: text("Pause animation") }).click();
     await p.waitForTimeout(100);
     const time = await c().getAttribute("data-animation-time");
     await p.waitForTimeout(350);
@@ -112,14 +124,14 @@ try {
         .locator(".lesson-copy p")
         .evaluate((e) => parseFloat(getComputedStyle(e).fontSize) >= 15),
     );
-    await p.getByRole("button", { name: "Replay animation" }).click();
+    await p.getByRole("button", { name: text("Replay animation") }).click();
     await p.waitForFunction(
       (t) =>
         Number(document.querySelector("canvas")?.dataset.animationTime) <
         Number(t),
       time,
     );
-    await p.getByRole("button", { name: "Close explanation" }).click();
+    await p.getByRole("button", { name: text("Close explanation") }).click();
   }
   for (const [name, width, height] of [
     ["mobile", 390, 844],
@@ -135,7 +147,7 @@ try {
     assert.ok(button.y >= 0 && button.y + button.height <= height);
     await go();
     await p.locator(".context-interaction").click();
-    await p.getByRole("button", { name: /Step 2:/ }).click();
+    await p.getByRole("button", { name: stepName(2) }).click();
     await p.waitForFunction(
       () => document.querySelector("canvas")?.dataset.transitioning === "false",
     );
@@ -150,8 +162,8 @@ try {
         .locator(".lesson-copy p")
         .evaluate((e) => parseFloat(getComputedStyle(e).fontSize) >= 12.5),
     );
-    await p.getByRole("button", { name: "Pause animation" }).click();
-    await p.getByRole("button", { name: "Close explanation" }).click();
+    await p.getByRole("button", { name: text("Pause animation") }).click();
+    await p.getByRole("button", { name: text("Close explanation") }).click();
   }
   await p.setViewportSize({ width: 1440, height: 1000 });
   await go("water", "atom-1/nucleus/proton-0/down-2");
@@ -167,9 +179,9 @@ try {
   await p.emulateMedia({ reducedMotion: "reduce" });
   await go("water", "atom-0");
   await p.locator(".context-interaction").click();
-  await p.getByRole("button", { name: /Step 2:/ }).click();
+  await p.getByRole("button", { name: stepName(2) }).click();
   assert.equal(
-    await p.getByRole("button", { name: "Pause animation" }).isDisabled(),
+    await p.getByRole("button", { name: text("Pause animation") }).isDisabled(),
     true,
   );
   const time = await c().getAttribute("data-animation-time");

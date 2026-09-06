@@ -1,3 +1,4 @@
+import { t, useLocale } from "./i18n";
 import { useEffect, useRef, useState } from "react";
 import * as T from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
@@ -70,6 +71,8 @@ export default function Scene({
   onEvent,
   onDetail,
 }: Props) {
+  const locale = useLocale();
+  const refreshLanguage = useRef(() => {});
   const host = useRef<HTMLDivElement>(null),
     current = useRef(state),
     pick = useRef(onPick),
@@ -109,7 +112,10 @@ export default function Scene({
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = T.PCFSoftShadowMap;
     const canvas = renderer.domElement;
-    canvas.setAttribute("aria-label", "Molecule and nested constituents in 3D");
+    canvas.setAttribute(
+      "aria-label",
+      t("Molecule and nested constituents in 3D"),
+    );
     canvas.dataset.sceneId = crypto.randomUUID();
     el.appendChild(canvas);
     const scene = new T.Scene();
@@ -298,7 +304,10 @@ export default function Scene({
       const label = document.createElement("button");
       label.className = "atom-label";
       label.dataset.node = node.id;
-      label.setAttribute("aria-label", `Inspect ${node.entry.name}`);
+      label.setAttribute(
+        "aria-label",
+        t("Inspect {name}", { name: node.entry.name }),
+      );
       label.innerHTML = `<span class="label-symbol">${node.entry.symbol}</span><span class="label-name">${node.entry.name}</span>`;
       label.style.setProperty("--particle", node.entry.color);
       label.onclick = () => pick.current(node.id);
@@ -618,7 +627,12 @@ export default function Scene({
       if (hover) {
         preferVisible(hover);
         const node = graph.nodes.get(hover)!;
-        tooltip.textContent = `${node.entry.name} · ${node.children.length ? "click to zoom in" : "elementary particle"}`;
+        tooltip.textContent = t("{name} · {hint}", {
+          name: node.entry.name,
+          hint: t(
+            node.children.length ? "click to zoom in" : "elementary particle",
+          ),
+        });
         tooltip.style.left = Math.min(width - 245, e.clientX + 15) + "px";
         tooltip.style.top = Math.min(height - 110, e.clientY + 18) + "px";
       }
@@ -1164,8 +1178,10 @@ export default function Scene({
       scaleLabel.style.left = `${((anchorPoint.x + 1) * width) / 2}px`;
       scaleLabel.style.top = `${((1 - anchorPoint.y) * height) / 2 + availableH / 2 - 38}px`;
       scaleLabel.textContent = explorerNext
-        ? `Explore ${graph.nodes.get(explorerNext)!.entry.name} →`
-        : `${explorerNode.entry.name} · elementary particle`;
+        ? t("Explore {name} →", {
+            name: graph.nodes.get(explorerNext)!.entry.name,
+          })
+        : t("{name} · elementary particle", { name: explorerNode.entry.name });
       controls.zoomToCursor = !isScale(macroLevel);
       canvas.dataset.scale = macroLevel;
       canvas.dataset.interaction = s.interaction;
@@ -1273,7 +1289,9 @@ export default function Scene({
           open: opened,
           readable,
           count,
-          layer: ["Atoms", "Nuclei & electrons", "Nucleons", "Quarks"][layer],
+          layer: [t("Atoms"), t("Nuclei & electrons"), t("Nucleons"), "Quarks"][
+            layer
+          ],
           context: detailContext,
           viewpoint,
           next: nextOf(viewpoint),
@@ -1303,8 +1321,27 @@ export default function Scene({
       }
       oldState = s;
     }
+    refreshLanguage.current = () => {
+      canvas.setAttribute(
+        "aria-label",
+        t("Molecule and nested constituents in 3D"),
+      );
+      canvas.dataset.locale = document.documentElement.lang;
+      for (const { node, label } of views.values()) {
+        label.setAttribute(
+          "aria-label",
+          t("Inspect {name}", { name: node.entry.name }),
+        );
+        label.querySelector(".label-name")!.textContent = node.entry.name;
+      }
+      tooltip.style.display = "none";
+      macro.updateLanguage();
+      controlsDirty = true;
+    };
+    refreshLanguage.current();
     raf = requestAnimationFrame(frame);
     return () => {
+      refreshLanguage.current = () => {};
       disposed = true;
       cancelAnimationFrame(raf);
       observer.disconnect();
@@ -1333,13 +1370,16 @@ export default function Scene({
       tooltip.remove();
     };
   }, [state.molecule, graph]);
+  useEffect(() => {
+    refreshLanguage.current();
+  }, [locale]);
   return (
     <div className="scene" ref={host}>
       {error && (
         <div className="scene-error">
-          <strong>The 3D scene is paused.</strong>
-          <p>Reload the atlas with graphics acceleration enabled.</p>
-          <button onClick={() => location.reload()}>Reload</button>
+          <strong>{t("The 3D scene is paused.")}</strong>
+          <p>{t("Reload the atlas with graphics acceleration enabled.")}</p>
+          <button onClick={() => location.reload()}>{t("Reload")}</button>
         </div>
       )}
     </div>

@@ -1,3 +1,11 @@
+import {
+  locale,
+  browserLocale,
+  text,
+  stepName,
+  artifact,
+  assertLocale,
+} from "./locale-fixture.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { chromium } from "playwright";
@@ -15,6 +23,7 @@ const b = await chromium.launch({
   ],
 });
 const context = await b.newContext({
+    locale: browserLocale,
     viewport: { width: 1440, height: 1000 },
     reducedMotion: "reduce",
     hasTouch: true,
@@ -38,7 +47,7 @@ const atom = "atom-0",
 const nav = (d) => p.locator(`.zoom-navigation [data-direction="${d}"]`),
   label = (id) => p.locator(`.atom-label[data-node="${id}"]`),
   settle = () => p.waitForTimeout(650),
-  shot = (name) => p.screenshot({ path: `artifacts/navigation-${name}.png` });
+  shot = (name) => p.screenshot({ path: artifact(`navigation-${name}.png`) });
 const view = (id) =>
   p.waitForFunction(
     (id) => document.querySelector("canvas")?.dataset.viewpoint === id,
@@ -68,7 +77,13 @@ async function ready() {
 }
 async function move(direction, target) {
   assert.equal(await nav(direction).getAttribute("data-target"), target);
-  assert.ok((await nav(direction).getAttribute("aria-label")).includes("to"));
+  assert.ok(
+    (await nav(direction).getAttribute("aria-label")).startsWith(
+      text(direction === "in" ? "Zoom in to {name}" : "Zoom out to {name}", {
+        name: "",
+      }),
+    ),
+  );
   await nav(direction).click();
   await view(target);
   await ready();
@@ -79,7 +94,10 @@ async function move(direction, target) {
 }
 async function home() {
   await p
-    .getByRole("button", { name: "Return to the whole object", exact: true })
+    .getByRole("button", {
+      name: text("Return to the whole object"),
+      exact: true,
+    })
     .click();
   await view("sample");
   for (const target of ["portion", "neighborhood", "molecule"])
@@ -87,13 +105,16 @@ async function home() {
   await ready();
 }
 async function search(term) {
-  await p.getByRole("button", { name: "Search", exact: true }).click();
-  await p.getByRole("textbox", { name: "Search for a constituent" }).fill(term);
+  await p.getByRole("button", { name: text("Search"), exact: true }).click();
+  await p
+    .getByRole("textbox", { name: text("Search for a constituent") })
+    .fill(term);
   await p.locator(".search-results>button").first().click();
   await ready();
 }
 try {
   await p.goto(base + "/?focus=molecule", { waitUntil: "networkidle" });
+  await assertLocale(p);
   await view("molecule");
   await ready();
   const identity = await p.locator("canvas").getAttribute("data-scene-id");
@@ -132,7 +153,9 @@ try {
     await shot(id.split("/").at(-1));
   }
   assert.equal(await nav("in").isDisabled(), true);
-  assert.ok((await nav("in").innerText()).includes("ELEMENTARY PARTICLE"));
+  assert.ok(
+    (await nav("in").innerText()).includes(text("ELEMENTARY PARTICLE")),
+  );
   for (const id of [proton, nucleus, atom, "molecule"]) await move("out", id);
   assert.equal(await nav("out").isDisabled(), false);
   assert.equal(
@@ -194,15 +217,17 @@ try {
   await reveal(nucleus, 0);
   await home();
   // Search, photon exchange, themes and the graph all remain in the same renderer.
-  await search("electron 1");
+  await search(text("Electron {number}", { number: 1 }).toLowerCase());
   await view("atom-0/electron-0");
   assert.equal(await nav("in").isDisabled(), true);
-  await p.getByRole("button", { name: "Understand the photon" }).click();
+  await p.getByRole("button", { name: text("Understand the photon") }).click();
   await view(atom);
-  await p.getByRole("button", { name: /Step 2:/ }).click();
-  await p.getByRole("button", { name: /Step 3:/ }).click();
-  await p.getByRole("button", { name: "Close explanation" }).click();
-  await p.getByRole("button", { name: "Light mode", exact: true }).click();
+  await p.getByRole("button", { name: stepName(2) }).click();
+  await p.getByRole("button", { name: stepName(3) }).click();
+  await p.getByRole("button", { name: text("Close explanation") }).click();
+  await p
+    .getByRole("button", { name: text("Light mode"), exact: true })
+    .click();
   await settle();
   assert.equal(await p.locator("html").getAttribute("data-theme"), "light");
   assert.equal(
@@ -210,8 +235,10 @@ try {
     identity,
   );
   await shot("light");
-  await p.getByRole("button", { name: "Dark mode", exact: true }).click();
-  await p.getByRole("switch", { name: "Annotations", exact: true }).click();
+  await p.getByRole("button", { name: text("Dark mode"), exact: true }).click();
+  await p
+    .getByRole("switch", { name: text("Annotations"), exact: true })
+    .click();
   await settle();
   assert.equal(await p.locator(".atom-label:visible").count(), 0);
   await p.keyboard.press("r");
@@ -243,7 +270,7 @@ try {
     await shot(`${width}-leaf`);
     for (const id of [proton, nucleus, atom, "molecule"]) await move("out", id);
     if (width < 768) {
-      await p.getByRole("button", { name: "Show composition" }).click();
+      await p.getByRole("button", { name: text("Show composition") }).click();
       await p.locator('[data-tree-node="atom-1"] .tree-name').click();
       await view("atom-1");
       await ready();
@@ -299,7 +326,7 @@ try {
     ["co2", 204, 3],
     ["methane", 84, 5],
   ]) {
-    await p.getByRole("button", { name: "Choose a molecule" }).click();
+    await p.getByRole("button", { name: text("Choose a molecule") }).click();
     await p.locator(`[data-molecule-choice="${molecule}"]`).click();
     await p.locator("[data-molecule-enter]").click();
     await view("sample");

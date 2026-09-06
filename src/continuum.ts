@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import { scaleEntry, scaleIds } from "./scales";
 import {
   atomEntry,
@@ -121,7 +122,9 @@ export function createGraph(molecule: MoleculeId): MatterGraph {
       index: 0,
       element: m.atoms[0].element,
       children: [],
-      entry: scaleEntry(molecule, id),
+      get entry() {
+        return scaleEntry(molecule, id);
+      },
     }),
   );
   add({
@@ -132,21 +135,28 @@ export function createGraph(molecule: MoleculeId): MatterGraph {
     index: 0,
     element: m.atoms[0].element,
     children: [],
-    entry: {
-      id: "molecule",
-      name:
-        molecule === "water"
-          ? "Water molecule"
-          : molecule === "co2"
-            ? "CO₂ molecule"
-            : "Methane molecule",
-      symbol: m.formula,
-      color: "#c6cbd4",
-      category: "MOLECULE",
-      description: `A ${m.name.toLowerCase()} molecule consists of ${m.atoms.length} bonded atoms. Enter an atom to see its nucleus and electrons, then a nucleon to reveal its quarks. You remain inside the same molecule.`,
-      note: "The breakdown illustrates composition, not a chemical reaction. Dimensions are adjusted to reveal the nested structures.",
-      facts: m.facts,
-      source: m.source,
+    get entry() {
+      return {
+        id: "molecule",
+        name:
+          molecule === "water"
+            ? t("Water molecule")
+            : molecule === "co2"
+              ? t("CO₂ molecule")
+              : t("Methane molecule"),
+        symbol: m.formula,
+        color: "#c6cbd4",
+        category: t("MOLECULE"),
+        description: t(
+          "A {name} molecule consists of {count} bonded atoms. Enter an atom to see its nucleus and electrons, then a nucleon to reveal its quarks. You remain inside the same molecule.",
+          { name: m.name.toLowerCase(), count: m.atoms.length },
+        ),
+        note: t(
+          "The breakdown illustrates composition, not a chemical reaction. Dimensions are adjusted to reveal the nested structures.",
+        ),
+        facts: m.facts,
+        source: m.source,
+      };
     },
   });
   m.atoms.forEach((a, i) => {
@@ -161,10 +171,12 @@ export function createGraph(molecule: MoleculeId): MatterGraph {
       index: i,
       element: a.element,
       children: [],
-      entry: {
-        ...atomEntry(a.element, id),
-        name: `${e.name} ${i + 1}`,
-        color: e.color,
+      get entry() {
+        return {
+          ...atomEntry(a.element, id),
+          name: `${e.name} ${i + 1}`,
+          color: e.color,
+        };
       },
     });
     const nucleus = `${id}/nucleus`;
@@ -176,10 +188,12 @@ export function createGraph(molecule: MoleculeId): MatterGraph {
       index: 0,
       element: a.element,
       children: [],
-      entry: {
-        ...nucleusEntry(a.element),
-        id: nucleus,
-        name: `Nucleus ${isotopeSymbol(a.element)}`,
+      get entry() {
+        return {
+          ...nucleusEntry(a.element),
+          id: nucleus,
+          name: t("Nucleus {symbol}", { symbol: isotopeSymbol(a.element) }),
+        };
       },
     });
     for (let j = 0; j < e.z + e.n; j++) {
@@ -194,10 +208,12 @@ export function createGraph(molecule: MoleculeId): MatterGraph {
         index: j,
         element: a.element,
         children: [],
-        entry: {
-          ...particles[kind],
-          id: nid,
-          name: `${kind === "proton" ? "Proton" : "Neutron"} ${index + 1}`,
+        get entry() {
+          return {
+            ...particles[kind],
+            id: nid,
+            name: `${kind === "proton" ? t("Proton") : t("Neutron")} ${index + 1}`,
+          };
         },
       });
       (kind === "proton"
@@ -213,7 +229,9 @@ export function createGraph(molecule: MoleculeId): MatterGraph {
           index: k,
           element: a.element,
           children: [],
-          entry: { ...particles[q], id: qid },
+          get entry() {
+            return { ...particles[q], id: qid };
+          },
         });
         totals.quarks++;
       });
@@ -229,7 +247,13 @@ export function createGraph(molecule: MoleculeId): MatterGraph {
         index: j,
         element: a.element,
         children: [],
-        entry: { ...particles.electron, id: eid, name: `Electron ${j + 1}` },
+        get entry() {
+          return {
+            ...particles.electron,
+            id: eid,
+            name: t("Electron {number}", { number: j + 1 }),
+          };
+        },
       });
       totals.electrons++;
     }
@@ -254,15 +278,37 @@ export function expansion(node: MatterNode, state: ExplorerState): number {
     : 0;
 }
 export const kindNames: Record<Kind, string> = {
-  sample: "object",
-  portion: "volume",
-  neighborhood: "neighborhood",
-  molecule: "molecule",
-  atom: "atom",
-  nucleus: "nucleus",
-  proton: "proton",
-  neutron: "neutron",
-  electron: "electron",
-  up: "up quark",
-  down: "down quark",
+  get sample() {
+    return t("object");
+  },
+  get portion() {
+    return t("volume");
+  },
+  get neighborhood() {
+    return t("neighborhood");
+  },
+  get molecule() {
+    return t("molecule");
+  },
+  get atom() {
+    return t("atom");
+  },
+  get nucleus() {
+    return t("nucleus");
+  },
+  get proton() {
+    return t("proton");
+  },
+  get neutron() {
+    return t("neutron");
+  },
+  get electron() {
+    return t("electron");
+  },
+  get up() {
+    return t("up quark");
+  },
+  get down() {
+    return t("down quark");
+  },
 };

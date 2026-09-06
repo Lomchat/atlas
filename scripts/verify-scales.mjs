@@ -1,3 +1,11 @@
+import {
+  locale,
+  browserLocale,
+  text,
+  stepName,
+  artifact,
+  assertLocale,
+} from "./locale-fixture.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { chromium } from "playwright";
@@ -14,6 +22,7 @@ const browser = await chromium.launch({
   ],
 });
 const page = await browser.newPage({
+  locale: browserLocale,
   viewport: { width: 1440, height: 1000 },
   reducedMotion: "reduce",
 });
@@ -30,12 +39,13 @@ const ready = (id) =>
     return c?.dataset.viewpoint === id && c?.dataset.transitioning === "false";
   }, id);
 const nav = (d) => page.locator(`.zoom-navigation [data-direction="${d}"]`);
-const shot = (n) => page.screenshot({ path: `artifacts/scales-${n}.png` });
+const shot = (n) => page.screenshot({ path: artifact(`scales-${n}.png`) });
 const goto = async (molecule, focus = "") => {
   await page.goto(
     `${base}/?molecule=${molecule}${focus ? "&focus=" + encodeURIComponent(focus) : ""}`,
     { waitUntil: "networkidle" },
   );
+  await assertLocale(page);
   await ready(focus || "sample");
 };
 fs.mkdirSync("artifacts", { recursive: true });
@@ -76,17 +86,15 @@ try {
       molecule === "water" ? "cohesion" : "motion",
     );
     for (let phase = 0; phase < 3; phase++) {
-      await page
-        .getByRole("button", { name: new RegExp(`Step ${phase + 1}:`) })
-        .click();
+      await page.getByRole("button", { name: stepName(phase + 1) }).click();
       await page.waitForFunction(
         (p) => document.querySelector("canvas")?.dataset.phase === String(p),
         phase,
       );
     }
     await shot(molecule + "-interaction");
-    await page.getByRole("button", { name: "Close explanation" }).click();
-    await page.getByRole("button", { name: "Choose a molecule" }).click();
+    await page.getByRole("button", { name: text("Close explanation") }).click();
+    await page.getByRole("button", { name: text("Choose a molecule") }).click();
     await page.locator(".molecule-preview canvas").waitFor();
     await shot(molecule + "-gallery");
     await page.keyboard.press("Escape");
@@ -123,17 +131,17 @@ try {
       type,
     );
     const before = await c().screenshot();
-    await page.getByRole("button", { name: /Step 2:/ }).click();
+    await page.getByRole("button", { name: stepName(2) }).click();
     await page.waitForFunction(
       () => document.querySelector("canvas")?.dataset.phase === "1",
     );
     const after = await c().screenshot();
     assert.equal(before.equals(after), false, `${type} visibly changes scene`);
     await shot(type);
-    await page.getByRole("button", { name: /Step 3:/ }).click();
+    await page.getByRole("button", { name: stepName(3) }).click();
     assert.ok(await page.locator(".lesson-copy p").textContent());
     await page
-      .getByRole("button", { name: "Restart from the beginning" })
+      .getByRole("button", { name: text("Restart from the beginning") })
       .click();
     await nav("out").click();
     assert.equal(await page.locator(".lesson-panel").count(), 0);
@@ -150,7 +158,7 @@ try {
     await ready("neighborhood");
     await shot(name + "-lesson");
     const close = await page
-      .getByRole("button", { name: "Close explanation" })
+      .getByRole("button", { name: text("Close explanation") })
       .boundingBox();
     assert.ok(
       close.x >= 0 &&
@@ -158,14 +166,14 @@ try {
         close.y >= 0 &&
         close.y + close.height <= height,
     );
-    await page.getByRole("button", { name: /Step 2:/ }).click();
+    await page.getByRole("button", { name: stepName(2) }).click();
     assert.ok(
       await page
         .locator(".lesson-panel")
         .evaluate((e) => e.scrollWidth <= e.clientWidth + 1),
     );
-    await page.getByRole("button", { name: "Close explanation" }).click();
-    await page.getByRole("button", { name: "Choose a molecule" }).click();
+    await page.getByRole("button", { name: text("Close explanation") }).click();
+    await page.getByRole("button", { name: text("Choose a molecule") }).click();
     await shot(name + "-gallery");
     await page.keyboard.press("Escape");
   }

@@ -1,3 +1,11 @@
+import {
+  locale,
+  browserLocale,
+  text,
+  stepName,
+  artifact,
+  assertLocale,
+} from "./locale-fixture.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { chromium } from "playwright";
@@ -15,6 +23,7 @@ const browser = await chromium.launch({
   ],
 });
 const p = await browser.newPage({
+    locale: browserLocale,
     viewport: { width: 1440, height: 1000 },
     reducedMotion: "no-preference",
   }),
@@ -52,6 +61,7 @@ try {
   ]) {
     await p.setViewportSize({ width, height });
     await p.goto(base, { waitUntil: "networkidle" });
+    await assertLocale(p);
     await settle(root);
     const identity = await p.locator("canvas").getAttribute("data-scene-id");
     // Many events in one task exercise stale render snapshots and React batching.
@@ -118,7 +128,7 @@ try {
       await p.locator("canvas").getAttribute("data-scene-id"),
       identity,
     );
-    await p.screenshot({ path: `artifacts/rapid-navigation-${width}.png` });
+    await p.screenshot({ path: artifact(`rapid-navigation-${width}.png`) });
   }
   // Returning then re-entering remembers a non-default branch during a burst.
   await p.setViewportSize({ width: 1440, height: 1000 });
@@ -138,7 +148,7 @@ try {
     "PASS: normal-motion rapid click bursts, actual seven-click bursts, immediate labels and enabled controls, endpoint clamping, mid-flight reversal, no animation queue, key repeat, remembered sibling, mobile and persistent renderer.",
   );
 } catch (e) {
-  await p.screenshot({ path: "artifacts/rapid-navigation-failure.png" });
+  await p.screenshot({ path: artifact("rapid-navigation-failure.png") });
   console.error(e);
   console.error({ url: p.url(), errors });
   process.exitCode = 1;

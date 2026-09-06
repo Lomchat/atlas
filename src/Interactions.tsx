@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import {
   ArrowLeft,
   ArrowRight,
@@ -22,158 +23,290 @@ export type Lesson = {
 };
 export const lessons: Record<Interaction, Lesson> = {
   cohesion: {
-    title: "What holds liquid water together?",
-    question: "Observe the attractions",
-    steps: [
-      [
-        "Molecules close together",
-        "H₂O molecules remain distinct. The sticks inside each one connect its own atoms.",
-      ],
-      [
-        "Neighbors that attract",
-        "The gold dotted lines symbolize attractions between molecules. Hydrogen bonds play a major role in water.",
-      ],
-      [
-        "A liquid that can flow",
-        "These attractions help hold the liquid together while allowing molecules to change neighbors. They do not form one giant molecule.",
-      ],
-    ],
-    legend:
-      "Gold dotted lines: attractions between molecules. Gray sticks: bonds within a molecule.",
-    note: "Positions and movements are illustrative. The lines are neither wires nor a calculated map of hydrogen bonds.",
+    get title() {
+      return t("What holds liquid water together?");
+    },
+    get question() {
+      return t("Observe the attractions");
+    },
+    get steps(): [string, string][] {
+      return [
+        [
+          t("Molecules close together"),
+          t(
+            "H₂O molecules remain distinct. The sticks inside each one connect its own atoms.",
+          ),
+        ],
+        [
+          t("Neighbors that attract"),
+          t(
+            "The gold dotted lines symbolize attractions between molecules. Hydrogen bonds play a major role in water.",
+          ),
+        ],
+        [
+          t("A liquid that can flow"),
+          t(
+            "These attractions help hold the liquid together while allowing molecules to change neighbors. They do not form one giant molecule.",
+          ),
+        ],
+      ];
+    },
+    get legend() {
+      return t(
+        "Gold dotted lines: attractions between molecules. Gray sticks: bonds within a molecule.",
+      );
+    },
+    get note() {
+      return t(
+        "Positions and movements are illustrative. The lines are neither wires nor a calculated map of hydrogen bonds.",
+      );
+    },
     source: matterSource,
   },
   motion: {
-    title: "Why does gas fill its container?",
-    question: "Observe gas motion",
-    steps: [
-      [
-        "Molecules spaced apart",
-        "Gas consists of separate molecules. The one at the center is our navigation marker.",
-      ],
-      [
-        "They move around",
-        "The other molecules travel through the volume in different directions. They keep moving even when the container appears still.",
-      ],
-      [
-        "They hit the walls",
-        "The frame represents a small, schematic container. The rebounds illustrate collisions with its walls; these impacts contribute to gas pressure.",
-      ],
-    ],
-    legend:
-      "Connected spheres: whole molecules. Frame: walls of the illustrative container.",
-    note: "Motion is slowed down and paths are simplified. The frame belongs to this demonstration; it does not represent a membrane within the gas.",
+    get title() {
+      return t("Why does gas fill its container?");
+    },
+    get question() {
+      return t("Observe gas motion");
+    },
+    get steps(): [string, string][] {
+      return [
+        [
+          t("Molecules spaced apart"),
+          t(
+            "Gas consists of separate molecules. The one at the center is our navigation marker.",
+          ),
+        ],
+        [
+          t("They move around"),
+          t(
+            "The other molecules travel through the volume in different directions. They keep moving even when the container appears still.",
+          ),
+        ],
+        [
+          t("They hit the walls"),
+          t(
+            "The frame represents a small, schematic container. The rebounds illustrate collisions with its walls; these impacts contribute to gas pressure.",
+          ),
+        ],
+      ];
+    },
+    get legend() {
+      return t(
+        "Connected spheres: whole molecules. Frame: walls of the illustrative container.",
+      );
+    },
+    get note() {
+      return t(
+        "Motion is slowed down and paths are simplified. The frame belongs to this demonstration; it does not represent a membrane within the gas.",
+      );
+    },
     source:
       "https://openstax.org/books/chemistry-2e/pages/9-5-the-kinetic-molecular-theory",
   },
   bonds: {
-    title: "What connects atoms?",
-    question: "Understand chemical bonds",
-    steps: [
-      [
-        "Atoms in a molecule",
-        "Each sphere represents an atom. The sticks show which pairs of atoms are bonded.",
-      ],
-      [
-        "Shared electrons",
-        "The bonds highlighted in gold are covalent: the atoms share electrons. The sticks are symbols, not tiny physical rods.",
-      ],
-      [
-        "A molecule that stays whole",
-        "Zooming inside does not break these bonds. You are exploring composition, not triggering a chemical reaction.",
-      ],
-    ],
-    legend: "Gold: a highlighted covalent bond. Two sticks: a double bond.",
-    note: "The bright dots highlight sharing; they are not electron trajectories. The clouds do not calculate molecular orbitals.",
+    get title() {
+      return t("What connects atoms?");
+    },
+    get question() {
+      return t("Understand chemical bonds");
+    },
+    get steps(): [string, string][] {
+      return [
+        [
+          t("Atoms in a molecule"),
+          t(
+            "Each sphere represents an atom. The sticks show which pairs of atoms are bonded.",
+          ),
+        ],
+        [
+          t("Shared electrons"),
+          t(
+            "The bonds highlighted in gold are covalent: the atoms share electrons. The sticks are symbols, not tiny physical rods.",
+          ),
+        ],
+        [
+          t("A molecule that stays whole"),
+          t(
+            "Zooming inside does not break these bonds. You are exploring composition, not triggering a chemical reaction.",
+          ),
+        ],
+      ];
+    },
+    get legend() {
+      return t("Gold: a highlighted covalent bond. Two sticks: a double bond.");
+    },
+    get note() {
+      return t(
+        "The bright dots highlight sharing; they are not electron trajectories. The clouds do not calculate molecular orbitals.",
+      );
+    },
     source:
       "https://openstax.org/books/chemistry-2e/pages/7-2-covalent-bonding",
   },
   nuclear: {
-    title: "What holds the nucleus together?",
-    question: "Understand nuclear cohesion",
-    steps: [
-      [
-        "Protons and neutrons",
-        "The nucleus is a collection of nucleons. Positively charged protons repel one another electrically.",
-      ],
-      [
-        "A very short-range attraction",
-        "The gold lines symbolize the nuclear interaction that binds nearby nucleons. It is related to the strong interaction between their quarks.",
-      ],
-      [
-        "A bound nucleus",
-        "This stable nucleus stays bound. The effect depends on distance and composition; it does not bind two distant nuclei in the same way.",
-      ],
-    ],
-    legend:
-      "Gold lines: a schematic interaction between nucleons, not chemical bonds.",
-    note: "The hydrogen nucleus shown here is a single proton: zoom inside to explore its quarks.",
+    get title() {
+      return t("What holds the nucleus together?");
+    },
+    get question() {
+      return t("Understand nuclear cohesion");
+    },
+    get steps(): [string, string][] {
+      return [
+        [
+          t("Protons and neutrons"),
+          t(
+            "The nucleus is a collection of nucleons. Positively charged protons repel one another electrically.",
+          ),
+        ],
+        [
+          t("A very short-range attraction"),
+          t(
+            "The gold lines symbolize the nuclear interaction that binds nearby nucleons. It is related to the strong interaction between their quarks.",
+          ),
+        ],
+        [
+          t("A bound nucleus"),
+          t(
+            "This stable nucleus stays bound. The effect depends on distance and composition; it does not bind two distant nuclei in the same way.",
+          ),
+        ],
+      ];
+    },
+    get legend() {
+      return t(
+        "Gold lines: a schematic interaction between nucleons, not chemical bonds.",
+      );
+    },
+    get note() {
+      return t(
+        "The hydrogen nucleus shown here is a single proton: zoom inside to explore its quarks.",
+      );
+    },
     source: "https://home.cern/science/physics/standard-model/",
   },
   strong: {
-    title: "What keeps quarks together?",
-    question: "Understand the strong interaction",
-    steps: [
-      [
-        "Three valence quarks",
-        "The three markers show the valence composition of a proton or neutron. They do not show its entire dynamic content.",
-      ],
-      [
-        "Gluon exchange",
-        "The gold curves suggest the strong interaction, carried by gluons. A gluon is a mediator of this interaction.",
-      ],
-      [
-        "Confined quarks",
-        "Moving these points apart does not produce a free quark. The zoom illustrates composition, not a physical separation of quarks.",
-      ],
-    ],
-    legend:
-      "Gold curves: a visual suggestion of gluon exchange. They are not measured trajectories.",
-    note: "The model omits quark–antiquark pairs and the full dynamics of gluons.",
+    get title() {
+      return t("What keeps quarks together?");
+    },
+    get question() {
+      return t("Understand the strong interaction");
+    },
+    get steps(): [string, string][] {
+      return [
+        [
+          t("Three valence quarks"),
+          t(
+            "The three markers show the valence composition of a proton or neutron. They do not show its entire dynamic content.",
+          ),
+        ],
+        [
+          t("Gluon exchange"),
+          t(
+            "The gold curves suggest the strong interaction, carried by gluons. A gluon is a mediator of this interaction.",
+          ),
+        ],
+        [
+          t("Confined quarks"),
+          t(
+            "Moving these points apart does not produce a free quark. The zoom illustrates composition, not a physical separation of quarks.",
+          ),
+        ],
+      ];
+    },
+    get legend() {
+      return t(
+        "Gold curves: a visual suggestion of gluon exchange. They are not measured trajectories.",
+      );
+    },
+    get note() {
+      return t(
+        "The model omits quark–antiquark pairs and the full dynamics of gluons.",
+      );
+    },
     source: sources.cern,
   },
   photon: {
-    title: "How does a photon affect an atom?",
-    question: "Light and energy",
-    steps: [
-      [
-        "Before: a photon arrives",
-        "The gold marker represents a photon, a quantum of light. In this example, it has the energy needed for a transition in the atom.",
-      ],
-      [
-        "Absorption: the atom gains energy",
-        "The photon is absorbed. The electronic state changes: the gold halo represents an excited state. The photon is not stored inside the electron.",
-      ],
-      [
-        "Emission: the atom releases energy",
-        "During a transition to a lower-energy state, the atom can emit a photon. In this two-level diagram, it returns to its initial state.",
-      ],
-    ],
-    legend:
-      "Gold marker: a photon. Gold halo: the energy of the excited state, not the atom’s actual size.",
-    note: "An example of an isolated atom with two levels. Energy states differ in a molecule; not every photon is absorbed.",
+    get title() {
+      return t("How does a photon affect an atom?");
+    },
+    get question() {
+      return t("Light and energy");
+    },
+    get steps(): [string, string][] {
+      return [
+        [
+          t("Before: a photon arrives"),
+          t(
+            "The gold marker represents a photon, a quantum of light. In this example, it has the energy needed for a transition in the atom.",
+          ),
+        ],
+        [
+          t("Absorption: the atom gains energy"),
+          t(
+            "The photon is absorbed. The electronic state changes: the gold halo represents an excited state. The photon is not stored inside the electron.",
+          ),
+        ],
+        [
+          t("Emission: the atom releases energy"),
+          t(
+            "During a transition to a lower-energy state, the atom can emit a photon. In this two-level diagram, it returns to its initial state.",
+          ),
+        ],
+      ];
+    },
+    get legend() {
+      return t(
+        "Gold marker: a photon. Gold halo: the energy of the excited state, not the atom’s actual size.",
+      );
+    },
+    get note() {
+      return t(
+        "An example of an isolated atom with two levels. Energy states differ in a molecule; not every photon is absorbed.",
+      );
+    },
     source: sources.atom,
   },
   higgs: {
-    title: "What is the Higgs field?",
-    question: "The Higgs field and mass",
-    steps: [
-      [
-        "An electron has mass",
-        "The Higgs field helps explain the origin of the mass of elementary particles such as the electron. It is not an object hidden inside them.",
-      ],
-      [
-        "A field throughout space",
-        "The purple volume symbolizes a field present everywhere. The electron’s coupling to this field is associated with its mass.",
-      ],
-      [
-        "Not a fluid that slows things down",
-        "This field does not slow particles through friction. The photon remains massless; most of the proton’s mass comes from the dynamics of the strong interaction.",
-      ],
-    ],
-    legend:
-      "Purple dots: a symbolic representation of the field, not individual Higgs bosons.",
-    note: "The pulse helps you identify the field; it does not show a moving fluid. The dots are not bosons produced in the scene.",
+    get title() {
+      return t("What is the Higgs field?");
+    },
+    get question() {
+      return t("The Higgs field and mass");
+    },
+    get steps(): [string, string][] {
+      return [
+        [
+          t("An electron has mass"),
+          t(
+            "The Higgs field helps explain the origin of the mass of elementary particles such as the electron. It is not an object hidden inside them.",
+          ),
+        ],
+        [
+          t("A field throughout space"),
+          t(
+            "The purple volume symbolizes a field present everywhere. The electron’s coupling to this field is associated with its mass.",
+          ),
+        ],
+        [
+          t("Not a fluid that slows things down"),
+          t(
+            "This field does not slow particles through friction. The photon remains massless; most of the proton’s mass comes from the dynamics of the strong interaction.",
+          ),
+        ],
+      ];
+    },
+    get legend() {
+      return t(
+        "Purple dots: a symbolic representation of the field, not individual Higgs bosons.",
+      );
+    },
+    get note() {
+      return t(
+        "The pulse helps you identify the field; it does not show a moving fluid. The dots are not bosons produced in the scene.",
+      );
+    },
     source: sources.higgs,
   },
 };
@@ -211,30 +344,33 @@ export default function Interactions({
   return (
     <aside
       className="lesson-panel glass"
-      aria-label="Understand the interaction"
+      aria-label={t("Understand the interaction")}
     >
       <div className="lesson-header">
-        <span className="eyebrow">OBSERVE & UNDERSTAND</span>
+        <span className="eyebrow">{t("OBSERVE & UNDERSTAND")}</span>
         <button
           className="icon-button"
-          aria-label="Close explanation"
+          aria-label={t("Close explanation")}
           onClick={onClose}
         >
           <X size={16} />
         </button>
       </div>
       <h2>{lesson.title}</h2>
-      <div className="lesson-steps" aria-label="Stages of the demonstration">
+      <div
+        className="lesson-steps"
+        aria-label={t("Stages of the demonstration")}
+      >
         {lesson.steps.map(([title], i) => (
           <button
             key={i}
             onClick={() => onPhase(i)}
             aria-pressed={phase === i}
-            aria-label={`Step ${i + 1}: ${title}`}
+            aria-label={t("Step {number}: {title}", { number: i + 1, title })}
           >
             {i + 1}
             <span>
-              {i === 0 ? "Before" : i === 1 ? "Observe" : "Understand"}
+              {i === 0 ? t("Before") : i === 1 ? t("Observe") : t("Understand")}
             </span>
           </button>
         ))}
@@ -243,23 +379,27 @@ export default function Interactions({
         <button
           onClick={onPause}
           disabled={reduced}
-          aria-label={paused ? "Resume animation" : "Pause animation"}
+          aria-label={paused ? t("Resume animation") : t("Pause animation")}
         >
           {paused || reduced ? <Play size={15} /> : <Pause size={15} />}
           <span>
-            {reduced ? "Reduced motion" : paused ? "Resume" : "Pause"}
+            {reduced ? t("Reduced motion") : paused ? t("Resume") : t("Pause")}
           </span>
         </button>
         <button
           onClick={onReplay}
           disabled={reduced}
-          aria-label="Replay animation"
+          aria-label={t("Replay animation")}
         >
           <RotateCcw size={14} />
-          <span>Replay</span>
+          <span>{t("Replay")}</span>
         </button>
         <small>
-          {reduced ? "Static diagram" : paused ? "Paused" : "Slow-motion loop"}
+          {reduced
+            ? t("Static diagram")
+            : paused
+              ? t("Paused")
+              : t("Slow-motion loop")}
         </small>
       </div>
       <div className="lesson-copy" aria-live="polite">
@@ -268,21 +408,21 @@ export default function Interactions({
       </div>
       {type === "photon" && (
         <div className="energy-diagram" data-excited={phase === 1}>
-          <span>Atom energy</span>
+          <span>{t("Atom energy")}</span>
           <div>
             <i className={phase === 1 ? "occupied" : ""} />
-            Excited state
+            {t("Excited state")}{" "}
           </div>
           <b>
             {phase === 1
-              ? "↑ Energy absorbed"
+              ? t("↑ Energy absorbed")
               : phase === 2
-                ? "↓ Energy emitted"
-                : "A photon arrives →"}
+                ? t("↓ Energy emitted")
+                : t("A photon arrives →")}
           </b>
           <div>
             <i className={phase !== 1 ? "occupied" : ""} />
-            Initial state
+            {t("Initial state")}{" "}
           </div>
         </div>
       )}
@@ -292,13 +432,13 @@ export default function Interactions({
         <button
           onClick={() => onPhase(Math.max(0, phase - 1))}
           disabled={phase === 0}
-          aria-label="Previous stage"
+          aria-label={t("Previous stage")}
         >
           <ArrowLeft size={16} />
         </button>
         <button onClick={() => onPhase(phase === 2 ? 0 : phase + 1)}>
           {phase === 2 ? <RotateCcw size={15} /> : null}
-          {phase === 2 ? "Restart from the beginning" : "Continue"}
+          {phase === 2 ? t("Restart from the beginning") : t("Continue")}
           {phase < 2 ? <ArrowRight size={16} /> : null}
         </button>
       </div>
@@ -308,7 +448,7 @@ export default function Interactions({
         target="_blank"
         rel="noreferrer"
       >
-        Why? Read the scientific source <ArrowUpRight size={11} />
+        {t("Why? Read the scientific source")} <ArrowUpRight size={11} />
       </a>
     </aside>
   );

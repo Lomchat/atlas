@@ -2,7 +2,15 @@
 
 [Explore the atlas](https://atlas.chalco.website) · [GitHub](https://github.com/Lomchat/atlas)
 
-An interactive English-language Three.js atlas of matter, from familiar objects to valence quarks. The neutral studio and camera-led exploration are inspired by Human Atlas and Model X Studio.
+An interactive English/French Three.js atlas of matter, from familiar objects to valence quarks. The neutral studio and camera-led exploration are inspired by Human Atlas and Model X Studio.
+
+## Languages
+
+Choose English or French using the flag selector in the upper-left corner (also available inside dialogs). Language changes preserve your molecule, zoom, orbit, lesson and gallery selection. All UI, scientific explanations, accessibility labels and the flask label update in place.
+
+A valid `?lang=en` or `?lang=fr` link takes priority over a saved preference, then the browser language; other browser languages default to English. Shared exploration URLs include the language. English and French messages live in `src/locales/en.json` and `src/locales/fr.json` and are accessed through the typed `t()` helper.
+
+Read [AGENTS.md](AGENTS.md) before contributing: every feature and every test must support both languages.
 
 ## Explore
 
@@ -41,7 +49,9 @@ npm run build -- --outDir .next-dist
 ## Verification
 
 ```sh
-npm test
+npm test                     # Every suite, in both English and French
+npm run test:navigation      # A focused suite, still in both languages
+npm run test:language
 npm run test:rapid
 npm run test:picker
 npm run test:scales
@@ -49,7 +59,9 @@ npm run test:experience
 ATLAS_URL=https://atlas.chalco.website npm test
 ```
 
-The local suite expects `npm run dev` to be running. Set `CHROMIUM_PATH` if needed, or install Chromium with `npx playwright install chromium`.
+The local suites expect `npm run dev` to be running. `scripts/test-matrix.mjs` automatically discovers all `verify*.mjs` suites and runs the same scenarios in both locales. It first checks identical catalog keys, nonempty translations and matching placeholders. Results are recorded in `artifacts/test-matrix.json`; screenshots use `en-` and `fr-` prefixes. New tests must use `scripts/locale-fixture.mjs` and assert the actual document language. A single-locale diagnostic run does not satisfy the bilingual gate.
+
+The dedicated language suite checks both switching directions, saved preference and link precedence, live graph/renderer/lesson preservation, gallery texture updates, responsive flag access, unavailable storage and translated graphics fallbacks. Set `CHROMIUM_PATH` if needed, or install Chromium with `npx playwright install chromium`.
 
 The rapid-navigation suite uses normal motion to check batched clicks, actual seven-click bursts, mid-flight reversal, endpoint clamping, keyboard repeat, remembered siblings and mobile behavior. The main browser suite checks the named inward/outward destination chain, disabled endpoint buttons, a pointed sibling remaining selected, exact ray picking, centered camera targets after orbiting, wheel reversal, mobile and landscape layouts, pinch targeting a hydrogen atom, absence of the gauge, persistent scene identity, photons, search, themes, shared URLs and graph composition totals. Screenshots are saved to `artifacts/navigation-*.png`.
 

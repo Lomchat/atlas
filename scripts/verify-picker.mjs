@@ -1,3 +1,11 @@
+import {
+  locale,
+  browserLocale,
+  text,
+  stepName,
+  artifact,
+  assertLocale,
+} from "./locale-fixture.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { chromium } from "playwright";
@@ -14,6 +22,7 @@ const browser = await chromium.launch({
   ],
 });
 const page = await browser.newPage({
+  locale: browserLocale,
   viewport: { width: 1440, height: 1000 },
   reducedMotion: "reduce",
 });
@@ -21,7 +30,7 @@ page.setDefaultTimeout(20000);
 const errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
 const open = () =>
-  page.getByRole("button", { name: "Choose a molecule" }).click();
+  page.getByRole("button", { name: text("Choose a molecule") }).click();
 const canvas = () => page.locator("canvas[data-scene-id]");
 const preview = () => page.locator(".molecule-preview canvas");
 const ready = (id) =>
@@ -38,6 +47,7 @@ try {
   await page.goto(base + "/?focus=atom-0%2Fnucleus&node=atom-0%2Fnucleus", {
     waitUntil: "networkidle",
   });
+  await assertLocale(page);
   await ready("atom-0/nucleus");
   const identity = await canvas().getAttribute("data-scene-id"),
     url = page.url();
@@ -52,7 +62,7 @@ try {
   );
   assert.equal(page.url(), url);
   assert.equal(await canvas().getAttribute("data-scene-id"), identity);
-  await page.screenshot({ path: "artifacts/picker-desktop.png" });
+  await page.screenshot({ path: artifact("picker-desktop.png") });
   const beforeRotation = await preview().screenshot();
   const area = await preview().boundingBox();
   await page.mouse.move(area.x + area.width / 2, area.y + area.height / 2);
@@ -74,7 +84,7 @@ try {
   assert.equal(await canvas().getAttribute("data-viewpoint"), "atom-0/nucleus");
   assert.equal(
     await page
-      .getByRole("button", { name: "Choose a molecule" })
+      .getByRole("button", { name: text("Choose a molecule") })
       .evaluate((e) => document.activeElement === e),
     true,
   );
@@ -117,7 +127,7 @@ try {
         .evaluate((e) => e.scrollWidth <= e.clientWidth + 1),
       `No horizontal overflow ${name}`,
     );
-    await page.screenshot({ path: `artifacts/picker-${name}.png` });
+    await page.screenshot({ path: artifact(`picker-${name}.png`) });
     await page.locator('[data-molecule-choice="methane"]').click();
     await page.locator("[data-molecule-enter]").click();
     await ready("sample");
@@ -125,10 +135,12 @@ try {
     assert.equal(await page.locator("canvas").count(), 1);
   }
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.getByRole("button", { name: "Light mode", exact: true }).click();
+  await page
+    .getByRole("button", { name: text("Light mode"), exact: true })
+    .click();
   await open();
-  await page.screenshot({ path: "artifacts/picker-light.png" });
-  await page.getByRole("button", { name: "Close dialog" }).click();
+  await page.screenshot({ path: artifact("picker-light.png") });
+  await page.getByRole("button", { name: text("Close dialog") }).click();
   assert.deepEqual(errors, []);
   console.log(
     "PASS molecule picker: previews, browsing/resume preserves focus, commit, Escape/backdrop/focus restoration, keyboard, mobile/landscape CTA, light theme, renderer cleanup",

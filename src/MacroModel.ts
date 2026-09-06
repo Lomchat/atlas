@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import * as T from "three";
 import { molecules, elements } from "./data";
 import type { MoleculeId } from "./data";
@@ -11,6 +12,7 @@ export const objectPalette = {
 
 /** A local-coordinate model shared by the gallery and the continuous scene. */
 export function macroModel(id: MoleculeId, portion = false) {
+  let updateLanguage = () => {};
   const group = new T.Group(),
     materials = new Set<T.Material>(),
     geometries = new Set<T.BufferGeometry>(),
@@ -190,27 +192,34 @@ export function macroModel(id: MoleculeId, portion = false) {
       canvas.width = 1024;
       canvas.height = 512;
       const ctx = canvas.getContext("2d")!;
-      ctx.fillStyle = "#f0e7d5";
-      ctx.fillRect(0, 0, 1024, 512);
-      ctx.fillStyle = "#b97447";
-      ctx.fillRect(0, 0, 1024, 16);
-      ctx.fillRect(0, 496, 1024, 16);
-      ctx.fillStyle = "#26436d";
-      ctx.textAlign = "center";
-      ctx.font = "500 29px sans-serif";
-      ctx.fillText("MATTER  /  COLLECTION", 512, 83);
-      ctx.font = "600 154px sans-serif";
-      ctx.fillText("CH₄", 512, 252);
-      ctx.font = "600 42px sans-serif";
-      ctx.fillText("METHANE", 512, 328);
-      ctx.fillStyle = "#b97447";
-      ctx.fillRect(434, 367, 156, 3);
-      ctx.fillStyle = "#53647a";
-      ctx.font = "28px sans-serif";
-      ctx.fillText("GAS • COLORLESS", 512, 433);
+      const paintLabel = () => {
+        ctx.fillStyle = "#f0e7d5";
+        ctx.fillRect(0, 0, 1024, 512);
+        ctx.fillStyle = "#b97447";
+        ctx.fillRect(0, 0, 1024, 16);
+        ctx.fillRect(0, 496, 1024, 16);
+        ctx.fillStyle = "#26436d";
+        ctx.textAlign = "center";
+        ctx.font = "500 29px sans-serif";
+        ctx.fillText(t("MATTER  /  COLLECTION"), 512, 83);
+        ctx.font = "600 154px sans-serif";
+        ctx.fillText("CH₄", 512, 252);
+        ctx.font = "600 42px sans-serif";
+        ctx.fillText(t("METHANE"), 512, 328);
+        ctx.fillStyle = "#b97447";
+        ctx.fillRect(434, 367, 156, 3);
+        ctx.fillStyle = "#53647a";
+        ctx.font = "28px sans-serif";
+        ctx.fillText(t("GAS • COLORLESS"), 512, 433);
+      };
+      paintLabel();
       const texture = new T.CanvasTexture(canvas);
       texture.colorSpace = T.SRGBColorSpace;
       texture.anisotropy = 4;
+      updateLanguage = () => {
+        paintLabel();
+        texture.needsUpdate = true;
+      };
       textures.add(texture);
       // Printed ink retains its contrast under the bright studio lights.
       const labelMat = new T.MeshBasicMaterial({
@@ -340,6 +349,7 @@ export function macroModel(id: MoleculeId, portion = false) {
   });
   return {
     group,
+    updateLanguage: () => updateLanguage(),
     fade(alpha: number) {
       group.visible = alpha > 0.002;
       materials.forEach((m) => {

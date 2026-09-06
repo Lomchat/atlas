@@ -1,3 +1,4 @@
+import { t, useLocale } from "./i18n";
 import { useEffect, useId, useRef, useState } from "react";
 import { ArrowRight, Check, Rotate3D } from "lucide-react";
 import * as T from "three";
@@ -201,6 +202,8 @@ function MacroThumbnail({ id }: { id: MoleculeId }) {
 }
 
 function Preview({ id, light }: { id: MoleculeId; light: boolean }) {
+  const locale = useLocale();
+  const refreshLanguage = useRef(() => {});
   const host = useRef<HTMLDivElement>(null);
   const change = useRef<((id: MoleculeId) => void) | null>(null);
   const initial = useRef(id);
@@ -219,7 +222,7 @@ function Preview({ id, light }: { id: MoleculeId; light: boolean }) {
     renderer.toneMappingExposure = light ? 1.3 : 1.1;
     renderer.domElement.setAttribute(
       "aria-label",
-      "3D object preview, drag to rotate",
+      t("3D object preview, drag to rotate"),
     );
     el.appendChild(renderer.domElement);
     const scene = new T.Scene(),
@@ -288,8 +291,17 @@ function Preview({ id, light }: { id: MoleculeId; light: boolean }) {
       resize();
       renderer.domElement.dataset.moleculePreview = next;
     }
+    refreshLanguage.current = () => {
+      renderer.domElement.setAttribute(
+        "aria-label",
+        t("3D object preview, drag to rotate"),
+      );
+      renderer.domElement.dataset.locale = document.documentElement.lang;
+      model?.updateLanguage();
+    };
     change.current = show;
     show(initial.current);
+    refreshLanguage.current();
     const observer = new ResizeObserver(resize);
     observer.observe(el);
     let frame = 0,
@@ -303,6 +315,7 @@ function Preview({ id, light }: { id: MoleculeId; light: boolean }) {
     frame = requestAnimationFrame(animate);
     return () => {
       change.current = null;
+      refreshLanguage.current = () => {};
       cancelAnimationFrame(frame);
       observer.disconnect();
       motion.removeEventListener("change", preference);
@@ -314,6 +327,9 @@ function Preview({ id, light }: { id: MoleculeId; light: boolean }) {
       renderer.domElement.remove();
     };
   }, [light]);
+  useEffect(() => {
+    refreshLanguage.current();
+  }, [locale]);
   useEffect(() => {
     change.current?.(id);
   }, [id]);
@@ -341,9 +357,9 @@ export default function MoleculePicker({
   return (
     <>
       <div className="picker-intro">
-        <span className="eyebrow">COLLECTION · 03 WORLDS</span>
-        <h2 id="dialog-title">From the visible to the invisible.</h2>
-        <p>Choose an object. Discover the matter inside.</p>
+        <span className="eyebrow">{t("COLLECTION · 03 WORLDS")}</span>
+        <h2 id="dialog-title">{t("From the visible to the invisible.")}</h2>
+        <p>{t("Choose an object. Discover the matter inside.")}</p>
       </div>
       <div className="picker-body">
         <div className="picker-stage">
@@ -354,18 +370,22 @@ export default function MoleculePicker({
           <div className="molecule-inset">
             <Thumbnail id={selected} />
             <span>
-              Inside<strong>{m.formula}</strong>
+              {t("Inside")}
+              <strong>{m.formula}</strong>
             </span>
           </div>
           <span className="preview-hint">
-            <Rotate3D size={14} /> Drag to rotate
+            <Rotate3D size={14} /> {t("Drag to rotate")}{" "}
           </span>
           <div className="preview-caption">
             <span>{environments[selected].name}</span>
             <span>≈ cm → nm</span>
           </div>
         </div>
-        <div className="picker-collection" aria-label="Available materials">
+        <div
+          className="picker-collection"
+          aria-label={t("Available materials")}
+        >
           {(Object.keys(molecules) as MoleculeId[]).map((id, i) => (
             <button
               key={id}
@@ -380,7 +400,7 @@ export default function MoleculePicker({
                 <strong>{environments[id].name}</strong>
                 <span>
                   {molecules[id].formula} <i>·</i> {molecules[id].atoms.length}{" "}
-                  atoms
+                  {t("atoms")}{" "}
                 </span>
               </span>
               <span className="choice-check">
@@ -391,9 +411,9 @@ export default function MoleculePicker({
           <div className="picker-facts" aria-live="polite">
             <p>{environments[selected].subtitle}</p>
             <div className="picker-route">
-              <span>Object</span> →{" "}
-              <span>{selected === "co2" ? "Bubble" : "Volume"}</span> →{" "}
-              <span>Neighborhood</span> → <strong>{m.formula}</strong>
+              <span>{t("Object")}</span> →{" "}
+              <span>{selected === "co2" ? t("Bubble") : t("Volume")}</span> →{" "}
+              <span>{t("Neighborhood")}</span> → <strong>{m.formula}</strong>
             </div>
             <div className="element-chips">
               {composition.map((e) => (
@@ -417,15 +437,17 @@ export default function MoleculePicker({
       </div>
       <div className="picker-footer">
         <span>
-          From objects to quarks.
-          <small>The same world, at every scale.</small>
+          {t("From objects to quarks.")}{" "}
+          <small>{t("The same world, at every scale.")}</small>
         </span>
         <button
           className="picker-enter"
           data-molecule-enter
           onClick={() => onChoose(selected)}
         >
-          {selected === current ? "Resume exploration" : "Explore this object"}
+          {selected === current
+            ? t("Resume exploration")
+            : t("Explore this object")}
           <ArrowRight size={17} />
         </button>
       </div>
