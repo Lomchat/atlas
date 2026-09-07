@@ -1,0 +1,85 @@
+.world-comparison {
+  border-top: 1px solid #ffffff12;
+  margin-top: 10px;
+  padding-top: 9px;
+}
+.world-comparison-caption {
+  font-size: 9px;
+  color: #abb6c3;
+  letter-spacing: 0.03em;
+}
+.world-comparison-canvas {
+  height: 86px;
+  width: 100%;
+}
+.world-comparison-canvas canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.world-comparison-names {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+  font-size: 9px;
+  line-height: 1.4;
+  text-align: center;
+  color: #cfd9e3;
+}
+.world-comparison p {
+  font-size: 9px;
+  color: #d4b58a;
+  margin: 6px 0 0;
+  line-height: 1.4;
+}
+@media (max-width: 700px) {
+  .world-comparison-canvas {
+    height: 60px;
+  }
+  .world-comparison-caption,
+  .world-comparison-names,
+  .world-comparison p {
+    font-size: 8px;
+  }
+  .world-comparison {
+    padding-top: 7px;
+    margin-top: 6px;
+  }
+}
+@media (max-height: 560px) {
+  .world-comparison-canvas {
+    height: 43px;
+  }
+}
+.world-label-leaders {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+.world-label-leaders line {
+  stroke-width: 1;
+  opacity: 0.5;
+  stroke-dasharray: 3 3;
+}
+.world-atlas[data-mechanism="true"] > .world-scene {
+  opacity: 0.25;
+  pointer-events: none;
+  transition: opacity 0.25s;
+}
+.world-loading {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: #101722;
+  color: #e0e7ef;
+  font: 15px system-ui;
+}
+@media (max-width: 1100px), (max-height: 520px) and (orientation: landscape) {
+  .world-atlas > .world-mechanism-visual {
+    display: none;
+  }
+}

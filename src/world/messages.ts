@@ -1,0 +1,158 @@
+/** New World Atlas interface messages. Merge both catalogs together before release. */
+const fr = {
+  "A world of things. A universe inside.":
+    "Un monde à regarder. Des univers à l’intérieur.",
+  "Start with something familiar. Follow what it contains, all the way down.":
+    "Partez de ce que vous connaissez. Explorez ce qui le compose, jusqu’à l’infiniment petit.",
+  "The living world": "Le monde vivant",
+  "World Atlas": "Atlas du monde",
+  "Back to the world": "Retour au monde",
+  "Explore the world": "Explorer le monde",
+  "Find something to explore": "Trouver quelque chose à explorer",
+  "Search the atlas": "Rechercher dans l’atlas",
+  "Clear search": "Effacer la recherche",
+  "Search a question, an object, a cell…":
+    "Chercher une question, un objet, une cellule…",
+  "Try red blood cell, wood or DNA.": "Essayez globule rouge, bois ou ADN.",
+  "Everything is connected": "Tout est relié",
+  "Six starting points. Countless questions.":
+    "Six points de départ. Une infinité de questions.",
+  "Choose a starting point": "Choisir un point de départ",
+  "Curiosity trails": "Parcours de découverte",
+  "My discoveries": "Mes découvertes",
+  "All worlds": "Tous les univers",
+  "Follow a question": "Suivre une question",
+  "A question worth going deeper for.":
+    "Une question qui donne envie d’aller plus loin.",
+  "Follow this trail": "Suivre ce parcours",
+  "{count} stops": "{count} étapes",
+  "Stop {current} of {total}": "Étape {current} sur {total}",
+  "Leave this trail": "Quitter ce parcours",
+  "Trail completed": "Parcours terminé",
+  "Your next question": "Votre prochaine question",
+  "Choose another trail": "Choisir un autre parcours",
+  "Your discoveries stay on this device. No account needed.":
+    "Vos découvertes restent sur cet appareil. Sans compte.",
+  "{count} places discovered": "{count} lieux découverts",
+  "Saved places": "Lieux sauvegardés",
+  "Recently explored": "Explorations récentes",
+  "Save a place to find it here later.":
+    "Sauvegardez un lieu pour le retrouver ici.",
+  "Your first discovery is waiting.": "Votre première découverte vous attend.",
+  "No matching places yet.": "Aucun lieu ne correspond.",
+  "Try a shorter word, or choose one of the worlds below.":
+    "Essayez un mot plus court, ou choisissez un univers ci-dessous.",
+  "{count} places found": "{count} lieux trouvés",
+  "Explore {name}": "Explorer {name}",
+  "Inside {name}": "À l’intérieur de {name}",
+  "World navigation": "Navigation dans le monde",
+  "Exploration path": "Chemin d’exploration",
+  "Open the exploration map": "Ouvrir la carte d’exploration",
+  "Exploration map": "Carte d’exploration",
+  "You are here": "Vous êtes ici",
+  "Parent scale": "Échelle supérieure",
+  "Go inside": "Entrer",
+  "Choose a world": "Choisir un univers",
+  "Zoom out to {name}": "Dézoomer vers {name}",
+  "Zoom in to {name}": "Zoomer vers {name}",
+  "The smallest scale in this branch":
+    "La plus petite échelle de cette branche",
+  "More to discover": "Encore à découvrir",
+  "Return to {name}": "Revenir à {name}",
+  "Look around": "Regarder autour de soi",
+  "Drag to orbit · scroll or pinch to explore":
+    "Glissez pour tourner · molette ou pincement pour explorer",
+  "Select an object to look inside.":
+    "Choisissez un objet pour voir à l’intérieur.",
+  "A closer look": "Regarder de plus près",
+  "Open the explanation": "Ouvrir l’explication",
+  "Fold the explanation": "Replier l’explication",
+  "What's inside?": "Qu’y a-t-il à l’intérieur ?",
+  "Made of": "Composé de",
+  Contains: "Contient",
+  "A representative sample": "Un échantillon représentatif",
+  "This view follows one representative example; it does not show every object present.":
+    "Cette vue suit un exemple représentatif ; elle ne montre pas tous les objets présents.",
+  "These are constituents of this object. The displayed numbers are illustrative.":
+    "Ce sont des constituants de cet objet. Les quantités affichées sont illustratives.",
+  "These structures are found inside this object; they are not necessarily its building blocks.":
+    "Ces structures se trouvent dans cet objet ; elles ne sont pas nécessairement ses briques de construction.",
+  "The idea to remember": "L’idée à retenir",
+  "A good question": "Une bonne question",
+  "Reveal the answer": "Découvrir la réponse",
+  "Hide the answer": "Masquer la réponse",
+  "What this model shows": "Ce que montre ce modèle",
+  "Scientific sources": "Sources scientifiques",
+  "Read the sources": "Consulter les sources",
+  "Size & scale": "Taille et échelle",
+  "Approximate characteristic size": "Taille caractéristique approximative",
+  "No measured particle diameter": "Aucun diamètre de particule mesuré",
+  "Schematic 3D · colours and counts are illustrative":
+    "3D schématique · couleurs et quantités illustratives",
+  "View scale": "Échelle de la vue",
+  "Camera ruler": "Règle de la caméra",
+  "At the camera’s focus plane": "Au plan visé par la caméra",
+  "This ruler follows the camera. Each scene is reframed; compare the labelled physical sizes.":
+    "Cette règle suit la caméra. Chaque scène est recadrée ; comparez les dimensions physiques indiquées.",
+  "Entering…": "Exploration…",
+  "Stable view": "Vue stable",
+  "Object size": "Taille de l’objet",
+  "Save this place": "Sauvegarder ce lieu",
+  "Place saved": "Lieu sauvegardé",
+  "Remove saved place": "Retirer ce lieu des sauvegardes",
+  "Share this place": "Partager ce lieu",
+  "Link copied": "Lien copié",
+  "Copy this address to share your place.":
+    "Copiez cette adresse pour partager votre lieu.",
+  "Copy link": "Copier le lien",
+  "A little challenge": "Un petit défi",
+  "See it happen": "Voir le phénomène",
+  "Animated explanations": "Explications animées",
+  "Watch a process unfold, one idea at a time.":
+    "Découvrez un mécanisme, une idée à la fois.",
+  "Explanatory diagram · motion and timing are illustrative":
+    "Schéma explicatif · mouvements et durées illustratifs",
+  "Pause the explanation": "Mettre l’explication en pause",
+  "Play the explanation": "Lancer l’explication",
+  "Replay the explanation": "Revoir l’explication",
+  "Close the explanation": "Fermer l’explication",
+  "Step {current} of {total}": "Étape {current} sur {total}",
+  "Explore this structure": "Explorer cette structure",
+  "Test your understanding": "Vérifier ce que vous avez compris",
+  "Choose an answer. Then discover why.":
+    "Choisissez une réponse. Découvrez ensuite pourquoi.",
+  "Exactly!": "Exactement !",
+  "A useful discovery": "Une découverte utile",
+  "The correct answer is {answer}.": "La bonne réponse est {answer}.",
+  "Next challenge": "Défi suivant",
+  "Explore the answer in 3D": "Explorer la réponse en 3D",
+  "{count} ideas understood": "{count} idées comprises",
+  "The point is to understand, not to race.":
+    "Le but est de comprendre, pas de faire la course.",
+  "Molecular laboratory": "Laboratoire moléculaire",
+  "Open the molecular laboratory": "Ouvrir le laboratoire moléculaire",
+  "Explore molecules, atoms and interactions in the detailed laboratory.":
+    "Explorez molécules, atomes et interactions dans le laboratoire détaillé.",
+  "World tools": "Outils du monde",
+  "Focus on the scene": "Se concentrer sur la scène",
+  "Show exploration panels": "Afficher les panneaux d’exploration",
+  "Start gentle rotation": "Activer la rotation douce",
+  "Pause gentle rotation": "Arrêter la rotation douce",
+  "Close this window": "Fermer cette fenêtre",
+  "A shared route for your classroom":
+    "Un parcours à partager avec votre classe",
+  "Share any place or follow a guided question together. Sources and model limits stay attached to every stop.":
+    "Partagez un lieu ou suivez une question ensemble. Sources et limites du modèle accompagnent chaque étape.",
+  "Explore freely": "Explorer librement",
+  "Human body": "Corps humain",
+  "Tree & wood": "Arbre et bois",
+  Water: "Eau",
+  Clouds: "Nuages",
+  "Rock & minerals": "Roche et minéraux",
+  Fungi: "Champignons",
+} as const;
+
+export const WORLD_MESSAGES = {
+  en: Object.fromEntries(Object.keys(fr).map((key) => [key, key])),
+  fr,
+};

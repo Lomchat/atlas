@@ -35,3 +35,9 @@ export async function assertLocale(page) {
     "Scenario must actually run in its assigned language",
   );
 }
+
+/** The original molecular laboratory remains independently testable. */
+export const laboratoryBase =
+  (process.env.ATLAS_URL || "http://127.0.0.1:3017")
+    .replace(/\/$/, "")
+    .replace(/\/lab$/, "") + "/lab";

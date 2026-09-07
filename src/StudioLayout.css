@@ -798,3 +798,8 @@
     animation: none;
   }
 }
+
+/* The identity normally lets gestures reach the scene; its world link is interactive. */
+.identity [data-action="open-world"] {
+  pointer-events: auto;
+}

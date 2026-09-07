@@ -1,3 +1,4 @@
+import { laboratoryBase } from "./locale-fixture.mjs";
 import assert from "node:assert/strict";
 import { chromium } from "playwright";
 import {
@@ -26,7 +27,7 @@ const page = await browser.newPage({
 page.setDefaultTimeout(25000);
 const errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
-const base = process.env.ATLAS_URL || "http://127.0.0.1:3017";
+const base = laboratoryBase;
 const canvas = page.locator("canvas[data-scene-id]");
 const settle = (id) =>
   page.waitForFunction((id) => {

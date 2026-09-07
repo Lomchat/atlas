@@ -12,6 +12,7 @@ import {
   ChevronDown,
   ChevronRight,
   CircleHelp,
+  Globe2,
   Crosshair,
   Layers3,
   Maximize2,
@@ -108,8 +109,19 @@ function Switch({
     </button>
   );
 }
-export default function App() {
+export default function App({ onWorld }: { onWorld?: () => void }) {
   const locale = useLocale();
+  useEffect(() => {
+    document.title = t("Matter Atlas — A journey into the subatomic world");
+    document
+      .querySelector('meta[name="description"]')
+      ?.setAttribute(
+        "content",
+        t(
+          "Explore matter in 3D. Dive into a molecule, enter an atom and discover the particles that make up our world.",
+        ),
+      );
+  }, [locale]);
   const [state, setState] = useState<ExplorerState>(initial),
     [panel, setPanel] = useState<"tree" | "details" | null>(null),
     [inspector, setInspector] = useState(true),
@@ -424,7 +436,15 @@ export default function App() {
       <div className="vignette" />
       <header className="identity">
         <div className="eyebrow">
-          <LanguagePicker />{" "}
+          <LanguagePicker />
+          {onWorld && (
+            <IconButton
+              label={t("Explore the world")}
+              icon={Globe2}
+              onClick={onWorld}
+              action="open-world"
+            />
+          )}{" "}
           <span className="identity-tagline">{t("EXPLORE MATTER")}</span>{" "}
         </div>
         <h1>

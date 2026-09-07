@@ -1,3 +1,4 @@
+import { laboratoryBase } from "./locale-fixture.mjs";
 import assert from "node:assert/strict";
 import { chromium } from "playwright";
 import {
@@ -7,7 +8,7 @@ import {
   artifact,
   assertLocale,
 } from "./locale-fixture.mjs";
-const base = process.env.ATLAS_URL || "http://127.0.0.1:3017";
+const base = laboratoryBase;
 const browser = await chromium.launch({
   executablePath:
     process.env.CHROMIUM_PATH ||

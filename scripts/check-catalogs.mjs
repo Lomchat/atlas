@@ -37,7 +37,7 @@ export function checkCatalogs() {
   ]);
   // Catch untranslated UI and missing literal t() keys before opening a browser.
   for (const file of fs
-    .readdirSync(new URL("../src", import.meta.url))
+    .readdirSync(new URL("../src", import.meta.url), { recursive: true })
     .filter((file) => /\.tsx?$/.test(file))) {
     const source = ts.createSourceFile(
       file,

@@ -1,10 +1,10 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
-import App from "./App";
+import AtlasApplication from "./AtlasApplication";
 import "./style.css";
 import "./StudioLayout.css";
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <App />
+    <AtlasApplication />
   </React.StrictMode>,
 );

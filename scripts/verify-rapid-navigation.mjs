@@ -1,3 +1,4 @@
+import { laboratoryBase } from "./locale-fixture.mjs";
 import {
   locale,
   browserLocale,
@@ -9,7 +10,7 @@ import {
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { chromium } from "playwright";
-const base = process.env.ATLAS_URL || "http://127.0.0.1:3017",
+const base = laboratoryBase,
   executable =
     process.env.CHROMIUM_PATH ||
     "/root/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome";

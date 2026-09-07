@@ -1,14 +1,22 @@
 # Matter Atlas contributor instructions
 
+## Two exploration surfaces
+
+The default `/` route is the World Atlas in `src/world/`. Its current content registry has 189 nodes across six object families (human, tree, water, cloud, rock and mushroom), nine guided trails, ten quizzes and four three-step mechanisms. These counts describe the current content, not limits on future additions.
+
+`/lab` preserves the molecular laboratory, including its three materials, streamed molecular sites, interactions and calibrated reference. `src/AtlasApplication.tsx` routes between the two surfaces and retains compatibility with existing molecule/focus links. Do not remove or silently redirect a shared laboratory location into an unrelated world object. Language selection is shared; world links use a stable `world` node ID and laboratory links keep their existing scale/site parameters.
+
 ## Languages are a permanent product requirement
 
 The app supports English (`en`) and French (`fr`). Every user-facing change must ship in both languages in the same commit. This includes visible copy, accessibility labels, tooltips, notices, empty/error states, document metadata, scientific explanations, generated descriptions and text painted into 3D textures.
 
 - Put messages in `src/locales/en.json` and `src/locales/fr.json`, with identical keys and interpolation placeholders. English source messages are the typed message IDs; use `t(key, params)` from `src/i18n.ts`. Do not concatenate sentence fragments when grammar depends on language. Proper names, formulae and language endonyms may stay literal.
+- The explicit exception is the structured scientific registry in `src/world/data.ts`: its names, descriptions, facts, size notes, questions, answers, trail text, quiz options and mechanism steps use required `Bilingual { en: string; fr: string }` pairs. Select the active locale directly, with no implicit fallback. `scripts/world-content.mjs` validates every pair and its placeholders in both locale runs. This exception keeps related scientific records together; it does not apply to ordinary UI, accessibility labels, buttons, notices or errors, which must still use the typed central catalogs.
 - `useLocale()` subscribes React components. The locale order is a valid `?lang=` parameter, a saved `atlas-language` preference, the browser language, then English. Shared URLs include the selected locale. Storage failure must remain harmless.
 - Data/content getters resolve translations when read. Keep the matter graph, constituent IDs, geometry, colors and navigation state independent of language. Switching language must preserve the current molecule, camera/orbit/zoom, selected branch, open lesson and its phase/pause state, and any gallery selection.
 - Three.js labels, canvas accessibility labels and the flask texture must update in place; do not remount the renderer to change language. Dispose generated GPU resources normally.
 - CSS must use classes or stable `data-action` attributes, never translated `aria-label` values.
+- In the world, translating must also preserve the current node and ancestor path, orbit/zoom, open trail, saved discoveries and the active mechanism phase/pause state. Scientific IDs, isotope metadata, quark flavor, relations and physical dimensions are independent of language.
 
 ## Every test must have an English and French equivalent
 
@@ -20,6 +28,7 @@ Use one parameterized scenario with the same assertions in both locales, not sep
 - `scripts/check-catalogs.mjs` checks key completeness, nonempty translations and matching interpolation placeholders before every matrix run. It also rejects untranslated JSX/accessible labels and requires every discovered suite to use the locale fixture and assert its language. Never silence missing translations with a broad fallback or skip the French run.
 - `npm run test:language` specifically checks switching in both directions, persistence, URL precedence, unchanged exploration state, gallery text/texture updates, small-screen access and fallbacks. Extend it when adding another language-dependent surface.
 - For focused work, `npm run test:navigation`, `test:rapid`, `test:picker`, `test:scales`, `test:experience` and `test:language` each run both languages. Before publishing changes, run `npm run build -- --outDir .next-dist`, `npm test`, and `git diff --check`. Once they pass, repeat only checks justified by subsequent changes or unresolved failures.
+- World browser scenarios call `assertWorldContent(locale)` from `scripts/world-content.mjs` and assert the actual page locale. The shared guard loads the pure TypeScript registry and checks bilingual fields, graph ancestry, source URLs, isotope/charge metadata, quark endpoints, real model-dispatch coverage, adjacent trail steps, quizzes and mechanisms. Keep the same assertions for both languages. The world ray-picking suite opts into `?diagnostics=1` to inspect a bounded `data-pick-targets` sample; this extra raycast work must remain disabled during ordinary exploration. World tests explicitly select `canvas[data-world-scene]`; `canvas[data-world-comparison]` is a different renderer. Existing laboratory tests continue to use `canvas[data-scene-id]`.
 
 ## Workspace and publication
 
@@ -27,13 +36,27 @@ The live static site is https://atlas.chalco.website. Build into `.next-dist`, n
 
 The public repository is https://github.com/Lomchat/atlas. `deploy/` is local server configuration and must remain ignored and absent from Git history. Do not add it, credentials, private backups, generated releases or test artifacts to the public repository. Preserve existing third-party credits and licenses.
 
-## Spatial exploration invariants
+## World scene and scientific navigation
+
+`src/world/WorldAtlas.tsx` owns world navigation; `WorldScene.tsx` maintains one renderer across node and language changes. `models.ts` supplies local procedural models, `layout.ts` owns local frame transforms and `modelAnchors`, `WorldUI.tsx` owns panels/trails/quizzes, and `WorldComparison.tsx` owns the independent comparison view. Dispose outgoing frame models and their GPU resources after transitions without rebuilding the main renderer.
+
+Match picks by scientific identity. A modeled organelle or particle must resolve to the matching direct child using `worldChildModel`, constituent identity, atomic number and `quarkFlavor` where relevant. Never route a clicked down quark to an up explanation, a cellular nucleus to an atomic nucleus, or an unavailable organelle to the nearest unrelated child. Up/down are separate targets within each nucleon; the menu samples types and does not imply that a proton has only two physical quarks. Preserve the stable `/quark` link and use explicit flavor metadata for all rendered representatives.
+
+Register modeled child positions through `setModelAnchor()` so labels, click targets and flights agree with the visible structure. When an embedded parent model already draws a constituent, do not add a second competing copy of that constituent. A picked instance must become the entry origin. `selectedAnchors` stores that navigation choice separately from generated model anchors, takes precedence and survives rebuilding the parent. Construct an unvisited destination frame before computing its return transform so its modeled landmarks are registered. Keep the floating local frames: `relativeFrame()` works through the nearest common ancestor instead of adding nanometer offsets directly to kilometer-scale world coordinates. Rebase the camera, target and fading departure frames together. Retarget immediately on new input; discard obsolete flights, preserve intermediate frames and respect reduced motion.
+
+The selected object may retain a faded or cut-away shell for context, but only its appropriate direct contents are interactive. Outgoing geometry is temporary and unpickable. Shared ancestor paths must return to the actual biological/material context: a carbon in cellulose returns to cellulose, and a carbon in DNA returns to DNA. Keep the difference between `contains`, `madeOf` and `sample` explicit; the alveolar-capillary branch samples the adjacent blood side rather than putting blood cells in an airspace.
+
+`sizeMeters` is the largest characteristic extent of the displayed specimen or selected segment, accompanied by a required size interpretation. A short DNA segment is not a whole chromosome; a membrane patch width is not membrane thickness. Keep parent/child SI ratios fixed during navigation. Model colors, packing, counts, ribbon folds and atom markers are explanatory where documented; they are not claimed microscopy or experimental coordinate reconstructions. An unresolved object needs a labeled locator, not an inflated physical diameter. Quarks/electrons have `sizeMeters: null`; `frameMeters()` supplies a view frame, never a measured particle diameter. The root landscape also has no single measured diameter. The distant cloud must retain its physical size and distance relationship to nearby objects.
+
+Attach scientific sources to every node and maintain [the world science notes](src/world/science.md). Preserve the critical distinctions: mature human red cells have neither nuclei nor mitochondria/DNA; plant nuclei do not inherit human chromosome counts; cellulose residues are not free glucose; lignin is not a protein; quartz is an extended network; water vapor is invisible; and no smaller quark/electron constituents are established. Actual proton/neutron counts come from the selected isotope metadata. Sources and explanatory limitations must remain accessible in both languages. Do not claim curriculum certification or institutional endorsement.
+
+## Laboratory spatial exploration invariants
 
 `src/MatterVolume.ts` provides deterministic molecular cell positions and orientations, bounded to the actual liquid, methane flask or CO₂ bubbles. `ExplorerState.site` selects a cell; graph constituent IDs remain relative to that cell. Changing the site must preserve the renderer and move the active hierarchy to the exact position/orientation of the picked instance. Shared links preserve site, current viewpoint and locale. Reset/material changes clear the site.
 
 Keep cursor/pinch zoom enabled at every scale. A container reveals only its direct contents: atom → nucleus/electrons, nucleus → nucleons, nucleon → quarks. Surrounding siblings and their descendants must be hidden and unpickable once entered. Wheel, pinch, clicks and named navigation share that rule, in both directions. The composition tree follows the active path. Entering a vessel bridges the empty macro-to-molecular scale range and fills the viewport with a bounded spatial sample of molecules. Never truncate a cell loop in coordinate order: distribute the rendering budget throughout the view. Distant dots represent volumes, not a claimed molecular count. The ordinary spatial layout is fixed; explicit interaction lessons animate separate explanatory diagrams around the current site. Always invalidate instanced ray bounds after streaming cells and dispose the volume’s geometry, materials and instance resources. `npm run test:volume` runs the full spatial scenario in both languages.
 
-## Physical scale and the permanent reference
+## Laboratory physical scale and the permanent reference
 
 `src/physicalScale.ts` owns SI calibration, fixed radii and comparison dimensions. The 3D molecular unit is calibrated to NIST experimental bond lengths; macro model units are 4 cm. Never enlarge an envelope when opening it. The scene uses a floating origin at the active molecular cell; `MatterVolume` converts between absolute cell positions and local render coordinates. Preserve that rebasing for camera targets, flights, picking and shared locations.
 
@@ -41,7 +64,7 @@ Keep cursor/pinch zoom enabled at every scale. A container reveals only its dire
 
 Tests must explicitly select the main renderer with `canvas[data-scene-id]`; the comparison and gallery have their own canvases. Verify that only allowed constituents are revealed, hidden siblings cannot be picked, both zoom directions recover the parent, and every visible particle has an accessible label. `verify-size-reference.mjs` checks comparison ratios, main-view projection, fixed envelopes, containment, distant sites and mobile lessons in both languages.
 
-## Immersion and studio layout
+## Laboratory immersion and studio layout
 
 `src/StudioLayout.css` owns the current edge-based HUD layout. Keep named navigation compact and below the exploration viewport; do not stack a large central navigation panel above the object. Composition opens on demand, the inspector and its properties can be folded, and focus mode keeps the permanent comparison. Reopening and translating panels must preserve the renderer, selected site and path. Reserve real panel space in `Scene.resize()` and expose it through `data-viewport`; use those bounds in navigation tests rather than obsolete hard-coded screen coordinates.
 
