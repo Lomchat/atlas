@@ -5,6 +5,8 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { elements, molecules } from "./data";
 import { macroModel, neighborsModel } from "./MacroModel";
+import { matterVolume, sitePosition, siteRotation } from "./MatterVolume";
+import type { Site } from "./MatterVolume";
 import { interactionEffects } from "./InteractionEffects";
 import { isScale } from "./scales";
 import { ancestors, expansion } from "./continuum";
@@ -19,6 +21,7 @@ type Props = {
   state: ExplorerState;
   graph: MatterGraph;
   onPick: (id: string) => void;
+  onSite: (site: Site) => void;
   onFocus: (id: string) => void;
   onAdvance: () => void;
   onEvent: (text: string) => void;
@@ -66,6 +69,7 @@ export default function Scene({
   state,
   graph,
   onPick,
+  onSite,
   onFocus,
   onAdvance,
   onEvent,
@@ -76,12 +80,14 @@ export default function Scene({
   const host = useRef<HTMLDivElement>(null),
     current = useRef(state),
     pick = useRef(onPick),
+    changeSite = useRef(onSite),
     focus = useRef(onFocus),
     advance = useRef(onAdvance),
     event = useRef(onEvent),
     detail = useRef(onDetail);
   current.current = state;
   pick.current = onPick;
+  changeSite.current = onSite;
   focus.current = onFocus;
   advance.current = onAdvance;
   event.current = onEvent;
@@ -405,30 +411,20 @@ export default function Scene({
     );
     scene.add(rim);
     const macro = macroModel(state.molecule),
-      portion = macroModel(state.molecule, true),
-      neighborhood = neighborsModel(state.molecule);
+      neighborhood = neighborsModel(state.molecule),
+      volume = matterVolume(state.molecule);
+    let activeSite: Site = [...state.site];
+    world.position.copy(sitePosition(activeSite, state.molecule));
+    world.quaternion.copy(siteRotation(activeSite));
     macro.group.scale.setScalar(900);
-    portion.group.scale.setScalar(150);
-    scene.add(macro.group, portion.group, neighborhood.group);
+    scene.add(macro.group, neighborhood.group, volume.group);
     let macroLevel: string = graph.root,
       macroAlpha = 1,
-      portionAlpha = 0,
       neighborAlpha = 0;
     const scaleLabel = document.createElement("button");
     scaleLabel.className = "scale-anchor";
     scaleLabel.addEventListener("click", () => advance.current());
     el.appendChild(scaleLabel);
-    const anchorGeo = new T.TorusGeometry(1, 0.022, 8, 64);
-    geometries.add(anchorGeo);
-    const anchorMat = new T.MeshBasicMaterial({
-      color: "#edc58d",
-      transparent: true,
-      opacity: 0.85,
-      depthTest: false,
-    });
-    materials.add(anchorMat);
-    const anchor = new T.Mesh(anchorGeo, anchorMat);
-    scene.add(anchor);
     const effects = interactionEffects(scene);
     const nuclearLinks = makeLine(
       "#edc58d",
@@ -554,9 +550,30 @@ export default function Scene({
       if (index >= 0 && path[index + 1])
         preferred.set(currentId, path[index + 1].id);
     }
+    function adoptSite(site: Site) {
+      if (site.every((n, i) => n === activeSite[i])) return;
+      activeSite = [...site];
+      world.position.copy(sitePosition(site, state.molecule));
+      world.quaternion.copy(siteRotation(site));
+      world.updateMatrixWorld(true);
+      views.forEach((view) => view.group.getWorldPosition(view.world));
+      labelTime = 0;
+      current.current = { ...current.current, site: [...site] };
+      changeSite.current(site);
+      controlsDirty = true;
+    }
+    function setRay(x: number, y: number) {
+      const box = canvas.getBoundingClientRect();
+      pointer.set(
+        ((x - box.left) / box.width) * 2 - 1,
+        -((y - box.top) / box.height) * 2 + 1,
+      );
+      raycaster.setFromCamera(pointer, camera);
+    }
     function wheelTarget(e: WheelEvent) {
+      tooltip.hidden = true;
       if (e.deltaY < 0) {
-        const id = hit(e.clientX, e.clientY);
+        const id = hit(e.clientX, e.clientY, true, true);
         if (id) {
           zoomAnchor = id;
           remember(id);
@@ -567,29 +584,79 @@ export default function Scene({
       capture: true,
       passive: true,
     });
-    function hit(x: number, y: number) {
-      if (isScale(macroLevel)) return undefined;
-      const box = canvas.getBoundingClientRect();
-      pointer.set(
-        ((x - box.left) / box.width) * 2 - 1,
-        (-(y - box.top) / box.height) * 2 + 1,
-      );
-      raycaster.setFromCamera(pointer, camera);
-      return raycaster.intersectObjects(pickers, false).find((h) => {
+    function hit(x: number, y: number, adopt = false, drilling = false) {
+      setRay(x, y);
+      canvas.dataset.hoverSite = "";
+      if (isScale(macroLevel) && macroLevel !== "neighborhood") {
+        const location = volume.volumeHit(raycaster.ray, controls.target);
+        const site = location && volume.nearest(location);
+        if (!site) return undefined;
+        canvas.dataset.hoverSite = site.join(",");
+        if (adopt) adoptSite(site);
+        return macroLevel === "sample" ? "portion" : "neighborhood";
+      }
+      const primary = raycaster.intersectObjects(pickers, false).find((h) => {
         const view = views.get(h.object.userData.nodeId)!;
         return (
+          world.visible &&
           view.reveal > 0.2 &&
           view.skin.material.opacity > 0.05 &&
           (!view.node.children.length || view.open < 0.45)
         );
-      })?.object.userData.nodeId as string | undefined;
+      });
+      // Zoom through the contents of an entered atom, not through its fading
+      // envelope into an unrelated background molecule. Clicking remains free
+      // to select that background molecule explicitly.
+      const branch = zoomAnchor ? graph.nodes.get(zoomAnchor) : undefined;
+      const enteredAtom =
+        branch && branch.atom >= 0
+          ? views.get(graph.atoms[branch.atom])
+          : undefined;
+      const insideEnteredAtom =
+        drilling &&
+        enteredAtom &&
+        enteredAtom.reveal > 0.2 &&
+        raycaster.ray.intersectSphere(
+          new T.Sphere(enteredAtom.world, enteredAtom.radius),
+          v(),
+        );
+      const neighbor =
+        current.current.interaction === "none" && !insideEnteredAtom
+          ? volume.hit(raycaster)
+          : null;
+      if (
+        neighbor &&
+        (!primary ||
+          neighbor.point.distanceTo(camera.position) < primary.distance)
+      ) {
+        canvas.dataset.hoverSite = neighbor.site.join(",");
+        if (adopt) adoptSite(neighbor.site);
+        return neighbor.node;
+      }
+      if (primary) {
+        canvas.dataset.hoverSite = activeSite.join(",");
+        return primary.object.userData.nodeId as string;
+      }
+      if (insideEnteredAtom && zoomAnchor) return zoomAnchor;
+      if (isScale(macroLevel)) {
+        const location = volume.volumeHit(raycaster.ray, controls.target);
+        const site = location && volume.nearest(location);
+        if (site && adopt) adoptSite(site);
+        if (site) return "molecule";
+      }
+      return undefined;
     }
     function pointerDown(e: PointerEvent) {
       pointers.add(e.pointerId);
       if (pointers.size > 1) {
         multitouch = true;
         if (down) {
-          const id = hit((e.clientX + down.x) / 2, (e.clientY + down.y) / 2);
+          const id = hit(
+            (e.clientX + down.x) / 2,
+            (e.clientY + down.y) / 2,
+            true,
+            true,
+          );
           if (id) {
             zoomAnchor = id;
             remember(id);
@@ -608,7 +675,7 @@ export default function Scene({
         down?.id === e.pointerId &&
         Math.hypot(e.clientX - down.x, e.clientY - down.y) < 7
       ) {
-        const id = hit(e.clientX, e.clientY);
+        const id = hit(e.clientX, e.clientY, true);
         if (id) pick.current(id);
       }
       down = null;
@@ -622,6 +689,7 @@ export default function Scene({
         return;
       hoverTime = performance.now();
       hover = hit(e.clientX, e.clientY) || null;
+      canvas.dataset.hoverNode = hover || "";
       canvas.style.cursor = hover ? "pointer" : "grab";
       tooltip.hidden = !hover;
       if (hover) {
@@ -642,7 +710,7 @@ export default function Scene({
       down = null;
     };
     const dbl = (e: MouseEvent) => {
-      const id = hit(e.clientX, e.clientY) || current.current.selected;
+      const id = hit(e.clientX, e.clientY, true) || current.current.selected;
       if (id) focus.current(id);
     };
     const leave = () => {
@@ -679,6 +747,13 @@ export default function Scene({
       if (document.hidden) return;
       clock += dt;
       const s = current.current;
+      if (!s.site.every((n, i) => n === activeSite[i])) {
+        activeSite = [...s.site];
+        world.position.copy(sitePosition(activeSite, s.molecule));
+        world.quaternion.copy(siteRotation(activeSite));
+        labelTime = 0;
+        controlsDirty = true;
+      }
       let moving = false;
       if (lastInteraction !== s.interaction) {
         lastInteraction = s.interaction;
@@ -780,13 +855,11 @@ export default function Scene({
           readableStart = atom ? 0.07 : 0.1,
           readableEnd = atom ? 0.18 : nucleus ? 0.2 : 0.25,
           requested = route.has(n.id) ? expansion(n, s) : 0,
-          automatic = route.has(n.id)
-            ? smooth(
-                atom ? 0.7 : nucleus ? 0.6 : 0.45,
-                atom ? 1.25 : nucleus ? 1.05 : 0.85,
-                sizeRatio,
-              )
-            : 0,
+          automatic = smooth(
+            atom ? 0.7 : nucleus ? 0.6 : 0.45,
+            atom ? 1.25 : nucleus ? 1.05 : 0.85,
+            sizeRatio,
+          ),
           goal = n.children.length
             ? Math.max(requested, automatic) *
               smooth(readableStart, readableEnd, sizeRatio)
@@ -891,7 +964,7 @@ export default function Scene({
         Math.abs(previousStrength - contextStrength) > 0.001
       )
         moving = true;
-      if (detailContext) {
+      if (detailContext && s.interaction !== "none") {
         for (const view of views.values()) {
           const inside =
               view.node.id === detailContext ||
@@ -915,8 +988,8 @@ export default function Scene({
         ...graph.atoms.map((id) => views.get(id)!.open),
       );
       bonds.forEach(({ mesh, a, b, offset }) => {
-        const p = views.get(graph.atoms[a])!.world,
-          q = views.get(graph.atoms[b])!.world;
+        const p = views.get(graph.atoms[a])!.group.position,
+          q = views.get(graph.atoms[b])!.group.position;
         mesh.position.copy(p).add(q).multiplyScalar(0.5);
         mesh.position.z += offset;
         direction.copy(q).sub(p);
@@ -930,8 +1003,8 @@ export default function Scene({
         const attr = line.geometry.getAttribute(
             "position",
           ) as T.BufferAttribute,
-          p = views.get(graph.atoms[a])!.world,
-          q = views.get(graph.atoms[b])!.world;
+          p = views.get(graph.atoms[a])!.group.position,
+          q = views.get(graph.atoms[b])!.group.position;
         attr.setXYZ(0, p.x, p.y, p.z);
         attr.setXYZ(1, q.x, q.y, q.z);
         attr.needsUpdate = true;
@@ -1070,7 +1143,9 @@ export default function Scene({
                   ? 64
                   : 52;
           size.setScalar(extent);
-          target.set(0, 0, 0);
+          target.copy(
+            (s.focus || graph.root) === "sample" ? v() : world.position,
+          );
         } else if (focused) {
           center.copy(focused.world);
           const worldScale = focused.group.getWorldScale(point).x,
@@ -1143,26 +1218,64 @@ export default function Scene({
               ? "neighborhood"
               : "molecule";
       macroAlpha = smooth(330, 950, halfView);
-      portionAlpha =
-        smooth(35, 110, halfView) * (1 - smooth(850, 1900, halfView));
       neighborAlpha = smooth(4, 11, halfView) * (1 - smooth(60, 190, halfView));
       macro.fade(macroAlpha);
-      portion.fade(portionAlpha);
+      // Lessons retain their animated diagrams at the currently explored location.
+      neighborhood.group.position.copy(world.position);
       neighborhood.update(
-        neighborAlpha,
+        s.interaction === "none" ? 0 : neighborAlpha,
         animationTime,
         s.interaction,
         s.phase,
         reduced,
       );
-      // A sampled volume stays anchored at the same origin throughout the zoom.
-      anchor.visible = isScale(macroLevel);
-      const anchorRadius =
-        macroLevel === "sample" ? 155 : macroLevel === "portion" ? 24 : 3.2;
-      anchor.scale.setScalar(anchorRadius);
-      anchor.quaternion.copy(camera.quaternion);
-      anchor.position.set(0, 0, 0);
       world.visible = halfView < 90;
+      volume.group.visible = s.interaction === "none";
+      if (
+        volume.group.visible &&
+        (cameraChanged ||
+          controlsDirty ||
+          moving ||
+          fitTime > 0 ||
+          oldState !== s)
+      ) {
+        volume.setTemplates(
+          [...views.values()].map((view) => ({
+            id: view.node.id,
+            parent: view.node.parent === "molecule" ? null : view.node.parent,
+            kind: view.node.kind,
+            position: world.worldToLocal(view.world.clone()),
+            radius: view.closedRadius,
+            openRadius: view.openRadius,
+            color: view.node.entry.color,
+            children: view.node.children.length > 0,
+          })),
+        );
+        volume.update(
+          camera,
+          controls.target,
+          halfView,
+          detailUnit,
+          height,
+          activeSite,
+        );
+      }
+      const localContext = detailContext ? views.get(detailContext) : undefined;
+      const fogNear =
+        (localContext
+          ? camera.position.distanceTo(localContext.world)
+          : controls.getDistance()) * 0.85;
+      const fogSpan = localContext
+        ? localContext.closedRadius * 5
+        : halfView * 2.8;
+      scene.fog = new T.Fog(
+        scene.background as T.Color,
+        fogNear,
+        fogNear + Math.max(fogSpan, 0.15),
+      );
+      canvas.dataset.site = activeSite.join(",");
+      canvas.dataset.volumeMolecules = String(volume.count);
+      canvas.dataset.volumeInstances = String(volume.instanceCount);
       const explorerId = navigationActive
         ? s.focus || graph.root
         : isScale(macroLevel)
@@ -1182,7 +1295,7 @@ export default function Scene({
             name: graph.nodes.get(explorerNext)!.entry.name,
           })
         : t("{name} · elementary particle", { name: explorerNode.entry.name });
-      controls.zoomToCursor = !isScale(macroLevel);
+      controls.zoomToCursor = true;
       canvas.dataset.scale = macroLevel;
       canvas.dataset.interaction = s.interaction;
       canvas.dataset.phase = String(s.phase);
@@ -1274,6 +1387,31 @@ export default function Scene({
           view.label.style.transform = `translate(${x}px,${y}px) translate(-50%,-100%)`;
           if (view.reveal > 0.45 && !isScale(macroLevel)) count++;
         });
+        canvas.dataset.volumeTargets = JSON.stringify(
+          volume.cells
+            .map((cell) => {
+              const position = v(...molecules[s.molecule].atoms[0].pos)
+                .applyQuaternion(cell.rotation)
+                .add(cell.position);
+              const projected = position.project(camera);
+              return {
+                site: cell.site,
+                x: ((projected.x + 1) * width) / 2,
+                y: ((1 - projected.y) * height) / 2,
+                z: projected.z,
+              };
+            })
+            .filter(
+              (p) =>
+                p.z < 1 &&
+                p.x > 300 &&
+                p.x < width - 440 &&
+                p.y > 280 &&
+                p.y < height - 180,
+            )
+            .sort((a, b) => a.z - b.z)
+            .slice(0, 80),
+        );
         canvas.dataset.visibleNodes = String(count);
         const viewpoint = navigationActive
           ? s.focus || graph.root
@@ -1317,6 +1455,8 @@ export default function Scene({
         clock < 0.5
       ) {
         renderer.render(scene, camera);
+        canvas.dataset.drawCalls = String(renderer.info.render.calls);
+        canvas.dataset.geometries = String(renderer.info.memory.geometries);
         controlsDirty = false;
       }
       oldState = s;
@@ -1334,7 +1474,7 @@ export default function Scene({
         );
         label.querySelector(".label-name")!.textContent = node.entry.name;
       }
-      tooltip.style.display = "none";
+      tooltip.hidden = true;
       macro.updateLanguage();
       controlsDirty = true;
     };
@@ -1356,7 +1496,7 @@ export default function Scene({
       canvas.removeEventListener("webglcontextlost", lost);
       effects.dispose();
       macro.dispose();
-      portion.dispose();
+      volume.dispose();
       neighborhood.dispose();
       scaleLabel.remove();
       geometries.forEach((g) => g.dispose());

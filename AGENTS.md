@@ -26,3 +26,9 @@ Use one parameterized scenario with the same assertions in both locales, not sep
 The live static site is https://atlas.chalco.website. Build into `.next-dist`, never directly over the live `dist`. Preserve the running site until verification finishes. Do not edit application source or build while browser suites run: Vite reloads can invalidate those checks.
 
 The public repository is https://github.com/Lomchat/atlas. `deploy/` is local server configuration and must remain ignored and absent from Git history. Do not add it, credentials, private backups, generated releases or test artifacts to the public repository. Preserve existing third-party credits and licenses.
+
+## Spatial exploration invariants
+
+`src/MatterVolume.ts` provides deterministic molecular cell positions and orientations, bounded to the actual liquid, methane flask or CO₂ bubbles. `ExplorerState.site` selects a cell; graph constituent IDs remain relative to that cell. Changing the site must preserve the renderer and move the active hierarchy to the exact position/orientation of the picked instance. Shared links preserve site, current viewpoint and locale. Reset/material changes clear the site.
+
+Keep cursor/pinch zoom enabled at every scale. Nearby branches resolve their contents by size independently of the named navigation path; the composition tree follows the active path. Distant dots represent volumes, not a claimed molecular count. The ordinary spatial layout is fixed; explicit interaction lessons animate separate explanatory diagrams around the current site. Always invalidate instanced ray bounds after streaming cells and dispose the volume’s geometry, materials and instance resources. `npm run test:volume` runs the full spatial scenario in both languages.

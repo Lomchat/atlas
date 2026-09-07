@@ -2900,3 +2900,21 @@ input[type="range"]::-moz-range-thumb {
   .has-lesson .subject-selector { left: auto; right: 12px; transform: none; max-width: calc(100% - 140px); }
   .has-lesson .molecule-trigger { max-width: 100%; }
 }
+
+/* Keep the spatial view's mobile controls on separate, reachable rows. */
+@media (max-width: 767px) {
+  .studio:not(.has-lesson) .interaction-controls {
+    bottom: calc(104px + env(safe-area-inset-bottom));
+  }
+  .studio:not(.has-lesson) .composition-trigger {
+    bottom: calc(54px + env(safe-area-inset-bottom));
+  }
+  .studio:not(.has-lesson) .detail-reopen {
+    bottom: calc(54px + env(safe-area-inset-bottom));
+    min-height: 38px;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--panel);
+  }
+}

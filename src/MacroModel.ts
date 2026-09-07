@@ -1,3 +1,4 @@
+import { gasBubbles } from "./MatterVolume";
 import { t } from "./i18n";
 import * as T from "three";
 import { molecules, elements } from "./data";
@@ -305,16 +306,10 @@ export function macroModel(id: MoleculeId, portion = false) {
       if (id === "co2") {
         const bubbleGeo = new T.SphereGeometry(1, 20, 16);
         const bubbleMat = optical("#a0dbe9", "#e0fbff", 0.035);
-        for (let i = 0; i < 46; i++) {
-          const a = i * 2.399,
-            radius = 0.022 + (i % 5) * 0.012;
+        for (const bubble of gasBubbles) {
           const mesh = add(bubbleGeo, bubbleMat);
-          mesh.scale.setScalar(radius);
-          mesh.position.set(
-            Math.cos(a) * (0.2 + (i % 4) * 0.15),
-            -1.01 + (i / 46) * 1.53,
-            Math.sin(a) * (0.28 + (i % 3) * 0.14),
-          );
+          mesh.scale.setScalar(bubble.radius / 900);
+          mesh.position.copy(bubble.center).divideScalar(900);
         }
       }
     }

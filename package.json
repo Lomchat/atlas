@@ -13,7 +13,8 @@
     "test:scales": "node scripts/test-matrix.mjs scales",
     "test:experience": "node scripts/test-matrix.mjs experience",
     "test:navigation": "node scripts/test-matrix.mjs navigation",
-    "test:language": "node scripts/test-matrix.mjs language"
+    "test:language": "node scripts/test-matrix.mjs language",
+    "test:volume": "node scripts/test-matrix.mjs volume"
   },
   "dependencies": {
     "lucide-react": "0.468.0",

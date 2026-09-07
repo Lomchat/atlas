@@ -44,6 +44,7 @@ export interface MatterGraph {
 }
 export interface ExplorerState {
   molecule: MoleculeId;
+  site: [number, number, number];
   selected: string | null;
   focus: string | null;
   labels: boolean;
@@ -82,6 +83,7 @@ export interface SceneDetail {
 }
 export const defaultState: ExplorerState = {
   molecule: "water",
+  site: [0, 0, 0],
   selected: null,
   focus: null,
   labels: true,
@@ -213,6 +215,13 @@ export function createGraph(molecule: MoleculeId): MatterGraph {
             ...particles[kind],
             id: nid,
             name: `${kind === "proton" ? t("Proton") : t("Neutron")} ${index + 1}`,
+            description:
+              kind === "proton"
+                ? t(
+                    "A positively charged constituent of this nucleus. The number of protons defines the element: {count} for {element}.",
+                    { count: e.z, element: e.name.toLowerCase() },
+                  )
+                : particles[kind].description,
           };
         },
       });

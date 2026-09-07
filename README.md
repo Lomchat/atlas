@@ -8,7 +8,7 @@ An interactive English/French Three.js atlas of matter, from familiar objects to
 
 Choose English or French using the two always-visible flag buttons in the upper-left corner (also available inside dialogs). Language changes preserve your molecule, zoom, orbit, lesson and gallery selection. All UI, scientific explanations, accessibility labels and the flask label update in place.
 
-A valid `?lang=en` or `?lang=fr` link takes priority over a saved preference, then the browser language; other browser languages default to English. Shared exploration URLs include the language. English and French messages live in `src/locales/en.json` and `src/locales/fr.json` and are accessed through the typed `t()` helper.
+A valid `?lang=en` or `?lang=fr` link takes priority over a saved preference, then the browser language; other browser languages default to English. Shared exploration URLs include the language, current scale and the molecule’s spatial `site=x,y,z` address. English and French messages live in `src/locales/en.json` and `src/locales/fr.json` and are accessed through the typed `t()` helper.
 
 Read [AGENTS.md](AGENTS.md) before contributing: every feature and every test must support both languages.
 
@@ -16,12 +16,12 @@ Read [AGENTS.md](AGENTS.md) before contributing: every feature and every test mu
 
 - Start with a glass of water, a glass of sparkling water or a methane flask. The collection dialog shows the large object in 3D, with a small molecular illustration and the path between them. Browsing and cancelling preserve the current exploration; entering a different material starts at its object.
 - Shared procedural object models use rounded vessel walls, blue/turquoise water and menisci, outlined bubbles, and a cobalt glass flask with a ribbed copper cap and a curved printed label. Scale-independent optical edges keep transparent surfaces readable in the scene and gallery; geometries, materials and label textures are released together.
-- One camera follows object → sampled volume / CO₂ bubble → molecular neighborhood → one molecule → atom → nucleus → nucleon → quark. The reverse path remains available throughout. Surrounding representations fade with the actual camera scale. An anchored marker connects each large level with the next smaller volume.
+- Explore a continuous spatial volume: aim anywhere in the water or methane, or inside any CO₂ bubble. Molecular details resolve at the place you approach. Every nearby molecule contains atoms; their nuclei, electrons and quarks appear according to their own projected size. The reverse path stays available, without a central marker or an isolated water droplet.
 - The exploration button inside the scene continues through every scale to the quarks, shares the current named destination and supports rapid repeated clicks. Elementary particles show an explicit endpoint.
 - The two top buttons name their destinations. Repeated clicks immediately update the requested destination, including a reversal during a flight. Macro transitions interpolate distance logarithmically; all button flights last 300 ms with no animation queue. Reduced motion snaps to the destination.
-- Wheel and pinch remain available. At macroscopic scales, wheel zoom stays centered on the sampled volume. Within the molecule, pointer targeting, remembered branches, fixed child coordinates and adaptive layers remain active.
+- Wheel and pinch zoom toward the pointer or touch midpoint at every scale. Drag to orbit; right-drag (or Shift-drag) to pan through the volume. Click a molecule or constituent to approach it. Positions and orientations stay deterministic when revisiting a region.
 - Contextual explanations connect an observable effect to its meaning: attractions between water molecules, gas motion and wall collisions, covalent bonds, nuclear cohesion, gluon exchanges, photon absorption/emission, and the Higgs field. Each has three user-controlled moments, a legend, a limitation and a scientific source. Animations loop within the selected moment: moving photons, energy halos, traveling highlights, gas trails and water motion. Pause freezes the animation clock; replay restarts the current moment. Reduced motion uses static diagrams. The 440 px desktop explanation panel uses 15 px body text, and camera framing reserves its actual width. Photon energy levels are shown alongside the 3D representation.
-- The macro objects, molecular neighbors and selected microscopic hierarchy share one renderer. Water, carbon dioxide and methane retain their 88, 204 and 84 microscopic nodes excluding the molecule. The three outer nodes describe sampled scales, not actual counts of molecules.
+- The macro object, streamed molecular volume and active microscopic hierarchy share one renderer. The composition tree follows the currently explored molecule and branch. Water, carbon dioxide and methane retain their 88, 204 and 84 microscopic nodes excluding the molecule. The three outer nodes describe sampled scales, not actual counts of molecules.
 - Search, theme selection, orbit, annotations, sharing and the composition tree remain available. There is no unfolding gauge.
 
 Keyboard: `R` return to the object, `L` annotations, `+` / `−` named zoom, `/` search, Escape close the explanation or return to the object. Native dialogs use Escape to close.
@@ -44,6 +44,8 @@ To build without changing the live site:
 npm run build -- --outDir .next-dist
 ```
 
+`src/MatterVolume.ts` streams deterministic, jittered molecular cells inside the vessel (or the CO₂ bubbles). Instanced meshes share geometry/materials and resolve each nearby atom’s contents by projected size. Far points represent occupied volumes, not individual molecules. Picking promotes a cell into the detailed graph at the same position and orientation. Cell addresses survive language changes and shared links; active instance bounds are invalidated when cells move through the render window. Depth fading and a bounded working set keep the view legible. No full physical simulation runs in the browser.
+
 `src/continuum.ts` defines the persistent graph and the current navigation target. `src/Scene.tsx` constructs it once per molecule. Child positions are fixed; opening envelopes does not move their contents. Camera fitting targets the selected constituent's center and bounds, while a stable branch preference determines the next destination. Layer thresholds use camera-to-object distance and scale with the available viewport. A small hysteresis keeps layer boundaries stable.
 
 ## Verification
@@ -56,10 +58,13 @@ npm run test:rapid
 npm run test:picker
 npm run test:scales
 npm run test:experience
+npm run test:volume
 ATLAS_URL=https://atlas.chalco.website npm test
 ```
 
 The local suites expect `npm run dev` to be running. `scripts/test-matrix.mjs` automatically discovers all `verify*.mjs` suites and runs the same scenarios in both locales. It first checks identical catalog keys, nonempty translations and matching placeholders. Results are recorded in `artifacts/test-matrix.json`; screenshots use `en-` and `fr-` prefixes. New tests must use `scripts/locale-fixture.mjs` and assert the actual document language. A single-locale diagnostic run does not satisfy the bilingual gate.
+
+The volume suite checks distinct off-center wheel paths, actual picking after streaming to another region, wheel-only revelation of quarks, all three materials to quarks and back, renderer identity, spatial URL persistence, language changes, bounded draw calls, small/mobile/landscape layouts and touch pinch.
 
 The dedicated language suite checks both switching directions, saved preference and link precedence, live graph/renderer/lesson preservation, gallery texture updates, responsive flag access, unavailable storage and translated graphics fallbacks. Set `CHROMIUM_PATH` if needed, or install Chromium with `npx playwright install chromium`.
 
@@ -67,7 +72,7 @@ The rapid-navigation suite uses normal motion to check batched clicks, actual se
 
 ## Scientific conventions
 
-The scale chain is a schematic composition diagram, not a literal geometric scale model or a quantum simulation. Intermediate sizes are adapted to make the transitions readable. Neighboring molecules and volume specks are illustrative samples, never a count of all molecules present. The highlighted water volume and methane volume are conceptual samples without a physical membrane; the CO₂ bubble has a real gas–liquid interface. The sparkling-water route follows the CO₂ in the bubble while the surrounding liquid contains water.
+The scale chain is a schematic composition diagram, not a literal geometric scale model or a quantum simulation. Intermediate sizes are adapted to make the transitions readable. Neighboring molecules and volume specks are illustrative samples, never a count of all molecules present. Water and methane volumes have no artificial boundary or membrane. The CO₂ bubbles have gas–liquid interfaces. The sparkling-water route follows the CO₂ in the bubble while the surrounding liquid contains water.
 
 Within a molecule, spheres and envelopes are visual conventions. Nuclei are enlarged; clouds do not compute molecular orbitals. Electron markers identify constituents, not classical trajectories. The photon lesson uses an isolated-atom, two-level schematic; molecular energy levels differ. Its steps do not represent elapsed physical time.
 

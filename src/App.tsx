@@ -1,3 +1,4 @@
+import { insideMatter, sitePosition } from "./MatterVolume";
 import LanguagePicker from "./LanguagePicker";
 import type { MessageKey } from "./i18n";
 import { t, useLocale } from "./i18n";
@@ -33,19 +34,21 @@ import type { Interaction } from "./Interactions";
 import { environments, isScale } from "./scales";
 import { molecules, particles, sources } from "./data";
 import type { MoleculeId } from "./data";
-import {
-  ancestors,
-  createGraph,
-  defaultState,
-  expansion,
-  kindNames,
-} from "./continuum";
+import { ancestors, createGraph, defaultState, kindNames } from "./continuum";
 import type { ExplorerState, MatterNode, SceneDetail } from "./continuum";
 function initial(): ExplorerState {
   const p = new URLSearchParams(location.search),
     s: ExplorerState = { ...defaultState };
   if (p.get("molecule") && Object.hasOwn(molecules, p.get("molecule")!))
     s.molecule = p.get("molecule") as MoleculeId;
+  const site = p.get("site")?.split(",").map(Number);
+  if (
+    site?.length === 3 &&
+    site.every((n) => Number.isInteger(n) && Math.abs(n) <= 160)
+  )
+    s.site = site as [number, number, number];
+  if (!insideMatter(sitePosition(s.site, s.molecule), s.molecule))
+    s.site = [0, 0, 0];
   const g = createGraph(s.molecule);
   if (g.nodes.has(p.get("node") || "")) s.selected = p.get("node");
   if (g.nodes.has(p.get("focus") || "")) s.focus = p.get("focus");
@@ -278,13 +281,22 @@ export default function App() {
     p.set("lang", locale);
     if (state.molecule !== "water") p.set("molecule", state.molecule);
     if (state.selected) p.set("node", state.selected);
-    if (state.focus) p.set("focus", state.focus);
+    if (viewpoint.id !== graph.root) p.set("focus", viewpoint.id);
+    if (state.site.some((n) => n !== 0)) p.set("site", state.site.join(","));
     history.replaceState(
       null,
       "",
       location.pathname + (p.size ? "?" + p.toString() : ""),
     );
-  }, [state.molecule, state.selected, state.focus, locale]);
+  }, [
+    state.molecule,
+    state.selected,
+    state.focus,
+    state.site,
+    locale,
+    viewpoint.id,
+    graph.root,
+  ]);
   useEffect(() => {
     if (modal) {
       dialog.current?.showModal();
@@ -339,8 +351,7 @@ export default function App() {
     const expanded =
       isScale(n.id) ||
       n.kind === "molecule" ||
-      expansion(n, state) > 0.25 ||
-      sceneDetail?.open.includes(n.id);
+      path.some((ancestor) => ancestor.id === n.id);
     return (
       <div key={n.id} className="tree-branch">
         <div
@@ -404,6 +415,7 @@ export default function App() {
         onAdvance={() => step("in")}
         onEvent={setEventText}
         onDetail={setDetail}
+        onSite={(site) => update({ site })}
       />
       <div className="vignette" />
       <header className="identity">
@@ -415,7 +427,7 @@ export default function App() {
           {t("Matter")} <em>{t("Atlas")}</em>
           <sup>02</sup>
         </h1>
-        <p>{t("From the visible world to the inside of atoms.")}</p>
+        <p>{t("Aim anywhere. Explore what is inside.")}</p>
       </header>
       <nav className="top-actions" aria-label={t("Atlas tools")}>
         <button
@@ -771,11 +783,13 @@ export default function App() {
       <div className="lower-left">
         <span className="mini-formula">{mol.formula}</span>
         <span>
-          {isScale(node.id) ? node.entry.category : t("One molecule in focus.")}
+          {isScale(node.id)
+            ? node.entry.category
+            : t("A continuous volume of matter.")}
           <br />
           {isScale(node.id)
             ? t("Connected scales · illustrative sample")
-            : t("All its building blocks.")}
+            : t("Every molecule is explorable.")}
         </span>
       </div>
       <button
@@ -793,8 +807,8 @@ export default function App() {
       </button>
       <footer>
         <span>
-          {t("Drag: rotate")} <b>·</b> {t("Scroll: explore layers")} <b>·</b>{" "}
-          {t("Click: zoom in")}{" "}
+          {t("Drag: rotate")} <b>·</b> {t("Scroll where you want to explore")}{" "}
+          <b>·</b> {t("Click: zoom in")}{" "}
         </span>
         <button onClick={() => setModal("about")}>
           {t("Illustrative model · Adjusted scales")} <ArrowUpRight size={11} />

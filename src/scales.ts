@@ -27,7 +27,7 @@ export const environments: Record<
       return t("From liquid water to the building blocks of H₂O.");
     },
     get portion() {
-      return t("A drop of water");
+      return t("A volume of water");
     },
     get neighborhood() {
       return t("Neighboring molecules");
@@ -38,12 +38,12 @@ export const environments: Record<
     color: "#9ebdd6",
     get description() {
       return t(
-        "This glass contains countless H₂O molecules. Zoom into a small volume of liquid, then into one molecule to reveal its atoms.",
+        "Aim anywhere in the water and zoom in. Molecules appear throughout the liquid; approach any of them to explore its atoms.",
       );
     },
     get portionDescription() {
       return t(
-        "Imagine selecting a drop-sized volume of water. Its boundary is a visual guide: there is no membrane at this point in the glass.",
+        "You are inside the water, at the place you chose. Keep zooming to resolve individual molecules, or move sideways to explore another region. There is no boundary around this volume.",
       );
     },
   },
@@ -94,7 +94,7 @@ export const environments: Record<
     color: "#b7b6d3",
     get description() {
       return t(
-        "In this sealed flask, methane fills the available space. The gas is invisible to the naked eye; colored markers guide you into a small volume, then a molecule.",
+        "Methane fills the flask. Aim anywhere inside it to explore the gas, then approach any CH₄ molecule to reveal its atoms.",
       );
     },
     get portionDescription() {
@@ -123,10 +123,10 @@ export function scaleEntry(molecule: MoleculeId, id: ScaleId): Entry {
     get neighborhood() {
       return molecule === "water"
         ? t(
-            "In liquid water, molecules stay close while changing neighbors. Attractions between them help hold the liquid together. The marked molecule at the center is the one you will explore.",
+            "Every visible molecule can be explored. Point at one and zoom in to reveal its atoms. Molecules keep their positions during exploration so you can retrace your path; the interaction lesson shows their motion.",
           )
         : t(
-            "Gas molecules are spaced apart and move between collisions. One is marked at the center to guide your zoom; the others show its surroundings.",
+            "Explore any molecule in this gas. Each has its own position and reveals its atoms as you approach. Positions are held still for navigation; the interaction lesson illustrates motion and collisions.",
           );
     },
   };
@@ -149,7 +149,7 @@ export function scaleEntry(molecule: MoleculeId, id: ScaleId): Entry {
     },
     get note() {
       return t(
-        "Zoom levels connect using adjusted dimensions. The molecules shown are an illustrative sample, not an actual count. The central marker keeps the scales connected.",
+        "Dimensions are adjusted to connect the scales. Distant specks represent small volumes of matter; individual molecules become visible closer up. This is an illustrative spatial model, not a count or a physical simulation.",
       );
     },
     get facts(): [string, string][] {

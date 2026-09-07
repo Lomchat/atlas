@@ -175,7 +175,18 @@ try {
   await move("in", "atom-1");
   await move("in", "atom-1/nucleus");
   await reveal("atom-1/nucleus/proton-0", 1);
-  await reveal("atom-0/nucleus", 0);
+  await p.waitForFunction(
+    () =>
+      Number(
+        document.querySelector('.atom-label[data-node="atom-0/nucleus"]')
+          ?.dataset.reveal,
+      ) > 0.001,
+  );
+  assert.equal(
+    await nav("out").getAttribute("data-target"),
+    "atom-1",
+    "Nearby atoms can reveal contents without stealing the selected branch",
+  );
   await home();
   // Ray picking reaches the exact atom, and orbiting keeps its camera target centered.
   const at = await anchor(atom);
