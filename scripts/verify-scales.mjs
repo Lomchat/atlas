@@ -88,7 +88,9 @@ try {
     for (let phase = 0; phase < 3; phase++) {
       await page.getByRole("button", { name: stepName(phase + 1) }).click();
       await page.waitForFunction(
-        (p) => document.querySelector("canvas")?.dataset.phase === String(p),
+        (p) =>
+          document.querySelector("canvas[data-scene-id]")?.dataset.phase ===
+          String(p),
         phase,
       );
     }
@@ -127,13 +129,16 @@ try {
     await goto("water", focus);
     await page.locator(".context-interaction").click();
     await page.waitForFunction(
-      (t) => document.querySelector("canvas")?.dataset.interaction === t,
+      (t) =>
+        document.querySelector("canvas[data-scene-id]")?.dataset.interaction ===
+        t,
       type,
     );
     const before = await c().screenshot();
     await page.getByRole("button", { name: stepName(2) }).click();
     await page.waitForFunction(
-      () => document.querySelector("canvas")?.dataset.phase === "1",
+      () =>
+        document.querySelector("canvas[data-scene-id]")?.dataset.phase === "1",
     );
     const after = await c().screenshot();
     assert.equal(before.equals(after), false, `${type} visibly changes scene`);

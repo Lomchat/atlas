@@ -37,7 +37,7 @@ const root = "sample",
   quark = proton + "/up-0";
 const settle = (id) =>
   p.waitForFunction((id) => {
-    const c = document.querySelector("canvas");
+    const c = document.querySelector("canvas[data-scene-id]");
     return c?.dataset.viewpoint === id && c?.dataset.transitioning === "false";
   }, id);
 const requested = (id) =>
@@ -63,7 +63,9 @@ try {
     await p.goto(base, { waitUntil: "networkidle" });
     await assertLocale(p);
     await settle(root);
-    const identity = await p.locator("canvas").getAttribute("data-scene-id");
+    const identity = await p
+      .locator("canvas[data-scene-id]")
+      .getAttribute("data-scene-id");
     // Many events in one task exercise stale render snapshots and React batching.
     await burst("in", 5);
     await requested(nucleus);
@@ -104,7 +106,7 @@ try {
     );
     await p.waitForTimeout(800);
     assert.equal(
-      await p.locator("canvas").getAttribute("data-viewpoint"),
+      await p.locator("canvas[data-scene-id]").getAttribute("data-viewpoint"),
       atom,
       "no queued flights replay after the last click",
     );
@@ -125,7 +127,7 @@ try {
     await requested(root);
     await settle(root);
     assert.equal(
-      await p.locator("canvas").getAttribute("data-scene-id"),
+      await p.locator("canvas[data-scene-id]").getAttribute("data-scene-id"),
       identity,
     );
     await p.screenshot({ path: artifact(`rapid-navigation-${width}.png`) });

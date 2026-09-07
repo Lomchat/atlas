@@ -81,6 +81,14 @@ try {
   const identity = await canvas().getAttribute("data-scene-id");
   const distance = await canvas().getAttribute("data-camera-distance");
   const nameBefore = await page.locator(".detail-panel h2").innerText();
+  await page
+    .locator(".size-reference")
+    .getByRole("button", { name: text("Hair"), exact: true })
+    .click();
+  const comparison = page.locator("canvas[data-comparison-scene]");
+  await comparison.evaluate((e) => {
+    e.dataset.testIdentity = "persistent-comparison";
+  });
   // Both native buttons work from the keyboard without moving the scene.
   await page.locator(`.identity [data-language-switch="${other}"]`).focus();
   await page.keyboard.press("Enter");
@@ -93,6 +101,14 @@ try {
   assert.equal(await canvas().getAttribute("data-scene-id"), identity);
   assert.equal(await canvas().getAttribute("data-camera-distance"), distance);
   assert.equal(await canvas().getAttribute("data-viewpoint"), "atom-1");
+  assert.equal(
+    await comparison.getAttribute("data-test-identity"),
+    "persistent-comparison",
+  );
+  assert.equal(
+    await page.locator(".size-reference").getAttribute("data-reference"),
+    "hair",
+  );
   assert.notEqual(
     await page.locator(".detail-panel h2").innerText(),
     nameBefore,
@@ -241,6 +257,34 @@ try {
   await blocked.locator(`[data-language-switch="${other}"]:visible`).click();
   assert.equal(await blocked.locator("html").getAttribute("lang"), other);
   await blocked.close();
+  // The new comparison has its own methane texture, updated without remounting.
+  await page.goto(`${base}/?lang=${locale}&molecule=methane&focus=sample`, {
+    waitUntil: "networkidle",
+  });
+  await ready("sample");
+  const comparisonTexture = page.locator("canvas[data-comparison-scene]");
+  await comparisonTexture.evaluate((e) => {
+    e.dataset.testIdentity = "same-texture-renderer";
+  });
+  const textureBefore = await comparisonTexture.screenshot();
+  await change(other);
+  await page.waitForFunction(
+    (language) =>
+      document.querySelector("canvas[data-comparison-scene]")?.dataset
+        .locale === language,
+    other,
+  );
+  assert.equal(
+    await comparisonTexture.getAttribute("data-test-identity"),
+    "same-texture-renderer",
+  );
+  assert.equal(
+    textureBefore.equals(await comparisonTexture.screenshot()),
+    false,
+    "Comparison flask texture changes language in place",
+  );
+  await change(locale);
+  await assertLocale(page);
   assert.deepEqual(errors, []);
   console.log(
     `PASS ${locale}: two visible flag buttons, active state and keyboard access, live state and texture preservation, URL/storage/browser precedence, responsive access and translated fallbacks`,

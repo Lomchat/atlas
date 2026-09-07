@@ -78,7 +78,7 @@ export function insideMatter(point: T.Vector3, id: MoleculeId) {
 
 /** A deterministic, spatially streamed volume. Cells never depend on the camera.
  * Far dots represent occupied volumes, not individual molecules. At molecular
- * distances these give way to bonded atoms, then each nearby atom's contents.
+ * distances these give way to bonded atoms, their interiors belong exclusively to the selected hierarchy.
  */
 export function matterVolume(id: MoleculeId) {
   const group = new T.Group();
@@ -87,7 +87,7 @@ export function matterVolume(id: MoleculeId) {
   const spacing = id === "water" ? 8 : 14;
   const sphere = new T.SphereGeometry(1, 16, 12);
   const cylinder = new T.CylinderGeometry(1, 1, 1, 8);
-  const capacity = 4096;
+  const capacity = 10000;
   type Batch = {
     mesh: T.InstancedMesh;
     alpha: T.InstancedBufferAttribute;
@@ -209,18 +209,24 @@ export function matterVolume(id: MoleculeId) {
     active: Site,
     force = false,
   ) {
+    const fullHalfView =
+      camera.position.distanceTo(target) *
+      Math.tan(T.MathUtils.degToRad(camera.fov / 2)) *
+      Math.max(1, camera.aspect);
     const stride = Math.max(
       1,
-      2 **
-        Math.ceil(Math.log2(Math.max(1, halfView / Math.max(65, spacing * 4)))),
+      2 ** Math.ceil(Math.log2(Math.max(1, halfView / 220))),
     );
     const step = spacing * stride;
     const center = target.clone().add(origin).divideScalar(step).round();
-    const key = `${center.toArray()}:${stride}`;
+    const key = `${center.toArray()}:${stride}:${Math.round(fullHalfView / spacing)}`;
     if (key !== lastKey || force) {
       lastKey = key;
       cells = [];
-      const extent = stride === 1 ? 5 : 7;
+      const extent =
+        stride === 1
+          ? Math.min(16, Math.max(7, Math.ceil((fullHalfView * 1.5) / spacing)))
+          : 7;
       for (let x = -extent; x <= extent; x++)
         for (let y = -extent; y <= extent; y++)
           for (let z = -extent; z <= extent; z++) {
@@ -239,20 +245,23 @@ export function matterVolume(id: MoleculeId) {
               });
           }
     }
+    // Stable spatial sampling spreads the bounded instance budget across the
+    // entire viewport. Truncating an x/y/z loop would erase half the field.
+    cells.sort((a, b) => hash(...a.site, 211) - hash(...b.site, 211));
     batches.forEach((b) => {
       b.count = 0;
     });
     let pointCount = 0;
     shown = 0;
-    const molecularAlpha = 1 - smooth(26, 65, halfView);
+    const molecularAlpha = 1 - smooth(130, 180, halfView);
     const densityAlpha =
-      smooth(20, 60, halfView) *
+      smooth(130, 180, halfView) *
       (1 - smooth(700 * macroScale, 1800 * macroScale, halfView));
     pickDistance =
       camera.position.distanceTo(target) * 0.85 +
       Math.max(halfView * 2.8, 0.15) * 0.85;
-    const projection =
-      height / Math.tan(T.MathUtils.degToRad(camera.fov / 2)) / detailUnit;
+    void detailUnit;
+    void height;
     for (const cell of cells) {
       if (pointCount < 12000 && densityAlpha > 0.001) {
         pointPositions.set(cell.position.toArray(), pointCount++ * 3);
@@ -268,8 +277,13 @@ export function matterVolume(id: MoleculeId) {
       if (p.z > 1 || Math.abs(p.x) > 1.4 || Math.abs(p.y) > 1.4) continue;
       const edgeAlpha =
         1 -
-        smooth(spacing * 3.5, spacing * 5, cell.position.distanceTo(target));
+        smooth(
+          Math.max(spacing * 5, fullHalfView),
+          Math.max(spacing * 7, fullHalfView * 1.5),
+          cell.position.distanceTo(target),
+        );
       if (edgeAlpha < 0.01) continue;
+      if (shown >= 2200) continue;
       shown++;
       const openings = new Map<string, { open: number; reveal: number }>();
       for (const n of templates) {
@@ -281,34 +295,7 @@ export function matterVolume(id: MoleculeId) {
           : molecularAlpha * edgeAlpha;
         if (reveal < 0.008) continue;
         p.copy(n.position).applyQuaternion(cell.rotation).add(cell.position);
-        const ratio =
-          (projection * n.radius) /
-          Math.max(1e-12, camera.position.distanceTo(p));
-        const atom = n.kind === "atom",
-          nucleus = n.kind === "nucleus";
-        const open = n.children
-          ? smooth(
-              atom
-                ? 0.7
-                : nucleus
-                  ? 0.6
-                  : n.parent &&
-                      templates.find((p) => p.id === n.parent)?.radius ===
-                        n.radius
-                    ? 1.1
-                    : 0.45,
-              atom
-                ? 1.25
-                : nucleus
-                  ? 1.05
-                  : n.parent &&
-                      templates.find((p) => p.id === n.parent)?.radius ===
-                        n.radius
-                    ? 1.6
-                    : 0.85,
-              ratio,
-            )
-          : 0;
+        const open = 0;
         openings.set(n.id, { open, reveal });
         const alpha = reveal * (1 - smooth(0.05, 0.7, open) * 0.975);
         put(

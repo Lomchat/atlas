@@ -288,6 +288,7 @@ export default function Scene({
       );
       label.innerHTML = `<span class="label-symbol">${node.entry.symbol}</span><span class="label-name">${node.entry.name}</span>`;
       label.style.setProperty("--particle", node.entry.color);
+      label.title = node.entry.name;
       label.onclick = () => pick.current(node.id);
       label.onpointerenter = () => preferVisible(node.id);
       label.ondblclick = (e) => {
@@ -462,6 +463,10 @@ export default function Scene({
       lastDetail = "",
       detailContext: string | null = null,
       contextStrength = 0,
+      visibleScope: string | null = null,
+      wheelDirection = 0,
+      wheelAt = 0,
+      bridgePending = false,
       oldState: ExplorerState | undefined;
     const fitFromPosition = v(),
       fitFromTarget = v(),
@@ -473,34 +478,29 @@ export default function Scene({
         landscape = height < 520 && width > height;
       const lessonOpen = current.current.interaction !== "none";
       const lessonWidth = width >= 1150 ? 440 : Math.max(340, width * 0.4);
-      const left =
-          mobile || (landscape && lessonOpen)
-            ? 16
-            : landscape
-              ? 215
-              : width < 1150
-                ? 260
-                : 300,
+      const left = mobile ? 16 : landscape ? 215 : width < 1150 ? 260 : 300,
         right = mobile
           ? width - 52
           : width - (lessonOpen ? lessonWidth + 44 : width >= 1150 ? 420 : 325),
-        top =
-          mobile && height < 650 && current.current.interaction !== "none"
-            ? 192
-            : landscape
-              ? lessonOpen
-                ? 246
-                : 220
-              : mobile
-                ? height < 650
-                  ? 286
-                  : 328
-                : width < 1150
-                  ? 300
-                  : 260,
+        top = (() => {
+          const nav = el.parentElement
+            ?.querySelector(".zoom-navigation")
+            ?.getBoundingClientRect();
+          const comparison = el.parentElement
+            ?.querySelector(".size-reference")
+            ?.getBoundingClientRect();
+          return (
+            Math.max(
+              nav?.bottom || 250,
+              landscape ? 0 : comparison?.bottom || 0,
+            ) + 18
+          );
+        })(),
         bottom =
-          mobile && current.current.interaction !== "none"
-            ? Math.max(top + 80, height * (height < 650 ? 0.4 : 0.48) - 28)
+          lessonOpen && mobile
+            ? (el.parentElement
+                ?.querySelector(".lesson-panel")
+                ?.getBoundingClientRect().top || height * 0.55) - 12
             : height - (landscape ? 60 : mobile ? 150 : 95);
       viewportTop = top;
       availableW = Math.max(180, right - left);
@@ -525,6 +525,7 @@ export default function Scene({
       fitTime = 0;
       fitPending = false;
       navigationActive = false;
+      bridgePending = false;
     });
     const raycaster = new T.Raycaster(),
       pointer = new T.Vector2();
@@ -532,6 +533,8 @@ export default function Scene({
       multitouch = false,
       hover: string | null = null;
     const pointers = new Set<number>();
+    const touchPositions = new Map<number, [number, number]>();
+    let pinchSpread = 0;
     let hoverTime = 0;
     const preferred = new Map<string, string>();
     function remember(id: string) {
@@ -592,6 +595,8 @@ export default function Scene({
     }
     function wheelTarget(e: WheelEvent) {
       tooltip.hidden = true;
+      wheelDirection = Math.sign(e.deltaY);
+      wheelAt = performance.now();
       const distance = controls.getDistance();
       controls.zoomSpeed =
         (distance > 250 && distance < 1e9) || (distance < 1 && distance > 0.001)
@@ -603,6 +608,16 @@ export default function Scene({
           zoomAnchor = id;
           remember(id);
           aimDepth(id);
+          const targetView = views.get(id);
+          if (
+            visibleScope &&
+            targetView?.node.parent === visibleScope &&
+            targetView.screenSize < 2 &&
+            !bridgePending
+          ) {
+            bridgePending = true;
+            focus.current(id);
+          }
         }
       }
     }
@@ -646,10 +661,34 @@ export default function Scene({
         if (adopt) adoptSite(site);
         return macroLevel === "sample" ? "portion" : "neighborhood";
       }
+      // Small constituents have usable screen-space hit targets. Their physical
+      // envelopes stay unchanged; the label identifies this location marker.
+      if (visibleScope) {
+        let closest: { id: string; distance: number } | undefined;
+        for (const view of views.values()) {
+          if (!view.skin.visible || view.reveal < 0.45) continue;
+          const projected = view.world.clone().project(camera);
+          if (projected.z < -1 || projected.z > 1) continue;
+          const distance = Math.hypot(
+            ((projected.x + 1) * width) / 2 - x,
+            ((1 - projected.y) * height) / 2 - y,
+          );
+          if (
+            distance < Math.max(14, Math.min(28, view.screenSize / 2)) &&
+            (!closest || distance < closest.distance)
+          )
+            closest = { id: view.node.id, distance };
+        }
+        if (closest) {
+          canvas.dataset.hoverSite = activeSite.join(",");
+          return closest.id;
+        }
+      }
       const primary = raycaster.intersectObjects(pickers, false).find((h) => {
         const view = views.get(h.object.userData.nodeId)!;
         return (
           world.visible &&
+          view.skin.visible &&
           view.reveal > 0.2 &&
           view.skin.material.opacity > 0.05 &&
           (!view.node.children.length || view.open < 0.45)
@@ -672,7 +711,10 @@ export default function Scene({
           v(),
         );
       const neighbor =
-        current.current.interaction === "none" && !insideEnteredAtom
+        current.current.interaction === "none" &&
+        volume.group.visible &&
+        !visibleScope &&
+        !insideEnteredAtom
           ? volume.hit(raycaster)
           : null;
       if (
@@ -699,6 +741,11 @@ export default function Scene({
     }
     function pointerDown(e: PointerEvent) {
       pointers.add(e.pointerId);
+      touchPositions.set(e.pointerId, [e.clientX, e.clientY]);
+      if (touchPositions.size === 2) {
+        const [a, b] = [...touchPositions.values()];
+        pinchSpread = Math.hypot(a[0] - b[0], a[1] - b[1]);
+      }
       if (pointers.size > 1) {
         multitouch = true;
         if (down) {
@@ -722,6 +769,7 @@ export default function Scene({
     }
     function pointerUp(e: PointerEvent) {
       pointers.delete(e.pointerId);
+      touchPositions.delete(e.pointerId);
       if (
         !multitouch &&
         down?.id === e.pointerId &&
@@ -733,6 +781,29 @@ export default function Scene({
       down = null;
     }
     function pointerMove(e: PointerEvent) {
+      if (touchPositions.has(e.pointerId)) {
+        touchPositions.set(e.pointerId, [e.clientX, e.clientY]);
+        if (touchPositions.size === 2) {
+          const [a, b] = [...touchPositions.values()];
+          const spread = Math.hypot(a[0] - b[0], a[1] - b[1]);
+          if (Math.abs(spread - pinchSpread) > 1) {
+            wheelDirection = spread > pinchSpread ? -1 : 1;
+            wheelAt = performance.now();
+            pinchSpread = spread;
+            const target = zoomAnchor ? views.get(zoomAnchor) : undefined;
+            if (
+              wheelDirection < 0 &&
+              visibleScope &&
+              target?.node.parent === visibleScope &&
+              target.screenSize < 2 &&
+              !bridgePending
+            ) {
+              bridgePending = true;
+              focus.current(target.node.id);
+            }
+          }
+        }
+      }
       if (
         down ||
         e.pointerType === "touch" ||
@@ -759,6 +830,7 @@ export default function Scene({
     }
     const cancel = (e: PointerEvent) => {
       pointers.delete(e.pointerId);
+      touchPositions.delete(e.pointerId);
       down = null;
     };
     const dbl = (e: MouseEvent) => {
@@ -830,6 +902,7 @@ export default function Scene({
       ) {
         fitPending = true;
         navigationActive = true;
+        bridgePending = false;
         lastFocus = s.focus;
         lastNavigation = s.navigation;
         zoomAnchor = s.focus;
@@ -902,12 +975,17 @@ export default function Scene({
           nucleus = n.kind === "nucleus",
           readableStart = atom ? 0.07 : 0.1,
           readableEnd = atom ? 0.18 : nucleus ? 0.2 : 0.25,
-          requested = route.has(n.id) ? expansion(n, s) : 0,
-          automatic = smooth(
-            atom ? 0.7 : nucleus ? 0.6 : n.element === "H" ? 1.1 : 0.45,
-            atom ? 1.25 : nucleus ? 1.05 : n.element === "H" ? 1.6 : 0.85,
-            sizeRatio,
-          ),
+          requested = navigationActive && route.has(n.id) ? expansion(n, s) : 0,
+          alreadyInside =
+            detailContext === n.id || !!detailContext?.startsWith(n.id + "/"),
+          automatic =
+            !navigationActive && route.has(n.id)
+              ? smooth(
+                  alreadyInside ? 0.22 : 0.6,
+                  alreadyInside ? 0.52 : 0.95,
+                  sizeRatio,
+                )
+              : 0,
           goal = n.children.length
             ? Math.max(requested, automatic) *
               smooth(readableStart, readableEnd, sizeRatio)
@@ -988,7 +1066,7 @@ export default function Scene({
       }
       world.updateMatrixWorld(true);
       views.forEach((view) => view.group.getWorldPosition(view.world));
-      // As a container fills the view, keep its surroundings as faint context.
+      // Enter one container at a time; its direct contents replace its surroundings.
       // Follow the branch nearest the orbit target without moving the camera.
       const previousContext = detailContext,
         previousStrength = contextStrength;
@@ -1015,26 +1093,33 @@ export default function Scene({
         Math.abs(previousStrength - contextStrength) > 0.001
       )
         moving = true;
-      if (detailContext && s.interaction !== "none") {
-        for (const view of views.values()) {
-          const inside =
-              view.node.id === detailContext ||
-              view.node.id.startsWith(detailContext + "/"),
-            ancestor = detailContext.startsWith(view.node.id + "/");
-          if (!inside) {
-            view.skin.material.opacity *= 1 - contextStrength * 0.975;
-            view.skin.material.depthWrite = view.skin.material.opacity > 0.95;
-            (view.wire.material as T.LineBasicMaterial).opacity *=
-              1 - contextStrength * (ancestor ? 0.4 : 0.9);
-            if (view.cloud)
-              (view.cloud.material as T.PointsMaterial).opacity *=
-                1 - contextStrength * 0.95;
-            for (const line of view.links)
-              (line.material as T.LineBasicMaterial).opacity *=
-                1 - contextStrength * 0.975;
-          }
+      const requestedScope = s.focus && views.has(s.focus) ? s.focus : null;
+      visibleScope = navigationActive ? requestedScope : detailContext;
+      const scopeNode = visibleScope ? graph.nodes.get(visibleScope)! : null;
+      const allowed = scopeNode
+        ? new Set(
+            scopeNode.children.length ? scopeNode.children : [scopeNode.id],
+          )
+        : new Set(graph.atoms);
+      for (const view of views.values()) {
+        const permitted = allowed.has(view.node.id);
+        // Hide surfaces, not ancestor groups: children's transforms stay nested.
+        view.skin.visible = permitted;
+        if (allowed) {
+          view.reveal = permitted ? 1 : 0;
+          view.skin.material.opacity = permitted ? 1 : 0;
+          view.skin.material.depthWrite = permitted;
+          view.wire.visible = false;
+          if (view.cloud) view.cloud.visible = false;
+          for (const link of view.links)
+            link.visible = view.node.id === visibleScope;
+          view.group.visible = true;
         }
       }
+      canvas.dataset.scope = visibleScope || "";
+      canvas.dataset.allowedNodes = JSON.stringify(
+        allowed ? [...allowed] : graph.atoms,
+      );
       const atomOpening = Math.max(
         ...graph.atoms.map((id) => views.get(id)!.open),
       );
@@ -1048,7 +1133,7 @@ export default function Scene({
         mesh.quaternion.setFromUnitVectors(v(0, 1, 0), direction.normalize());
         mesh.material.opacity =
           (1 - atomOpening) * (1 - contextStrength * 0.97);
-        mesh.visible = mesh.material.opacity > 0.01;
+        mesh.visible = !visibleScope && mesh.material.opacity > 0.01;
       });
       bondTraces.forEach(({ line, a, b }) => {
         const attr = line.geometry.getAttribute(
@@ -1061,7 +1146,7 @@ export default function Scene({
         attr.needsUpdate = true;
         line.geometry.computeBoundingSphere();
         (line.material as T.LineBasicMaterial).opacity = atomOpening * 0.09;
-        line.visible = s.cloud;
+        line.visible = s.cloud && !visibleScope;
       });
       platform.visible = rim.visible = false;
       platformMat.opacity = 1 - smooth(0, 0.45, atomOpening);
@@ -1189,10 +1274,12 @@ export default function Scene({
             (s.focus || graph.root) === "sample"
               ? 3300 * macroScale
               : s.focus === "portion"
-                ? 370 * macroScale
+                ? 100
                 : s.interaction === "motion"
-                  ? 64
-                  : 52;
+                  ? 52
+                  : s.interaction === "cohesion"
+                    ? 38
+                    : 52;
           size.setScalar(extent);
           target.copy(
             (s.focus || graph.root) === "sample"
@@ -1263,13 +1350,49 @@ export default function Scene({
         Math.tan(T.MathUtils.degToRad(camera.fov / 2)) *
         Math.min((availableW / width) * camera.aspect, availableH / height);
       macroLevel =
-        halfView > 560 * macroScale
+        halfView > 160
           ? "sample"
-          : halfView > 65
+          : halfView > 38
             ? "portion"
             : halfView > 9
               ? "neighborhood"
               : "molecule";
+      if (
+        !navigationActive &&
+        performance.now() - wheelAt < 1500 &&
+        !bridgePending &&
+        fitTime === 0 &&
+        s.interaction === "none"
+      ) {
+        if (
+          wheelDirection < 0 &&
+          halfView < 560 * macroScale &&
+          halfView > 160
+        ) {
+          bridgePending = true;
+          focus.current("portion");
+        } else if (
+          wheelDirection > 0 &&
+          halfView > 100 &&
+          halfView < 160 * macroScale
+        ) {
+          bridgePending = true;
+          focus.current("sample");
+        } else if (wheelDirection > 0 && (previousContext || visibleScope)) {
+          const scope = views.get(previousContext || visibleScope!)!;
+          const parent = scope.node.parent
+            ? views.get(scope.node.parent)
+            : undefined;
+          if (
+            parent &&
+            parent.closedRadius / scope.closedRadius > 1000 &&
+            scope.screenSize / detailUnit < 0.6
+          ) {
+            bridgePending = true;
+            focus.current(parent.node.id);
+          }
+        }
+      }
       macroAlpha = smooth(330 * macroScale, 950 * macroScale, halfView);
       neighborAlpha = smooth(4, 11, halfView) * (1 - smooth(60, 190, halfView));
       macro.fade(macroAlpha);
@@ -1283,7 +1406,8 @@ export default function Scene({
         reduced,
       );
       world.visible = halfView < 90;
-      volume.group.visible = s.interaction === "none";
+      volume.group.visible =
+        s.interaction === "none" && !visibleScope && halfView < 160;
       if (
         volume.group.visible &&
         (cameraChanged ||
@@ -1327,8 +1451,12 @@ export default function Scene({
         fogNear + Math.max(fogSpan, 1e-10),
       );
       canvas.dataset.site = activeSite.join(",");
-      canvas.dataset.volumeMolecules = String(volume.count);
-      canvas.dataset.volumeInstances = String(volume.instanceCount);
+      canvas.dataset.volumeMolecules = String(
+        volume.group.visible ? volume.count : 0,
+      );
+      canvas.dataset.volumeInstances = String(
+        volume.group.visible ? volume.instanceCount : 0,
+      );
       const explorerId = navigationActive
         ? s.focus || graph.root
         : isScale(macroLevel)
@@ -1376,8 +1504,7 @@ export default function Scene({
         let layer = 0;
         const opened: string[] = [],
           readable: string[] = [];
-        const focusId = detailContext;
-        const focused = focusId ? graph.nodes.get(focusId) : null;
+
         views.forEach((view) => {
           point.copy(view.world).project(camera);
           view.label.dataset.anchorX = String(((point.x + 1) * width) / 2);
@@ -1414,22 +1541,15 @@ export default function Scene({
             );
           }
           const direct =
-            focused &&
-            (view.node.id === focused.id ||
-              (view.node.parent === focused.id &&
-                (focused.children.length <= 4 ||
-                  view.node.id === nextOf(focused.id) ||
-                  view.node.id === hover)));
+            !!scopeNode && scopeNode.children.includes(view.node.id);
           const selected = s.selected === view.node.id;
-          let eligible =
-            selected ||
-            direct ||
-            ((!s.focus || s.focus === "molecule") &&
-              (view.node.kind === "atom" ||
-                (view.node.kind === "nucleus" &&
-                  views.get(view.node.parent!)!.open > 0.4)));
-          if (view.node.kind === "electron" && !selected && !direct)
-            eligible = false;
+          const eligible = visibleScope
+            ? direct || view.node.id === visibleScope
+            : view.node.kind === "atom";
+          view.label.classList.toggle(
+            "compact-label",
+            direct && (scopeNode?.children.length || 0) > 4,
+          );
           point.copy(view.world);
           const scale = view.group.getWorldScale(v()).x;
           point.y += view.radius * scale * 1.12;
@@ -1452,7 +1572,7 @@ export default function Scene({
           if (view.reveal > 0.45 && !isScale(macroLevel)) count++;
         });
         canvas.dataset.volumeTargets = JSON.stringify(
-          volume.cells
+          (volume.group.visible ? volume.cells : [])
             .map((cell) => {
               const position = v(...molecules[s.molecule].atoms[0].pos)
                 .applyQuaternion(cell.rotation)
@@ -1543,6 +1663,7 @@ export default function Scene({
           t("Inspect {name}", { name: node.entry.name }),
         );
         label.querySelector(".label-name")!.textContent = node.entry.name;
+        label.title = node.entry.name;
       }
       tooltip.hidden = true;
       macro.updateLanguage();

@@ -50,7 +50,8 @@ const nav = (d) => p.locator(`.zoom-navigation [data-direction="${d}"]`),
   shot = (name) => p.screenshot({ path: artifact(`navigation-${name}.png`) });
 const view = (id) =>
   p.waitForFunction(
-    (id) => document.querySelector("canvas")?.dataset.viewpoint === id,
+    (id) =>
+      document.querySelector("canvas[data-scene-id]")?.dataset.viewpoint === id,
     id,
   );
 const reveal = (id, v) =>
@@ -88,7 +89,7 @@ async function move(direction, target) {
   await view(target);
   await ready();
   assert.equal(
-    await p.locator("canvas").getAttribute("data-viewpoint"),
+    await p.locator("canvas[data-scene-id]").getAttribute("data-viewpoint"),
     target,
   );
 }
@@ -117,7 +118,9 @@ try {
   await assertLocale(p);
   await view("molecule");
   await ready();
-  const identity = await p.locator("canvas").getAttribute("data-scene-id");
+  const identity = await p
+    .locator("canvas[data-scene-id]")
+    .getAttribute("data-scene-id");
   assert.equal(await p.getByRole("slider").count(), 0);
   assert.equal(await p.locator(".bottom-dock").count(), 0);
   assert.equal(await p.locator(".zoom-navigation button").count(), 2);
@@ -131,7 +134,7 @@ try {
       "destination centered in unobstructed scene",
     );
     assert.equal(
-      await p.locator("canvas").getAttribute("data-scene-id"),
+      await p.locator("canvas[data-scene-id]").getAttribute("data-scene-id"),
       identity,
     );
     if (id === atom) {
@@ -142,14 +145,14 @@ try {
       await reveal(proton, 1);
       await reveal(quark, 0);
       assert.ok(
-        (await p.locator(".atom-label:visible").count()) < 8,
-        "dense nucleus annotations remain readable",
+        (await p.locator(".atom-label:visible").count()) <= 16,
+        "Every nucleon has an identifiable compact annotation",
       );
     }
     if (id === proton) {
       await reveal(quark, 1);
-      // With fixed nuclear dimensions, nearby nucleons can resolve their own
-      // quarks too. Selecting one must not shrink or hide its neighbors.
+      // Fixed dimensions persist even while surrounding nucleons are hidden.
+      await reveal(nucleus + "/proton-1", 0);
       assert.equal(
         await label(nucleus + "/proton-1").getAttribute("data-radius-meters"),
         await label(proton).getAttribute("data-radius-meters"),
@@ -165,7 +168,7 @@ try {
   for (const id of [proton, nucleus, atom, "molecule"]) await move("out", id);
   assert.equal(await nav("out").isDisabled(), false);
   assert.equal(
-    await p.locator("canvas").getAttribute("data-visible-nodes"),
+    await p.locator("canvas[data-scene-id]").getAttribute("data-visible-nodes"),
     "3",
   );
   // A pointed sibling remains the named destination after moving to the button.
@@ -181,17 +184,11 @@ try {
   await move("in", "atom-1");
   await move("in", "atom-1/nucleus");
   await reveal("atom-1/nucleus/proton-0", 1);
-  await p.waitForFunction(
-    () =>
-      Number(
-        document.querySelector('.atom-label[data-node="atom-0/nucleus"]')
-          ?.dataset.reveal,
-      ) > 0.001,
-  );
+  await reveal("atom-0/nucleus", 0);
   assert.equal(
     await nav("out").getAttribute("data-target"),
     "atom-1",
-    "Nearby atoms can reveal contents without stealing the selected branch",
+    "Only the entered atom is visible, with its exact parent preserved",
   );
   await home();
   // Ray picking reaches the exact atom, and orbiting keeps its camera target centered.
@@ -213,13 +210,21 @@ try {
   // Real wheel navigation follows the pointed branch and reverses to its outer shells.
   const pos = await anchor(atom);
   await p.mouse.move(pos.x, pos.y);
-  for (let i = 0; i < 7; i++) {
-    await p.mouse.wheel(0, -500);
-    await p.waitForTimeout(130);
+  for (let i = 0; i < 12; i++) {
+    await p.mouse.wheel(0, -220);
+    await p.waitForTimeout(160);
+    if (
+      (await p
+        .locator("canvas[data-scene-id]")
+        .getAttribute("data-viewpoint")) === atom
+    )
+      break;
   }
   await settle();
   assert.ok(
-    (await p.locator("canvas").getAttribute("data-viewpoint")).startsWith(atom),
+    (
+      await p.locator("canvas[data-scene-id]").getAttribute("data-viewpoint")
+    ).startsWith(atom),
   );
   await reveal(nucleus, 1);
   await shot("wheel");
@@ -229,7 +234,9 @@ try {
   }
   await p.waitForFunction(
     () =>
-      !document.querySelector("canvas")?.dataset.viewpoint?.startsWith("atom-"),
+      !document
+        .querySelector("canvas[data-scene-id]")
+        ?.dataset.viewpoint?.startsWith("atom-"),
   );
   await reveal(nucleus, 0);
   await home();
@@ -248,7 +255,7 @@ try {
   await settle();
   assert.equal(await p.locator("html").getAttribute("data-theme"), "light");
   assert.equal(
-    await p.locator("canvas").getAttribute("data-scene-id"),
+    await p.locator("canvas[data-scene-id]").getAttribute("data-scene-id"),
     identity,
   );
   await shot("light");
@@ -275,7 +282,7 @@ try {
     assert.ok(
       box.x >= 0 &&
         box.x + box.width <= width &&
-        box.y + box.height < height / 2 + 20,
+        box.y + box.height < height - 200,
     );
     for (const id of [atom, nucleus, proton, quark]) await move("in", id);
     assert.equal(await nav("in").isDisabled(), true);
@@ -325,9 +332,9 @@ try {
   await settle();
   await reveal("atom-1/nucleus", 1);
   assert.ok(
-    (await p.locator("canvas").getAttribute("data-viewpoint")).startsWith(
-      "atom-1",
-    ),
+    (
+      await p.locator("canvas[data-scene-id]").getAttribute("data-viewpoint")
+    ).startsWith("atom-1"),
   );
   await shot("pinch-hydrogen");
   await p.setViewportSize({ width: 1440, height: 1000 });
@@ -351,7 +358,9 @@ try {
     await ready();
     assert.equal(await p.locator(".atom-label").count(), total);
     assert.equal(
-      await p.locator("canvas").getAttribute("data-visible-nodes"),
+      await p
+        .locator("canvas[data-scene-id]")
+        .getAttribute("data-visible-nodes"),
       String(atoms),
     );
     await move("in", atom);
@@ -365,7 +374,7 @@ try {
   await home();
   await ready();
   assert.equal(
-    await p.locator("canvas").getAttribute("data-visible-nodes"),
+    await p.locator("canvas[data-scene-id]").getAttribute("data-visible-nodes"),
     "3",
   );
   assert.equal(await p.getByRole("slider").count(), 0);

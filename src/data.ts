@@ -203,7 +203,7 @@ export const particles: Record<string, Entry> = {
     get category() {
       return t("NUCLEON · BARYON");
     },
-    color: "#a6b4c9",
+    color: "#779fc7",
     get description() {
       return t(
         "Electrically neutral, it forms part of the nucleus. The number of neutrons distinguishes isotopes of the same element.",
@@ -232,7 +232,7 @@ export const particles: Record<string, Entry> = {
     get category() {
       return t("ELEMENTARY PARTICLE · LEPTON");
     },
-    color: "#82b6f2",
+    color: "#62cfea",
     get description() {
       return t(
         "The electron carries a negative charge. In an atom, its quantum state is described by an orbital, which lets us calculate the probability of finding it in a given region.",

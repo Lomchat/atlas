@@ -202,6 +202,23 @@ try {
         );
       }, target);
     }
+    // No surrounding nuclei or atoms survive inside the selected particle.
+    const isolated = await data();
+    assert.equal(isolated.volumeMolecules, "0");
+    const allowed = JSON.parse(isolated.allowedNodes);
+    const revealed = await page
+      .locator(".atom-label")
+      .evaluateAll((es) =>
+        es.filter((e) => +e.dataset.reveal > 0.45).map((e) => e.dataset.node),
+      );
+    assert.deepEqual(revealed.sort(), allowed.sort());
+    for (const id of revealed) {
+      const particle = page.locator(`.atom-label[data-node="${id}"]`);
+      assert.ok(
+        (await particle.getAttribute("aria-label")).length > 5,
+        "Every shown particle is identified and selectable",
+      );
+    }
     const leaf = await data();
     assert.match(leaf.viewpoint, /\/(up|down)-/);
     assert.equal(leaf.site, picked.site);

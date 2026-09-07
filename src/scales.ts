@@ -43,7 +43,7 @@ export const environments: Record<
     },
     get portionDescription() {
       return t(
-        "You are inside the water, at the place you chose. Keep zooming to resolve individual molecules, or move sideways to explore another region. There is no boundary around this volume.",
+        "Entering matter changes magnification to reveal the molecules throughout the chosen region. Their positions stay fixed; zoom out to return to the vessel.",
       );
     },
   },
@@ -135,7 +135,7 @@ export function scaleEntry(molecule: MoleculeId, id: ScaleId): Entry {
     get name() {
       return names[id];
     },
-    symbol: id === "sample" ? "cm" : id === "portion" ? "mm" : "nm",
+    symbol: id === "sample" ? "cm" : id === "portion" ? "nm" : "nm",
     color: e.color,
     get category() {
       return id === "sample"
@@ -159,7 +159,7 @@ export function scaleEntry(molecule: MoleculeId, id: ScaleId): Entry {
           id === "sample"
             ? t("Centimeter")
             : id === "portion"
-              ? t("Millimeter")
+              ? t("Nanometer")
               : t("Nanometer"),
         ],
         [

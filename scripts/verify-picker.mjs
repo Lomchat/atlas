@@ -80,7 +80,7 @@ try {
   );
   await page.keyboard.press("Escape");
   assert.equal(await page.getByRole("dialog").count(), 0);
-  assert.equal(await page.locator("canvas").count(), 1);
+  assert.equal(await page.locator("canvas[data-scene-id]").count(), 1);
   assert.equal(await canvas().getAttribute("data-viewpoint"), "atom-0/nucleus");
   assert.equal(
     await page
@@ -132,7 +132,7 @@ try {
     await page.locator("[data-molecule-enter]").click();
     await ready("sample");
     assert.equal(new URL(page.url()).searchParams.get("molecule"), "methane");
-    assert.equal(await page.locator("canvas").count(), 1);
+    assert.equal(await page.locator("canvas[data-scene-id]").count(), 1);
   }
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page

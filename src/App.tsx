@@ -463,6 +463,8 @@ export default function App() {
       </nav>
       <SizeReference
         detail={detail}
+        node={node}
+        molecule={state.molecule}
         elementary={["electron", "up", "down"].includes(node.kind)}
         markers={["atom", "proton", "neutron"].includes(node.kind)}
         lesson={state.interaction !== "none"}

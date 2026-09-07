@@ -33,7 +33,7 @@ const c = () => p.locator("canvas[data-scene-id]"),
   cta = () => p.locator(".scale-anchor");
 const ready = (id) =>
   p.waitForFunction((id) => {
-    const c = document.querySelector("canvas");
+    const c = document.querySelector("canvas[data-scene-id]");
     return c?.dataset.viewpoint === id && c?.dataset.transitioning === "false";
   }, id);
 const go = async (molecule = "water", focus = "") => {
@@ -95,8 +95,12 @@ try {
     await p.getByRole("button", { name: stepName(2) }).click();
     await p.waitForFunction(
       () =>
-        document.querySelector("canvas")?.dataset.transitioning === "false" &&
-        Number(document.querySelector("canvas")?.dataset.animationTime) > 1.1,
+        document.querySelector("canvas[data-scene-id]")?.dataset
+          .transitioning === "false" &&
+        Number(
+          document.querySelector("canvas[data-scene-id]")?.dataset
+            .animationTime,
+        ) > 1.1,
     );
     const before = await c().screenshot();
     await p.waitForTimeout(550);
@@ -127,8 +131,10 @@ try {
     await p.getByRole("button", { name: text("Replay animation") }).click();
     await p.waitForFunction(
       (t) =>
-        Number(document.querySelector("canvas")?.dataset.animationTime) <
-        Number(t),
+        Number(
+          document.querySelector("canvas[data-scene-id]")?.dataset
+            .animationTime,
+        ) < Number(t),
       time,
     );
     await p.getByRole("button", { name: text("Close explanation") }).click();
@@ -149,7 +155,9 @@ try {
     await p.locator(".context-interaction").click();
     await p.getByRole("button", { name: stepName(2) }).click();
     await p.waitForFunction(
-      () => document.querySelector("canvas")?.dataset.transitioning === "false",
+      () =>
+        document.querySelector("canvas[data-scene-id]")?.dataset
+          .transitioning === "false",
     );
     await shot(name + "-lesson");
     assert.ok(

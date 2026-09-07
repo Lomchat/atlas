@@ -45,6 +45,26 @@ const navigate = async (direction, id) => {
 };
 const number = async (locator, key) =>
   Number(await locator.getAttribute("data-" + key));
+async function isolatedScope(id) {
+  assert.equal(await canvas.getAttribute("data-scope"), id);
+  assert.equal(await canvas.getAttribute("data-volume-molecules"), "0");
+  const allowed = JSON.parse(await canvas.getAttribute("data-allowed-nodes"));
+  const shown = await page
+    .locator(".atom-label")
+    .evaluateAll((es) =>
+      es.filter((e) => +e.dataset.reveal > 0.45).map((e) => e.dataset.node),
+    );
+  assert.deepEqual(
+    shown.sort(),
+    allowed.sort(),
+    "Only the entered container's contents are revealed",
+  );
+  assert.ok(
+    allowed.every((child) => child === id || child.startsWith(id + "/")),
+  );
+  for (const child of allowed)
+    assert.ok((await node(child).getAttribute("aria-label")).length > 5);
+}
 async function rulerMatchesProjection() {
   const mpp = await number(reference, "meters-per-pixel");
   assert.ok(mpp > 0 && Number.isFinite(mpp));
@@ -57,16 +77,22 @@ async function rulerMatchesProjection() {
     Math.abs((pixels * mpp) / meters - 1) < 1e-6,
     "Rendered ruler pixels match physical length, without responsive CSS scaling",
   );
-  const art = reference.locator(".reference-art");
+  const art = reference.locator("canvas[data-comparison-scene]");
+  const [rp, sp, rm, sm] = await Promise.all([
+    number(art, "reference-pixels"),
+    number(art, "subject-pixels"),
+    number(art, "reference-meters"),
+    number(art, "subject-meters"),
+  ]);
+  assert.ok(rp > 0 && sp > 0);
   assert.ok(
-    Math.abs((await art.evaluate((e) => e.getScreenCTM().a)) - 1) < 1e-6,
-    "Comparison graphic uses CSS pixels one-to-one",
+    Math.abs(rp / sp / (rm / sm) - 1) < 1e-6,
+    "Both 3D models use the same physical comparison scale",
   );
-  const width = await number(art, "object-pixels");
+  const stage = await art.boundingBox();
   assert.ok(
-    Math.abs(
-      (width * mpp) / (await number(reference, "reference-meters")) - 1,
-    ) < 1e-6,
+    stage.width >= 150 && stage.height >= 60,
+    "Comparison provides a substantial 3D stage",
   );
   const box = await reference.boundingBox();
   const vp = page.viewportSize();
@@ -75,7 +101,7 @@ async function rulerMatchesProjection() {
       box.x + box.width <= vp.width + 1 &&
       box.y >= 0 &&
       box.y < vp.height / 2 &&
-      box.y + box.height < vp.height - 100,
+      box.y + box.height < vp.height - (vp.width > vp.height ? 16 : 100),
     `Reference stays visible in upper viewport: ${JSON.stringify({ box, vp })}`,
   );
   assert.ok(
@@ -121,6 +147,7 @@ try {
     ]) {
       await navigate("in", target);
       await rulerMatchesProjection();
+      await isolatedScope(target);
       for (const key of ["atom-0", "atom-0/nucleus", "atom-0/nucleus/proton-0"])
         assert.equal(
           await number(node(key), "radius-meters"),
@@ -191,22 +218,52 @@ try {
       "molecule",
     ])
       await navigate("out", target);
+    // Visible electrons, the tiny nucleus locator and neutrons support real clicks.
+    for (const target of ["atom-0", "atom-0/electron-0"]) {
+      await node(target).click();
+      await ready(target);
+      await isolatedScope(target);
+    }
+    await navigate("out", "atom-0");
+    for (const target of [
+      "atom-0/nucleus",
+      "atom-0/nucleus/neutron-0",
+      "atom-0/nucleus/neutron-0/down-1",
+    ]) {
+      await node(target).click();
+      await ready(target);
+      await isolatedScope(target);
+    }
+    assert.equal(
+      await page.locator('.zoom-navigation [data-direction="in"]').isDisabled(),
+      true,
+    );
+    for (const target of [
+      "atom-0/nucleus/neutron-0",
+      "atom-0/nucleus",
+      "atom-0",
+      "molecule",
+    ])
+      await navigate("out", target);
   }
-  // Familiar references change continuously between named viewpoints.
+  // Explicit reference choice remains available at every scale.
   await page.goto(`${base}/?lang=${locale}`, { waitUntil: "networkidle" });
   await ready("sample");
-  await page.mouse.move(660, 650);
-  for (
-    let i = 0;
-    i < 50 && (await reference.getAttribute("data-reference")) !== "hair";
-    i++
-  ) {
-    await page.mouse.wheel(0, -500);
-    await page.waitForTimeout(120);
+  for (const [label, id] of [
+    ["Hair", "hair"],
+    ["DNA", "dna"],
+    ["Ruler", "ruler"],
+  ]) {
+    await reference
+      .getByRole("button", { name: text(label), exact: true })
+      .click();
+    assert.equal(await reference.getAttribute("data-reference"), id);
+    await rulerMatchesProjection();
   }
-  assert.equal(await reference.getAttribute("data-reference"), "hair");
-  await rulerMatchesProjection();
-  await page.screenshot({ path: artifact("size-hair.png") });
+  await reference
+    .getByRole("button", { name: text("Auto"), exact: true })
+    .click();
+  await page.screenshot({ path: artifact("size-comparison-3d.png") });
   // Same physical neighborhood at two distant cells: floating origin must preserve small dimensions.
   await page.goto(
     `${base}/?lang=${locale}&focus=atom-0/nucleus&site=60000000,-50000000,0`,
@@ -244,6 +301,18 @@ try {
       waitUntil: "networkidle",
     });
     await ready("atom-0/nucleus");
+    if (width === 320) {
+      const labels = await page
+        .locator(".atom-label.compact-label:visible")
+        .count();
+      assert.ok(
+        labels > 0 && labels <= 2,
+        "A short phone keeps sparse particle labels without covering the model",
+      );
+      await node("atom-0/nucleus/proton-0").click();
+      await ready("atom-0/nucleus/proton-0");
+      await navigate("out", "atom-0/nucleus");
+    }
     await rulerMatchesProjection();
     assert.ok(
       await page
@@ -261,6 +330,15 @@ try {
     );
     await page.locator(".context-interaction").click();
     await ready("atom-0/nucleus");
+    if (width === 320) {
+      const labels = await page
+        .locator(".atom-label.compact-label:visible")
+        .count();
+      assert.ok(
+        labels > 0 && labels <= 2,
+        "A short phone keeps sparse particle labels without covering the model",
+      );
+    }
     await rulerMatchesProjection();
     if (width >= 768 && height < 520) {
       const panel = await page.locator(".lesson-panel").boundingBox();
