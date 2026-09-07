@@ -159,6 +159,17 @@ try {
         document.querySelector("canvas[data-scene-id]")?.dataset
           .transitioning === "false",
     );
+    assert.ok(
+      await p.locator(".lesson-copy p").evaluate((e) => {
+        const text = e.getBoundingClientRect(),
+          panel = e.closest(".lesson-panel").getBoundingClientRect();
+        return (
+          Math.min(text.bottom, panel.bottom) - Math.max(text.top, panel.top) >=
+          24
+        );
+      }),
+      "The explanation starts inside the visible panel, before playback controls",
+    );
     await shot(name + "-lesson");
     assert.ok(
       await p

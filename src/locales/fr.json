@@ -415,5 +415,8 @@
   "Electrons": "Électrons",
   "Location marker · click to explore": "Repère de position · cliquer pour explorer",
   "Entering matter changes magnification to reveal the molecules throughout the chosen region. Their positions stay fixed; zoom out to return to the vessel.": "Entrer dans la matière change le grossissement pour révéler les molécules dans toute la région choisie. Leurs positions restent fixes ; dézoomez pour retrouver le récipient.",
-  "At each scale, only the contents of the entered object are shown. Every solid particle can be identified and selected. The camera crosses large size gaps automatically; dimensions stay fixed.": "À chaque échelle, seul le contenu de l’objet exploré est affiché. Chaque particule solide peut être identifiée et sélectionnée. La caméra traverse automatiquement les grands écarts de taille ; les dimensions restent fixes."
+  "At each scale, only the contents of the entered object are shown. Every solid particle can be identified and selected. The camera crosses large size gaps automatically; dimensions stay fixed.": "À chaque échelle, seul le contenu de l’objet exploré est affiché. Chaque particule solide peut être identifiée et sélectionnée. La caméra traverse automatiquement les grands écarts de taille ; les dimensions restent fixes.",
+  "Show panels": "Afficher les panneaux",
+  "Focus on the scene": "Se concentrer sur la scène",
+  "Properties & source": "Propriétés et source"
 }

@@ -415,5 +415,8 @@
   "Electrons": "Electrons",
   "Location marker · click to explore": "Location marker · click to explore",
   "Entering matter changes magnification to reveal the molecules throughout the chosen region. Their positions stay fixed; zoom out to return to the vessel.": "Entering matter changes magnification to reveal the molecules throughout the chosen region. Their positions stay fixed; zoom out to return to the vessel.",
-  "At each scale, only the contents of the entered object are shown. Every solid particle can be identified and selected. The camera crosses large size gaps automatically; dimensions stay fixed.": "At each scale, only the contents of the entered object are shown. Every solid particle can be identified and selected. The camera crosses large size gaps automatically; dimensions stay fixed."
+  "At each scale, only the contents of the entered object are shown. Every solid particle can be identified and selected. The camera crosses large size gaps automatically; dimensions stay fixed.": "At each scale, only the contents of the entered object are shown. Every solid particle can be identified and selected. The camera crosses large size gaps automatically; dimensions stay fixed.",
+  "Show panels": "Show panels",
+  "Focus on the scene": "Focus on the scene",
+  "Properties & source": "Properties & source"
 }

@@ -2,6 +2,8 @@
 
 Production: https://atlas.chalco.website
 
+These are chronological release notes. The latest behavior and verification results appear in the final section.
+
 ## Current behavior
 
 - All three materials have an eight-level named route: object → sampled volume or CO₂ bubble → molecular neighborhood → molecule → atom → nucleus → nucleon → valence quark. The root is now the object. Deep links to existing molecular constituents remain valid.
@@ -122,3 +124,17 @@ All eight suites have passing results in English and French (16 distinct suite/l
 Final TypeScript/Vite production build and whitespace checks passed. The atomic release serves `index-BuTeHGOy.js`, `index-Biddgkeq.css` and `three-BEAm_r63.js`. The previous deployment is retained at `releases/before-coherent-exploration-20260907T161940Z`; prior hashed assets remain available to already-open clients. Server configuration, releases and generated artifacts remain excluded from the public repository. Maintenance and scientific conventions are recorded in `AGENTS.md` and `SCIENCE.md`.
 
 The final language and size-reference suites also passed in both languages against public HTTPS (four runs). They verified in-place comparison texture translation, reference selection, physical projection, actual electron/neutron/quark clicks, distant sites, sparse phone annotations and responsive lesson/control access. The production report is retained in ignored `artifacts/coherent-public.json`.
+
+## Immersive navigation and an open studio viewport — 2026-09-07
+
+Named zoom controls now occupy a compact bottom bar. The subject and breadcrumb stay at the top, the permanent 3D size comparison moves to the left edge, and composition opens on demand. The 320 px desktop inspector retains readable 14 px copy, expands properties/source separately, and respects its closed state when navigating. Focus mode folds the side panels and refits the camera while retaining the comparison. Phones use compact reference and bottom controls; landscape places composition beside navigation so it does not cover the interaction buttons. Panel contents have a short entrance animation with a reduced-motion alternative. Explanatory copy precedes playback controls; short-screen headings and step buttons are compact so the paragraph is visible immediately. Each phase change returns the explanation to its beginning.
+
+Camera flights retain fading departure surfaces at fixed physical positions and dimensions, progressively reveal the destination and track the approach with a small nonphysical reticle. Logarithmic flights spend more time near visible geometry and cross the large empty intervals in their middle. Their nominal duration is 850 ms; advancement after a dropped frame is capped to preserve intermediate views. New clicks retarget immediately without a queue. Temporary departure geometry is unpickable and disappears on arrival, retaining the direct-content isolation rule. Reduced motion snaps to the same destination. Main-view labels and streamed target checks use the available exploration bounds rather than the former central HUD coordinates.
+
+The new bilingual immersion suite checks intermediate camera distances and retained departure geometry, final departure removal, compact navigation outside the viewport, focus mode, persistent inspector dismissal, responsive composition/details access and reachable interaction buttons. Navigation and volume tests now use the renderer's declared unobstructed viewport. Manual French screenshots were reviewed during atom and nucleus entry, as well as French/English desktop and mobile screens. Tests use Chromium software WebGL and emulated touch, not physical-device performance measurements.
+
+All nine suites have passing English and French results (18 distinct suite/locale combinations). The full matrix caught the hidden scientific marker notice and an outdated test assumption that composition settings were always open. After correction, the size-reference, immersion and navigation pairs passed. A final visual review led to the compact explanation header and copy-first order; the final size-reference and experience pairs passed with explicit visible-paragraph assertions, all seven lessons and pause/replay checks. The combined report preserves the source of every result in ignored `artifacts/ergonomics-validation.json`; the full and focused reports remain alongside it. Final TypeScript/Vite build and whitespace checks passed.
+
+The atomic release serves `index-Cs0JaLBA.js`, `index-YFCCGSKB.css` and `three-BEAm_r63.js`. The previous live site is retained at `releases/before-ergonomic-studio-20260907T170925Z`. Public HTTPS HTML and all three asset bodies match the verified build byte for byte. Older hashed assets remain available for already-open clients. Server configuration, backups and generated artifacts remain excluded from Git.
+
+The final immersion and size-reference suites also passed in English and French against public HTTPS (four runs). They covered progressive flights, focus mode, closed-inspector persistence, responsive controls, physical ratios and projection, actual constituent clicks, spatial addresses, visible scientific notices and immediately readable compact explanations. The public report is retained in ignored `artifacts/ergonomics-public.json`.

@@ -128,8 +128,16 @@ try {
         x: Number(e.dataset.anchorX),
         y: Number(e.dataset.anchorY),
       }));
+      const viewport = JSON.parse(
+        await page
+          .locator("canvas[data-scene-id]")
+          .getAttribute("data-viewport"),
+      );
       assert.ok(
-        anchor.x > 280 && anchor.x < 1020 && anchor.y > 260 && anchor.y < 850,
+        anchor.x > viewport.left &&
+          anchor.x < viewport.right &&
+          anchor.y > viewport.top &&
+          anchor.y < viewport.bottom,
         "Target stays inside the exploration area",
       );
       await page.mouse.move(anchor.x, anchor.y);

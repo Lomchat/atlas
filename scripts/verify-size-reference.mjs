@@ -95,6 +95,19 @@ async function rulerMatchesProjection() {
     "Comparison provides a substantial 3D stage",
   );
   const box = await reference.boundingBox();
+  const note = reference.locator(".reference-symbol-note");
+  if (await note.count()) {
+    assert.ok(
+      await note.isVisible(),
+      "Scientific marker/diagram notice stays visible in the compact reference",
+    );
+    const noteBox = await note.boundingBox();
+    assert.ok(
+      noteBox.y >= box.y &&
+        noteBox.y + noteBox.height <= box.y + box.height + 1,
+      "The scientific notice fits inside the reference",
+    );
+  }
   const vp = page.viewportSize();
   assert.ok(
     box.x >= 0 &&
@@ -363,6 +376,17 @@ try {
           "Both zoom buttons stay reachable beside the lesson",
         );
     }
+    assert.ok(
+      await page.locator(".lesson-copy p").evaluate((e) => {
+        const text = e.getBoundingClientRect(),
+          panel = e.closest(".lesson-panel").getBoundingClientRect();
+        return (
+          Math.min(text.bottom, panel.bottom) - Math.max(text.top, panel.top) >=
+          24
+        );
+      }),
+      "The explanation starts inside the visible panel, before playback controls",
+    );
     await page.screenshot({ path: artifact(`size-lesson-${width}.png`) });
     await page.getByRole("button", { name: text("Close explanation") }).click();
     await reference.locator("summary").click();

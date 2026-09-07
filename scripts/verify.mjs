@@ -129,8 +129,14 @@ try {
   for (const id of [atom, nucleus, proton, quark]) {
     await move("in", id);
     const pos = await anchor(id);
+    const viewport = JSON.parse(
+      await p.locator("canvas[data-scene-id]").getAttribute("data-viewport"),
+    );
     assert.ok(
-      pos.x > 300 && pos.x < 1115 && pos.y > 260 && pos.y < 905,
+      pos.x > viewport.left &&
+        pos.x < viewport.right &&
+        pos.y > viewport.top &&
+        pos.y < viewport.bottom,
       "destination centered in unobstructed scene",
     );
     assert.equal(
@@ -261,6 +267,9 @@ try {
   await shot("light");
   await p.getByRole("button", { name: text("Dark mode"), exact: true }).click();
   await p
+    .getByRole("button", { name: text("Show composition"), exact: true })
+    .click();
+  await p
     .getByRole("switch", { name: text("Annotations"), exact: true })
     .click();
   await settle();
@@ -282,7 +291,9 @@ try {
     assert.ok(
       box.x >= 0 &&
         box.x + box.width <= width &&
-        box.y + box.height < height - 200,
+        box.y >= height - 125 &&
+        box.y + box.height <= height - 12,
+      "Named navigation stays in the bottom dock, outside the scene",
     );
     for (const id of [atom, nucleus, proton, quark]) await move("in", id);
     assert.equal(await nav("in").isDisabled(), true);

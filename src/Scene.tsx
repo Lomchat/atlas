@@ -412,6 +412,10 @@ export default function Scene({
     scaleLabel.className = "scale-anchor";
     scaleLabel.addEventListener("click", () => advance.current());
     el.appendChild(scaleLabel);
+    const travelReticle = document.createElement("div");
+    travelReticle.className = "travel-reticle";
+    travelReticle.setAttribute("aria-hidden", "true");
+    el.appendChild(travelReticle);
     const effects = interactionEffects(scene);
     const nuclearLinks = makeLine(
       "#edc58d",
@@ -447,9 +451,14 @@ export default function Scene({
       availableW = 1,
       availableH = 1,
       viewportTop = 0,
+      viewportBottom = 0,
+      viewportLeft = 0,
+      viewportRight = 0,
+      flightProgress = 1,
+      flightTransition = false,
       fitTime = 0,
       fitPending = true,
-      fitStarted = 0,
+      fitElapsed = 0,
       navigationActive = true,
       lastFocus: string | null = null,
       lastReset = -1,
@@ -468,6 +477,7 @@ export default function Scene({
       wheelAt = 0,
       bridgePending = false,
       oldState: ExplorerState | undefined;
+    const departureSurfaces = new Map<string, number>();
     const fitFromPosition = v(),
       fitFromTarget = v(),
       fitDirection = v();
@@ -478,30 +488,41 @@ export default function Scene({
         landscape = height < 520 && width > height;
       const lessonOpen = current.current.interaction !== "none";
       const lessonWidth = width >= 1150 ? 440 : Math.max(340, width * 0.4);
-      const left = mobile ? 16 : landscape ? 215 : width < 1150 ? 260 : 300,
+      const studio = el.parentElement!;
+      const immersive = studio.classList.contains("immersive");
+      const inspectorClosed = studio.classList.contains("inspector-closed");
+      const left = mobile
+          ? 16
+          : immersive
+            ? 24
+            : landscape
+              ? 222
+              : width < 1150
+                ? 246
+                : 288,
         right = mobile
-          ? width - 52
-          : width - (lessonOpen ? lessonWidth + 44 : width >= 1150 ? 420 : 325),
-        top = (() => {
-          const nav = el.parentElement
-            ?.querySelector(".zoom-navigation")
-            ?.getBoundingClientRect();
-          const comparison = el.parentElement
-            ?.querySelector(".size-reference")
-            ?.getBoundingClientRect();
-          return (
-            Math.max(
-              nav?.bottom || 250,
-              landscape ? 0 : comparison?.bottom || 0,
-            ) + 18
-          );
-        })(),
+          ? width - 48
+          : width -
+            (lessonOpen
+              ? lessonWidth + 36
+              : immersive || inspectorClosed || landscape
+                ? 24
+                : width >= 1150
+                  ? 356
+                  : 281),
+        top = mobile
+          ? (studio.querySelector(".size-reference")?.getBoundingClientRect()
+              .bottom || 248) + 12
+          : 100,
         bottom =
           lessonOpen && mobile
-            ? (el.parentElement
-                ?.querySelector(".lesson-panel")
-                ?.getBoundingClientRect().top || height * 0.55) - 12
-            : height - (landscape ? 60 : mobile ? 150 : 95);
+            ? (studio.querySelector(".lesson-panel")?.getBoundingClientRect()
+                .top || height * 0.55) - 12
+            : height - (mobile ? 157 : landscape ? 82 : 126);
+      viewportLeft = left;
+      viewportRight = right;
+      viewportBottom = bottom;
+      canvas.dataset.viewport = JSON.stringify({ left, right, top, bottom });
       viewportTop = top;
       availableW = Math.max(180, right - left);
       availableH = Math.max(90, bottom - top);
@@ -520,9 +541,17 @@ export default function Scene({
     }
     const observer = new ResizeObserver(resize);
     observer.observe(el);
+    const layoutObserver = new MutationObserver(resize);
+    layoutObserver.observe(el.parentElement!, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
     resize();
     controls.addEventListener("start", () => {
       fitTime = 0;
+      flightProgress = 1;
+      flightTransition = false;
+      departureSurfaces.clear();
       fitPending = false;
       navigationActive = false;
       bridgePending = false;
@@ -866,6 +895,9 @@ export default function Scene({
     function frame(now: number) {
       if (disposed) return;
       raf = requestAnimationFrame(frame);
+      // Preserve intermediate views even after a dropped frame; never replay
+      // queued destinations. The active flight still retargets immediately.
+      if (fitTime > 0) fitElapsed += Math.max(0, Math.min(now - last, 100));
       const dt = Math.max(0, Math.min((now - last) / 1000, 0.05));
       last = now;
       if (document.hidden) return;
@@ -900,6 +932,11 @@ export default function Scene({
         s.reset !== lastReset ||
         s.navigation !== lastNavigation
       ) {
+        departureSurfaces.clear();
+        for (const [id, view] of views)
+          if (view.skin.visible && view.skin.material.opacity > 0.01)
+            departureSurfaces.set(id, view.skin.material.opacity);
+        flightTransition = lastNavigation >= 0 && !reduced;
         fitPending = true;
         navigationActive = true;
         bridgePending = false;
@@ -918,13 +955,22 @@ export default function Scene({
         }
       }
       if (fitPending) {
-        fitStarted = now;
+        fitElapsed = 0;
         fitFromPosition.copy(camera.position);
         fitFromTarget.copy(controls.target);
         fitDirection.copy(camera.position).sub(controls.target).normalize();
         fitTime = 1;
         fitPending = false;
       }
+      flightProgress =
+        fitTime && !reduced ? T.MathUtils.clamp(fitElapsed / 850, 0, 1) : 1;
+      canvas.dataset.flightProgress = String(flightProgress);
+      const departureAlpha = flightTransition
+        ? 1 - smooth(0.18, 0.88, flightProgress)
+        : 0;
+      const arrivalAlpha = flightTransition
+        ? smooth(0.28, 0.86, flightProgress)
+        : 1;
       camera.updateMatrixWorld();
       const detailUnit = Math.max(120, Math.min(availableW, availableH));
       const route = new Set<string>();
@@ -1104,11 +1150,21 @@ export default function Scene({
       for (const view of views.values()) {
         const permitted = allowed.has(view.node.id);
         // Hide surfaces, not ancestor groups: children's transforms stay nested.
-        view.skin.visible = permitted;
+        const departure = !permitted
+          ? (departureSurfaces.get(view.node.id) || 0) * departureAlpha
+          : 0;
+        view.skin.visible = permitted || departure > 0.01;
         if (allowed) {
-          view.reveal = permitted ? 1 : 0;
-          view.skin.material.opacity = permitted ? 1 : 0;
-          view.skin.material.depthWrite = permitted;
+          // Departure surfaces carry the eye through the zoom, but never become
+          // pickable siblings of the new container. Radii and positions stay fixed.
+          view.reveal = permitted ? arrivalAlpha : 0;
+          view.skin.material.opacity = permitted
+            ? Math.max(
+                arrivalAlpha,
+                departureSurfaces.has(view.node.id) ? departureAlpha : 0,
+              )
+            : departure;
+          view.skin.material.depthWrite = permitted && arrivalAlpha > 0.95;
           view.wire.visible = false;
           if (view.cloud) view.cloud.visible = false;
           for (const link of view.links)
@@ -1116,6 +1172,11 @@ export default function Scene({
           view.group.visible = true;
         }
       }
+      canvas.dataset.departureNodes = JSON.stringify(
+        [...departureSurfaces.keys()].filter(
+          (id) => !allowed.has(id) && departureAlpha > 0.01,
+        ),
+      );
       canvas.dataset.scope = visibleScope || "";
       canvas.dataset.allowedNodes = JSON.stringify(
         allowed ? [...allowed] : graph.atoms,
@@ -1319,18 +1380,40 @@ export default function Scene({
         // destination instead of waiting for a queue of full-length flights.
         const progress = reduced
             ? 1
-            : T.MathUtils.clamp((now - fitStarted) / 300, 0, 1),
-          eased = 1 - Math.pow(1 - progress, 3);
+            : T.MathUtils.clamp(fitElapsed / 850, 0, 1),
+          eased = progress * progress * (3 - 2 * progress);
         controls.target.lerpVectors(fitFromTarget, target, eased);
         const fromDistance = fitFromPosition.distanceTo(fitFromTarget);
         if (distance > 0) {
-          const flightDistance = Math.exp(
-            T.MathUtils.lerp(
-              Math.log(Math.max(1e-10, fromDistance)),
-              Math.log(distance),
-              eased,
-            ),
-          );
+          const startLog = Math.log(Math.max(1e-10, fromDistance));
+          const endLog = Math.log(distance);
+          const gap = endLog - startLog;
+          // Spend the flight approaching and leaving real geometry. Compress
+          // the unresolvable empty interval (e.g. atom → nucleus) into its
+          // middle, instead of showing a blank screen for most of the trip.
+          const edge =
+            Math.sign(gap) * Math.min(Math.abs(gap) * 0.25, Math.log(4));
+          const travelLog =
+            Math.abs(gap) > Math.log(100)
+              ? progress < 0.42
+                ? T.MathUtils.lerp(
+                    startLog,
+                    startLog + edge,
+                    smooth(0, 0.42, progress),
+                  )
+                : progress < 0.58
+                  ? T.MathUtils.lerp(
+                      startLog + edge,
+                      endLog - edge,
+                      smooth(0.42, 0.58, progress),
+                    )
+                  : T.MathUtils.lerp(
+                      endLog - edge,
+                      endLog,
+                      smooth(0.58, 1, progress),
+                    )
+              : T.MathUtils.lerp(startLog, endLog, eased);
+          const flightDistance = Math.exp(travelLog);
           camera.position
             .copy(controls.target)
             .addScaledVector(fitDirection, flightDistance);
@@ -1341,6 +1424,7 @@ export default function Scene({
             eased,
           );
         fitTime = progress < 1 ? 1 : 0;
+        if (!fitTime) flightTransition = false;
       }
       controls.autoRotate = s.rotate && !reduced;
       const cameraChanged = controls.update(dt);
@@ -1465,7 +1549,14 @@ export default function Scene({
       const explorerNext = nextOf(explorerId);
       const explorerNode = graph.nodes.get(explorerId)!;
       const anchorPoint = controls.target.clone().project(camera);
-      scaleLabel.hidden = s.interaction !== "none";
+      travelReticle.hidden = !flightTransition || fitTime === 0 || reduced;
+      travelReticle.style.left = `${((anchorPoint.x + 1) * width) / 2}px`;
+      travelReticle.style.top = `${((1 - anchorPoint.y) * height) / 2}px`;
+      travelReticle.style.opacity = String(
+        Math.sin(flightProgress * Math.PI) * 0.65,
+      );
+      travelReticle.style.scale = String(0.65 + flightProgress * 0.7);
+      scaleLabel.hidden = s.interaction !== "none" || fitTime > 0;
       scaleLabel.disabled = !explorerNext;
       scaleLabel.dataset.target = explorerNext || "";
       scaleLabel.dataset.viewpoint = explorerId;
@@ -1563,7 +1654,7 @@ export default function Scene({
             eligible &&
             point.z < 1 &&
             y > viewportTop &&
-            y < height - (width < 768 ? 150 : 90) &&
+            y < viewportBottom &&
             x > 12 &&
             x < width - 30;
           view.label.hidden = !show;
@@ -1588,10 +1679,10 @@ export default function Scene({
             .filter(
               (p) =>
                 p.z < 1 &&
-                p.x > 300 &&
-                p.x < width - 440 &&
-                p.y > 280 &&
-                p.y < height - 180,
+                p.x > viewportLeft + 12 &&
+                p.x < viewportRight - 12 &&
+                p.y > viewportTop + 12 &&
+                p.y < viewportBottom - 12,
             )
             .sort((a, b) => a.z - b.z)
             .slice(0, 80),
@@ -1676,6 +1767,7 @@ export default function Scene({
       disposed = true;
       cancelAnimationFrame(raf);
       observer.disconnect();
+      layoutObserver.disconnect();
       controls.dispose();
       canvas.removeEventListener("wheel", wheelTarget, true);
       el.removeEventListener("wheel", forwardOverlayWheel, true);
@@ -1691,6 +1783,7 @@ export default function Scene({
       volume.dispose();
       neighborhood.dispose();
       scaleLabel.remove();
+      travelReticle.remove();
       geometries.forEach((g) => g.dispose());
       materials.forEach((m) => m.dispose());
       environment.dispose();

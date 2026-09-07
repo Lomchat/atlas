@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { t } from "./i18n";
 import {
   ArrowLeft,
@@ -339,10 +340,15 @@ export default function Interactions({
   onPause: () => void;
   onReplay: () => void;
 }) {
+  const panel = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (panel.current) panel.current.scrollTop = 0;
+  }, [type, phase]);
   const lesson = lessons[type];
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
   return (
     <aside
+      ref={panel}
       className="lesson-panel glass"
       aria-label={t("Understand the interaction")}
     >
@@ -375,6 +381,10 @@ export default function Interactions({
           </button>
         ))}
       </div>
+      <div className="lesson-copy" aria-live="polite" key={`${type}:${phase}`}>
+        <h3>{lesson.steps[phase][0]}</h3>
+        <p>{lesson.steps[phase][1]}</p>
+      </div>
       <div className="lesson-playback">
         <button
           onClick={onPause}
@@ -401,10 +411,6 @@ export default function Interactions({
               ? t("Paused")
               : t("Slow-motion loop")}
         </small>
-      </div>
-      <div className="lesson-copy" aria-live="polite">
-        <h3>{lesson.steps[phase][0]}</h3>
-        <p>{lesson.steps[phase][1]}</p>
       </div>
       {type === "photon" && (
         <div className="energy-diagram" data-excited={phase === 1}>

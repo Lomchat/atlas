@@ -15,6 +15,8 @@ import {
   Crosshair,
   Layers3,
   Maximize2,
+  PanelLeftClose,
+  PanelLeftOpen,
   Minus,
   Moon,
   Pause,
@@ -111,6 +113,7 @@ export default function App() {
   const [state, setState] = useState<ExplorerState>(initial),
     [panel, setPanel] = useState<"tree" | "details" | null>(null),
     [inspector, setInspector] = useState(true),
+    [immersive, setImmersive] = useState(false),
     [modal, setModal] = useState<"about" | "search" | "molecules" | null>(null),
     [query, setQuery] = useState(""),
     [message, setMessage] = useState<MessageKey | "">(""),
@@ -162,7 +165,6 @@ export default function App() {
     };
   }
   function step(direction: "in" | "out") {
-    setInspector(true);
     setPanel(null);
     setState((s) => {
       // Resolve each click against the latest requested destination, including
@@ -187,7 +189,6 @@ export default function App() {
   }
   function approach(id: string) {
     if (!graph.nodes.has(id)) return;
-    setInspector(true);
     setPanel(null);
     setState((s) => destinationState(s, id));
   }
@@ -405,7 +406,9 @@ export default function App() {
       className={
         "studio " +
         (state.light ? "light" : "dark") +
-        (state.interaction !== "none" ? " has-lesson" : "")
+        (state.interaction !== "none" ? " has-lesson" : "") +
+        (immersive ? " immersive" : "") +
+        (!inspector ? " inspector-closed" : "")
       }
     >
       <Scene
@@ -443,6 +446,13 @@ export default function App() {
           <span>{t("Search")}</span>
           <kbd>/</kbd>
         </button>
+        <IconButton
+          label={immersive ? t("Show panels") : t("Focus on the scene")}
+          action="focus-mode"
+          icon={immersive ? PanelLeftOpen : PanelLeftClose}
+          active={immersive}
+          onClick={() => setImmersive(!immersive)}
+        />
         <IconButton
           label={state.light ? t("Dark mode") : t("Light mode")}
           icon={state.light ? Moon : Sun}
@@ -547,16 +557,18 @@ export default function App() {
       </nav>
       <aside
         className={
-          "tree-panel glass " + (panel === "tree" ? "mobile-open" : "")
+          "tree-panel glass " + (panel === "tree" ? "mobile-open" : " folded")
         }
         aria-label={t("Nested composition")}
       >
         <div className="panel-heading">
           <span>{t("From the visible to the subatomic")}</span>
           <button
-            className="mobile-only icon-button"
+            className="icon-button"
             aria-label={t("Close composition")}
-            onClick={() => setPanel(null)}
+            onClick={() => {
+              setPanel(null);
+            }}
           >
             <X size={15} />
           </button>
@@ -644,80 +656,90 @@ export default function App() {
             }}
           />
         </div>
-        <div
-          className="symbol-tile"
-          style={{ "--particle": node.entry.color } as React.CSSProperties}
-        >
-          {node.entry.symbol}
-        </div>
-        <h2>{node.entry.name}</h2>
-        {node.parent && (
-          <button className="belongs-to" onClick={() => approach(node.parent!)}>
-            <ArrowLeft size={11} />
-            <span>
-              {t("Inside {name}", {
-                name: graph.nodes.get(node.parent)!.entry.name,
-              })}
-            </span>
-          </button>
-        )}
-        <p className="description">{node.entry.description}</p>
-        {node.children.length > 0 && (
-          <div className="contains">
-            <Layers3 size={14} />
-            <span>
-              {isScale(node.id) ? (
-                <>
-                  {t("Zoom into")} <strong>{next?.entry.name}</strong>
-                </>
-              ) : (
-                <>
-                  {t("Contains")} <strong>{node.children.length}</strong>{" "}
-                  {node.kind === "molecule"
-                    ? t("atoms")
-                    : node.kind === "atom"
-                      ? t("constituents")
-                      : node.kind === "nucleus"
-                        ? node.children.length === 1
-                          ? t("nucleon")
-                          : t("nucleons")
-                        : t("valence quarks")}
-                </>
-              )}
-            </span>
+        <div className="detail-content" key={node.id}>
+          <div
+            className="symbol-tile"
+            style={{ "--particle": node.entry.color } as React.CSSProperties}
+          >
+            {node.entry.symbol}
           </div>
-        )}
-        <dl className="facts">
-          {node.entry.facts.map(([name, value]) => (
-            <div key={name}>
-              <dt>{name}</dt>
-              <dd>{value}</dd>
+          <h2>{node.entry.name}</h2>
+          {node.parent && (
+            <button
+              className="belongs-to"
+              onClick={() => approach(node.parent!)}
+            >
+              <ArrowLeft size={11} />
+              <span>
+                {t("Inside {name}", {
+                  name: graph.nodes.get(node.parent)!.entry.name,
+                })}
+              </span>
+            </button>
+          )}
+          <p className="description">{node.entry.description}</p>
+          {node.children.length > 0 && (
+            <div className="contains">
+              <Layers3 size={14} />
+              <span>
+                {isScale(node.id) ? (
+                  <>
+                    {t("Zoom into")} <strong>{next?.entry.name}</strong>
+                  </>
+                ) : (
+                  <>
+                    {t("Contains")} <strong>{node.children.length}</strong>{" "}
+                    {node.kind === "molecule"
+                      ? t("atoms")
+                      : node.kind === "atom"
+                        ? t("constituents")
+                        : node.kind === "nucleus"
+                          ? node.children.length === 1
+                            ? t("nucleon")
+                            : t("nucleons")
+                          : t("valence quarks")}
+                  </>
+                )}
+              </span>
             </div>
-          ))}
-        </dl>
-        <div className="detail-actions">
-          {next && (
-            <button className="primary-action" onClick={() => step("in")}>
-              <Plus size={15} />
-              <span>{t("Explore {name}", { name: next.entry.name })}</span>
-              <ChevronRight size={13} />
-            </button>
           )}
-          {parent && (
-            <button className="secondary-action" onClick={() => step("out")}>
-              <ArrowLeft size={14} />
-              <span>{t("Return to {name}", { name: parent.entry.name })}</span>
-            </button>
-          )}
+          <details className="detail-facts">
+            <summary>{t("Properties & source")}</summary>
+            <dl className="facts">
+              {node.entry.facts.map(([name, value]) => (
+                <div key={name}>
+                  <dt>{name}</dt>
+                  <dd>{value}</dd>
+                </div>
+              ))}
+            </dl>
+            <a
+              className="source-link"
+              href={node.entry.source}
+              target="_blank"
+              rel="noreferrer"
+            >
+              {t("Scientific source")} <ArrowUpRight size={11} />
+            </a>
+          </details>
+          <div className="detail-actions">
+            {next && (
+              <button className="primary-action" onClick={() => step("in")}>
+                <Plus size={15} />
+                <span>{t("Explore {name}", { name: next.entry.name })}</span>
+                <ChevronRight size={13} />
+              </button>
+            )}
+            {parent && (
+              <button className="secondary-action" onClick={() => step("out")}>
+                <ArrowLeft size={14} />
+                <span>
+                  {t("Return to {name}", { name: parent.entry.name })}
+                </span>
+              </button>
+            )}
+          </div>
         </div>
-        <a
-          className="source-link"
-          href={node.entry.source}
-          target="_blank"
-          rel="noreferrer"
-        >
-          {t("Scientific source")} <ArrowUpRight size={11} />
-        </a>
       </aside>
       <div className="interaction-controls glass">
         <button
@@ -779,7 +801,8 @@ export default function App() {
         </div>
       )}
       <button
-        className="composition-trigger glass mobile-only"
+        className="composition-trigger glass"
+        aria-expanded={panel === "tree"}
         aria-label={t("Show composition")}
         onClick={() => {
           setPanel(panel === "tree" ? null : "tree");
