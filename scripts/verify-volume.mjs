@@ -53,7 +53,7 @@ try {
     await open();
     const identity = (await data()).sceneId;
     await page.mouse.move(x, 650);
-    for (let i = 0; i < 15 && (await data()).scale !== "neighborhood"; i++) {
+    for (let i = 0; i < 65 && (await data()).scale !== "neighborhood"; i++) {
       await page.mouse.wheel(0, -650);
       await page.waitForTimeout(180);
     }
@@ -121,7 +121,7 @@ try {
     const label = page.locator(`.atom-label[data-node="${node}"]`);
     for (
       let i = 0;
-      i < 24 && Number(await label.getAttribute("data-open")) < 0.7;
+      i < 80 && Number(await label.getAttribute("data-open")) < 0.7;
       i++
     ) {
       const anchor = await label.evaluate((e) => ({
@@ -291,7 +291,7 @@ try {
   );
   assert.equal((await data()).sceneId, beforePinch.sceneId);
   await cdp.detach();
-  await open("site=999,0,0");
+  await open("site=100000000000000000000,0,0");
   assert.equal((await data()).site, "0,0,0");
   assert.deepEqual(errors, []);
   console.log(

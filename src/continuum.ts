@@ -70,6 +70,7 @@ export interface ExplorerState {
   interactionReplay: number;
 }
 export interface SceneDetail {
+  metersPerPixel: number;
   molecule: MoleculeId;
   open: string[];
   readable: string[];

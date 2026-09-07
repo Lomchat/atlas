@@ -1,3 +1,4 @@
+import { macroFactor, metersPerUnit, physicalRadius } from "./physicalScale";
 import { t, useLocale } from "./i18n";
 import { useEffect, useRef, useState } from "react";
 import * as T from "three";
@@ -132,8 +133,9 @@ export default function Scene({
     controls.enableDamping = !reduced;
     controls.dampingFactor = 0.075;
     // Let the camera approach even the smallest nested constituents.
-    controls.minDistance = 0.00001;
-    controls.maxDistance = 100000;
+    controls.minDistance = 1e-9;
+    controls.maxDistance = 100000 * macroFactor(state.molecule);
+    camera.far = controls.maxDistance * 10;
     controls.zoomToCursor = true;
     let controlsDirty = true;
     controls.addEventListener("change", () => {
@@ -249,38 +251,8 @@ export default function Scene({
         group = new T.Group();
       parent.add(group);
       const big = elements[node.element].z > 1;
-      const closedRadius =
-        node.kind === "atom"
-          ? node.element === "H"
-            ? 0.57
-            : 0.87
-          : node.kind === "nucleus"
-            ? big
-              ? 0.48
-              : 0.24
-            : node.kind === "proton" || node.kind === "neutron"
-              ? big
-                ? 0.22
-                : 0.32
-              : node.kind === "electron"
-                ? 0.085
-                : big
-                  ? 0.073
-                  : 0.105;
-      const openRadius =
-        node.kind === "atom"
-          ? big
-            ? 2.3
-            : 1.65
-          : node.kind === "nucleus"
-            ? big
-              ? 1.45
-              : 0.77
-            : node.children.length
-              ? big
-                ? 0.34
-                : 0.52
-              : closedRadius;
+      const closedRadius = physicalRadius(node, state.molecule);
+      const openRadius = closedRadius; // Opening changes opacity, never physical size.
       const mat = new T.MeshPhysicalMaterial({
         color: node.entry.color,
         metalness: 0.25,
@@ -353,8 +325,19 @@ export default function Scene({
     // Each child remains attached to its real parent throughout every animation.
     const nucleiPositions = new Map<string, T.Vector3[]>();
     for (const node of graph.nodes.values())
-      if (node.kind === "nucleus")
-        nucleiPositions.set(node.id, cluster(node.children.length));
+      if (node.kind === "nucleus") {
+        const points = cluster(node.children.length);
+        const extent = Math.max(...points.map((p) => p.length()), 1e-20);
+        const space = Math.max(
+          0,
+          views.get(node.id)!.closedRadius -
+            views.get(node.children[0])!.closedRadius,
+        );
+        nucleiPositions.set(
+          node.id,
+          points.map((p) => p.multiplyScalar(space / extent)),
+        );
+      }
     for (const view of views.values())
       if (view.node.kind === "proton" || view.node.kind === "neutron")
         for (let i = 0; i < 3; i++) {
@@ -414,9 +397,12 @@ export default function Scene({
       neighborhood = neighborsModel(state.molecule),
       volume = matterVolume(state.molecule);
     let activeSite: Site = [...state.site];
-    world.position.copy(sitePosition(activeSite, state.molecule));
+    const origin = sitePosition(activeSite, state.molecule);
+    const macroScale = macroFactor(state.molecule);
+    volume.setOrigin(origin);
     world.quaternion.copy(siteRotation(activeSite));
-    macro.group.scale.setScalar(900);
+    macro.group.scale.setScalar(900 * macroScale);
+    macro.group.position.copy(origin).negate();
     scene.add(macro.group, neighborhood.group, volume.group);
     let macroLevel: string = graph.root,
       macroAlpha = 1,
@@ -459,6 +445,7 @@ export default function Scene({
       height = 1,
       availableW = 1,
       availableH = 1,
+      viewportTop = 0,
       fitTime = 0,
       fitPending = true,
       fitStarted = 0,
@@ -486,24 +473,36 @@ export default function Scene({
         landscape = height < 520 && width > height;
       const lessonOpen = current.current.interaction !== "none";
       const lessonWidth = width >= 1150 ? 440 : Math.max(340, width * 0.4);
-      const left = mobile ? 16 : landscape ? 215 : width < 1150 ? 260 : 300,
+      const left =
+          mobile || (landscape && lessonOpen)
+            ? 16
+            : landscape
+              ? 215
+              : width < 1150
+                ? 260
+                : 300,
         right = mobile
           ? width - 52
           : width - (lessonOpen ? lessonWidth + 44 : width >= 1150 ? 420 : 325),
         top =
           mobile && height < 650 && current.current.interaction !== "none"
-            ? 120
+            ? 192
             : landscape
-              ? 160
+              ? lessonOpen
+                ? 246
+                : 220
               : mobile
                 ? height < 650
-                  ? 210
-                  : 250
-                : 260,
+                  ? 286
+                  : 328
+                : width < 1150
+                  ? 300
+                  : 260,
         bottom =
           mobile && current.current.interaction !== "none"
             ? Math.max(top + 80, height * (height < 650 ? 0.4 : 0.48) - 28)
             : height - (landscape ? 60 : mobile ? 150 : 95);
+      viewportTop = top;
       availableW = Math.max(180, right - left);
       availableH = Math.max(90, bottom - top);
       renderer.setSize(width, height);
@@ -553,7 +552,17 @@ export default function Scene({
     function adoptSite(site: Site) {
       if (site.every((n, i) => n === activeSite[i])) return;
       activeSite = [...site];
-      world.position.copy(sitePosition(site, state.molecule));
+      const nextOrigin = sitePosition(site, state.molecule);
+      const shift = origin.clone().sub(nextOrigin);
+      camera.position.add(shift);
+      controls.target.add(shift);
+      fitFromPosition.add(shift);
+      fitFromTarget.add(shift);
+      origin.copy(nextOrigin);
+      macro.group.position.copy(origin).negate();
+      volume.setOrigin(origin);
+      camera.updateMatrixWorld();
+      world.position.set(0, 0, 0);
       world.quaternion.copy(siteRotation(site));
       world.updateMatrixWorld(true);
       views.forEach((view) => view.group.getWorldPosition(view.world));
@@ -570,19 +579,61 @@ export default function Scene({
       );
       raycaster.setFromCamera(pointer, camera);
     }
+    function aimDepth(id: string) {
+      const view = views.get(id);
+      if (!view) return;
+      // Cursor zoom must converge on the constituent's depth, not on the old
+      // molecular plane. Otherwise the radius reaches zero in front of a nucleus.
+      const forward = camera.getWorldDirection(v());
+      const depth = view.world.clone().sub(camera.position).dot(forward);
+      if (depth > controls.minDistance) {
+        controls.target.copy(camera.position).addScaledVector(forward, depth);
+      }
+    }
     function wheelTarget(e: WheelEvent) {
       tooltip.hidden = true;
+      const distance = controls.getDistance();
+      controls.zoomSpeed =
+        (distance > 250 && distance < 1e9) || (distance < 1 && distance > 0.001)
+          ? 5
+          : 1.6;
       if (e.deltaY < 0) {
         const id = hit(e.clientX, e.clientY, true, true);
         if (id) {
           zoomAnchor = id;
           remember(id);
+          aimDepth(id);
         }
       }
     }
     canvas.addEventListener("wheel", wheelTarget, {
       capture: true,
       passive: true,
+    });
+    const forwardOverlayWheel = (e: WheelEvent) => {
+      if (
+        e.target === canvas ||
+        !(e.target instanceof Element) ||
+        !e.target.closest(".atom-label, .scale-anchor, .hover-card")
+      )
+        return;
+      e.preventDefault();
+      canvas.dispatchEvent(
+        new WheelEvent("wheel", {
+          clientX: e.clientX,
+          clientY: e.clientY,
+          deltaX: e.deltaX,
+          deltaY: e.deltaY,
+          deltaMode: e.deltaMode,
+          ctrlKey: e.ctrlKey,
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+    };
+    el.addEventListener("wheel", forwardOverlayWheel, {
+      capture: true,
+      passive: false,
     });
     function hit(x: number, y: number, adopt = false, drilling = false) {
       setRay(x, y);
@@ -660,6 +711,7 @@ export default function Scene({
           if (id) {
             zoomAnchor = id;
             remember(id);
+            aimDepth(id);
           }
         }
       } else {
@@ -748,11 +800,7 @@ export default function Scene({
       clock += dt;
       const s = current.current;
       if (!s.site.every((n, i) => n === activeSite[i])) {
-        activeSite = [...s.site];
-        world.position.copy(sitePosition(activeSite, s.molecule));
-        world.quaternion.copy(siteRotation(activeSite));
-        labelTime = 0;
-        controlsDirty = true;
+        adoptSite(s.site);
       }
       let moving = false;
       if (lastInteraction !== s.interaction) {
@@ -789,9 +837,9 @@ export default function Scene({
         if (s.reset !== lastReset) {
           lastReset = s.reset;
           camera.position.set(
-            s.focus ? 0.5 : 500,
-            s.focus ? 2.9 : 2900,
-            s.focus ? 12 : 12000,
+            s.focus ? 0.5 : 500 * macroScale,
+            s.focus ? 2.9 : 2900 * macroScale,
+            s.focus ? 12 : 12000 * macroScale,
           );
           controls.target.set(0, 0, 0);
         }
@@ -856,8 +904,8 @@ export default function Scene({
           readableEnd = atom ? 0.18 : nucleus ? 0.2 : 0.25,
           requested = route.has(n.id) ? expansion(n, s) : 0,
           automatic = smooth(
-            atom ? 0.7 : nucleus ? 0.6 : 0.45,
-            atom ? 1.25 : nucleus ? 1.05 : 0.85,
+            atom ? 0.7 : nucleus ? 0.6 : n.element === "H" ? 1.1 : 0.45,
+            atom ? 1.25 : nucleus ? 1.05 : n.element === "H" ? 1.6 : 0.85,
             sizeRatio,
           ),
           goal = n.children.length
@@ -924,7 +972,10 @@ export default function Scene({
             const t = j / (attr.count - 1);
             point.copy(a).lerp(b, t);
             point.z +=
-              Math.sin(t * Math.PI * 12) * 0.028 * Math.sin(t * Math.PI);
+              Math.sin(t * Math.PI * 12) *
+              view.closedRadius *
+              0.08 *
+              Math.sin(t * Math.PI);
             attr.setXYZ(j, point.x, point.y, point.z);
           }
           attr.needsUpdate = true;
@@ -1062,7 +1113,7 @@ export default function Scene({
       if (field.visible) {
         const focused = views.get(s.focus || "");
         field.position.copy(focused?.world || v());
-        field.scale.setScalar(0.026);
+        field.scale.setScalar((focused?.closedRadius || 0.1) * 3);
         (field.material as T.PointsMaterial).sizeAttenuation = false;
         (field.material as T.PointsMaterial).size = 2;
         (field.material as T.PointsMaterial).opacity =
@@ -1136,21 +1187,23 @@ export default function Scene({
         if (isScale(s.focus || graph.root)) {
           const extent =
             (s.focus || graph.root) === "sample"
-              ? 3300
+              ? 3300 * macroScale
               : s.focus === "portion"
-                ? 370
+                ? 370 * macroScale
                 : s.interaction === "motion"
                   ? 64
                   : 52;
           size.setScalar(extent);
           target.copy(
-            (s.focus || graph.root) === "sample" ? v() : world.position,
+            (s.focus || graph.root) === "sample"
+              ? origin.clone().negate()
+              : world.position,
           );
         } else if (focused) {
           center.copy(focused.world);
           const worldScale = focused.group.getWorldScale(point).x,
             r = Math.max(
-              0.02,
+              1e-10,
               (focused.node.children.length
                 ? focused.openRadius
                 : focused.closedRadius) * worldScale,
@@ -1183,10 +1236,10 @@ export default function Scene({
           eased = 1 - Math.pow(1 - progress, 3);
         controls.target.lerpVectors(fitFromTarget, target, eased);
         const fromDistance = fitFromPosition.distanceTo(fitFromTarget);
-        if (distance > 80 || fromDistance > 80) {
+        if (distance > 0) {
           const flightDistance = Math.exp(
             T.MathUtils.lerp(
-              Math.log(Math.max(0.00001, fromDistance)),
+              Math.log(Math.max(1e-10, fromDistance)),
               Math.log(distance),
               eased,
             ),
@@ -1210,14 +1263,14 @@ export default function Scene({
         Math.tan(T.MathUtils.degToRad(camera.fov / 2)) *
         Math.min((availableW / width) * camera.aspect, availableH / height);
       macroLevel =
-        halfView > 560
+        halfView > 560 * macroScale
           ? "sample"
           : halfView > 65
             ? "portion"
             : halfView > 9
               ? "neighborhood"
               : "molecule";
-      macroAlpha = smooth(330, 950, halfView);
+      macroAlpha = smooth(330 * macroScale, 950 * macroScale, halfView);
       neighborAlpha = smooth(4, 11, halfView) * (1 - smooth(60, 190, halfView));
       macro.fade(macroAlpha);
       // Lessons retain their animated diagrams at the currently explored location.
@@ -1271,7 +1324,7 @@ export default function Scene({
       scene.fog = new T.Fog(
         scene.background as T.Color,
         fogNear,
-        fogNear + Math.max(fogSpan, 0.15),
+        fogNear + Math.max(fogSpan, 1e-10),
       );
       canvas.dataset.site = activeSite.join(",");
       canvas.dataset.volumeMolecules = String(volume.count);
@@ -1300,10 +1353,21 @@ export default function Scene({
       canvas.dataset.interaction = s.interaction;
       canvas.dataset.phase = String(s.phase);
       // Keep close details visible without sacrificing depth precision at overview scale.
-      const near = T.MathUtils.clamp(controls.getDistance() * 0.01, 1e-7, 20);
-      const projectionChanged = Math.abs(camera.near - near) > near * 0.001;
+      const near = T.MathUtils.clamp(
+        controls.getDistance() * 0.01,
+        1e-12,
+        20 * macroScale,
+      );
+      // Keep the projection well-conditioned across 14+ orders of magnitude.
+      // A fixed astronomical far plane makes cursor-ray unprojection singular
+      // when near becomes subatomic (z=1 then unprojects to infinity).
+      const far = Math.max(near * 100, controls.getDistance() * 100);
+      const projectionChanged =
+        Math.abs(camera.near - near) > near * 0.001 ||
+        Math.abs(camera.far - far) > far * 0.001;
       if (projectionChanged) {
         camera.near = near;
+        camera.far = far;
         camera.updateProjectionMatrix();
       }
       if (now - labelTime > 50) {
@@ -1320,6 +1384,13 @@ export default function Scene({
           view.label.dataset.anchorY = String(((1 - point.y) * height) / 2);
           view.label.dataset.open = view.open.toFixed(3);
           view.label.dataset.reveal = view.reveal.toFixed(3);
+          view.label.dataset.parentDistance = String(
+            view.group.position.length(),
+          );
+          view.label.dataset.radius = String(view.radius);
+          view.label.dataset.radiusMeters = String(
+            view.radius * metersPerUnit(s.molecule),
+          );
           view.label.dataset.screenSize = view.screenSize.toFixed(1);
           if (view.open > 0.5) opened.push(view.node.id);
           if (view.readable) readable.push(view.node.id);
@@ -1361,7 +1432,7 @@ export default function Scene({
             eligible = false;
           point.copy(view.world);
           const scale = view.group.getWorldScale(v()).x;
-          point.y += view.radius * scale + 0.1 * scale;
+          point.y += view.radius * scale * 1.12;
           point.project(camera);
           const x = ((point.x + 1) * width) / 2,
             y = ((1 - point.y) * height) / 2;
@@ -1371,14 +1442,7 @@ export default function Scene({
             view.reveal > 0.45 &&
             eligible &&
             point.z < 1 &&
-            y >
-              (width < 768
-                ? height < 650
-                  ? 220
-                  : 265
-                : height < 520
-                  ? 170
-                  : 260) &&
+            y > viewportTop &&
             y < height - (width < 768 ? 150 : 90) &&
             x > 12 &&
             x < width - 30;
@@ -1419,11 +1483,17 @@ export default function Scene({
             ? macroLevel
             : detailContext || "molecule";
         canvas.dataset.viewpoint = viewpoint;
-        canvas.dataset.cameraDistance = controls.getDistance().toFixed(6);
+        canvas.dataset.cameraDistance = controls.getDistance().toPrecision(12);
         canvas.dataset.transitioning = String(fitTime > 0);
         canvas.dataset.focus = s.focus || "";
         const snapshot: SceneDetail = {
           molecule: s.molecule,
+          metersPerPixel:
+            ((2 *
+              controls.getDistance() *
+              Math.tan(T.MathUtils.degToRad(camera.fov / 2))) /
+              height) *
+            metersPerUnit(s.molecule),
           open: opened,
           readable,
           count,
@@ -1487,6 +1557,7 @@ export default function Scene({
       observer.disconnect();
       controls.dispose();
       canvas.removeEventListener("wheel", wheelTarget, true);
+      el.removeEventListener("wheel", forwardOverlayWheel, true);
       canvas.removeEventListener("pointerdown", pointerDown);
       canvas.removeEventListener("pointerup", pointerUp);
       canvas.removeEventListener("pointermove", pointerMove);

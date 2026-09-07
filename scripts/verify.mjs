@@ -148,7 +148,13 @@ try {
     }
     if (id === proton) {
       await reveal(quark, 1);
-      await reveal(nucleus + "/proton-1/up-0", 0);
+      // With fixed nuclear dimensions, nearby nucleons can resolve their own
+      // quarks too. Selecting one must not shrink or hide its neighbors.
+      assert.equal(
+        await label(nucleus + "/proton-1").getAttribute("data-radius-meters"),
+        await label(proton).getAttribute("data-radius-meters"),
+      );
+      assert.equal(await nav("in").getAttribute("data-target"), quark);
     }
     await shot(id.split("/").at(-1));
   }

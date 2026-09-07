@@ -103,7 +103,7 @@ try {
   await goto("water", "molecule");
   const wheelLevels = new Set();
   await page.mouse.move(700, 570);
-  for (let i = 0; i < 40; i++) {
+  for (let i = 0; i < 100; i++) {
     await page.mouse.wheel(0, 350);
     await page.waitForTimeout(100);
     wheelLevels.add(await c().getAttribute("data-viewpoint"));
@@ -111,7 +111,7 @@ try {
   }
   for (const level of ["neighborhood", "portion", "sample"])
     assert.ok(wheelLevels.has(level), `wheel outward reveals ${level}`);
-  for (let i = 0; i < 40; i++) {
+  for (let i = 0; i < 100; i++) {
     await page.mouse.wheel(0, -350);
     await page.waitForTimeout(100);
     if ((await c().getAttribute("data-scale")) === "molecule") break;

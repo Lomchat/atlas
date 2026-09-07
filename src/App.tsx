@@ -1,3 +1,4 @@
+import SizeReference from "./SizeReference";
 import { insideMatter, sitePosition } from "./MatterVolume";
 import LanguagePicker from "./LanguagePicker";
 import type { MessageKey } from "./i18n";
@@ -44,7 +45,7 @@ function initial(): ExplorerState {
   const site = p.get("site")?.split(",").map(Number);
   if (
     site?.length === 3 &&
-    site.every((n) => Number.isInteger(n) && Math.abs(n) <= 160)
+    site.every((n) => Number.isSafeInteger(n) && Math.abs(n) <= 1e10)
   )
     s.site = site as [number, number, number];
   if (!insideMatter(sitePosition(s.site, s.molecule), s.molecule))
@@ -460,6 +461,12 @@ export default function App() {
           onClick={() => setModal("about")}
         />
       </nav>
+      <SizeReference
+        detail={detail}
+        elementary={["electron", "up", "down"].includes(node.kind)}
+        markers={["atom", "proton", "neutron"].includes(node.kind)}
+        lesson={state.interaction !== "none"}
+      />
       <div className="subject-selector">
         <button
           className="molecule-trigger"
@@ -512,7 +519,7 @@ export default function App() {
           <Minus size={18} />
           <span>
             <small>{t("ZOOM OUT")}</small>
-            <strong>{parent?.entry.name || "Overview"}</strong>
+            <strong>{parent?.entry.name || t("Overview")}</strong>
           </span>
         </button>
         <i />
@@ -811,7 +818,8 @@ export default function App() {
           <b>·</b> {t("Click: zoom in")}{" "}
         </span>
         <button onClick={() => setModal("about")}>
-          {t("Illustrative model · Adjusted scales")} <ArrowUpRight size={11} />
+          {t("Physical size ruler · Illustrative model")}{" "}
+          <ArrowUpRight size={11} />
         </button>
       </footer>
       {message && (
@@ -909,7 +917,7 @@ export default function App() {
             <h2 id="dialog-title">{t("Everything is connected.")}</h2>
             <p>
               {t(
-                "The zoom starts with an object, passes through a reference volume and its molecular neighborhood, then follows a single molecule. Scale changes are adjusted; the visible molecules are an illustrative sample. Atoms contain nuclei and electrons; nuclei contain nucleons; protons and neutrons reveal their three valence quarks.",
+                "Explore an object, any volume inside it, and its molecules. The ruler tracks physical dimensions throughout the zoom. Atoms contain nuclei and electrons; nuclei contain nucleons; protons and neutrons reveal their three valence quarks. Molecular positions are an illustrative sample.",
               )}{" "}
             </p>
             <h3>{t("Explore freely")}</h3>
@@ -922,7 +930,7 @@ export default function App() {
             <p>{node.entry.note}</p>
             <p>
               {t(
-                "The spheres and their shells are not physical walls. Sizes are adjusted, electron clouds are illustrative and marked electrons are selection aids. Quarks remain confined: showing them separately is a diagram of composition. Curves between quarks represent gluons.",
+                "Spheres represent conventional atomic and nuclear radii, not hard walls. They do not grow when opened. Electron clouds are illustrative; electrons and quarks are selection markers without a measured diameter. Quarks remain confined, and the curves illustrate gluon interactions.",
               )}{" "}
             </p>
             <p>

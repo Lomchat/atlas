@@ -1,4 +1,5 @@
 import * as T from "three";
+import { macroFactor } from "./physicalScale";
 import { molecules } from "./data";
 import type { MoleculeId } from "./data";
 import type { Kind } from "./continuum";
@@ -61,7 +62,8 @@ export const gasBubbles = [
     radius: (0.022 + (i % 5) * 0.012) * 900,
   })),
 ];
-export function insideMatter(p: T.Vector3, id: MoleculeId) {
+export function insideMatter(point: T.Vector3, id: MoleculeId) {
+  const p = point.clone().divideScalar(macroFactor(id));
   if (id === "co2")
     return gasBubbles.some(
       (b) => p.distanceToSquared(b.center) < (b.radius - 3) ** 2,
@@ -80,6 +82,8 @@ export function insideMatter(p: T.Vector3, id: MoleculeId) {
  */
 export function matterVolume(id: MoleculeId) {
   const group = new T.Group();
+  const origin = vec();
+  const macroScale = macroFactor(id);
   const spacing = id === "water" ? 8 : 14;
   const sphere = new T.SphereGeometry(1, 16, 12);
   const cylinder = new T.CylinderGeometry(1, 1, 1, 8);
@@ -178,7 +182,8 @@ export function matterVolume(id: MoleculeId) {
     b.hits[b.count] = { site, node };
     b.count++;
   };
-  const nearest = (point: T.Vector3): Site | null => {
+  const nearest = (localPoint: T.Vector3): Site | null => {
+    const point = localPoint.clone().add(origin);
     const home = point.clone().divideScalar(spacing).round();
     let best: Site | null = null,
       distance = Infinity;
@@ -210,7 +215,7 @@ export function matterVolume(id: MoleculeId) {
         Math.ceil(Math.log2(Math.max(1, halfView / Math.max(65, spacing * 4)))),
     );
     const step = spacing * stride;
-    const center = target.clone().divideScalar(step).round();
+    const center = target.clone().add(origin).divideScalar(step).round();
     const key = `${center.toArray()}:${stride}`;
     if (key !== lastKey || force) {
       lastKey = key;
@@ -227,7 +232,11 @@ export function matterVolume(id: MoleculeId) {
             ];
             const position = sitePosition(site, id);
             if (insideMatter(position, id))
-              cells.push({ site, position, rotation: siteRotation(site) });
+              cells.push({
+                site,
+                position: position.sub(origin),
+                rotation: siteRotation(site),
+              });
           }
     }
     batches.forEach((b) => {
@@ -237,7 +246,8 @@ export function matterVolume(id: MoleculeId) {
     shown = 0;
     const molecularAlpha = 1 - smooth(26, 65, halfView);
     const densityAlpha =
-      smooth(20, 60, halfView) * (1 - smooth(700, 1800, halfView));
+      smooth(20, 60, halfView) *
+      (1 - smooth(700 * macroScale, 1800 * macroScale, halfView));
     pickDistance =
       camera.position.distanceTo(target) * 0.85 +
       Math.max(halfView * 2.8, 0.15) * 0.85;
@@ -273,13 +283,29 @@ export function matterVolume(id: MoleculeId) {
         p.copy(n.position).applyQuaternion(cell.rotation).add(cell.position);
         const ratio =
           (projection * n.radius) /
-          Math.max(0.00001, camera.position.distanceTo(p));
+          Math.max(1e-12, camera.position.distanceTo(p));
         const atom = n.kind === "atom",
           nucleus = n.kind === "nucleus";
         const open = n.children
           ? smooth(
-              atom ? 0.7 : nucleus ? 0.6 : 0.45,
-              atom ? 1.25 : nucleus ? 1.05 : 0.85,
+              atom
+                ? 0.7
+                : nucleus
+                  ? 0.6
+                  : n.parent &&
+                      templates.find((p) => p.id === n.parent)?.radius ===
+                        n.radius
+                    ? 1.1
+                    : 0.45,
+              atom
+                ? 1.25
+                : nucleus
+                  ? 1.05
+                  : n.parent &&
+                      templates.find((p) => p.id === n.parent)?.radius ===
+                        n.radius
+                    ? 1.6
+                    : 0.85,
               ratio,
             )
           : 0;
@@ -352,6 +378,10 @@ export function matterVolume(id: MoleculeId) {
   return {
     group,
     nearest,
+    setOrigin(value: T.Vector3) {
+      origin.copy(value);
+      lastKey = "";
+    },
     update,
     setTemplates(value: Constituent[]) {
       templates = value;
@@ -378,7 +408,16 @@ export function matterVolume(id: MoleculeId) {
       }
       return null;
     },
-    volumeHit(ray: T.Ray, target: T.Vector3) {
+    volumeHit(localRay: T.Ray, localTarget: T.Vector3) {
+      // Work in vessel units for bounded ray marching, then return render coordinates.
+      const ray = new T.Ray(
+        localRay.origin.clone().add(origin).divideScalar(macroScale),
+        localRay.direction,
+      );
+      const target = localTarget.clone().add(origin).divideScalar(macroScale);
+      const local = (p: T.Vector3) => p.multiplyScalar(macroScale).sub(origin);
+      const inside = (p: T.Vector3) =>
+        insideMatter(p.clone().multiplyScalar(macroScale), id);
       // Project onto the current exploration plane first, then search along the
       // ray through the vessel. This also works after orbiting or from inside.
       const plane = new T.Plane().setFromNormalAndCoplanarPoint(
@@ -386,7 +425,7 @@ export function matterVolume(id: MoleculeId) {
         target,
       );
       const hit = ray.intersectPlane(plane, vec());
-      if (hit && insideMatter(hit, id)) return hit;
+      if (hit && inside(hit)) return local(hit);
       if (id === "co2") {
         let best: T.Vector3 | null = null;
         for (const bubble of gasBubbles) {
@@ -402,7 +441,7 @@ export function matterVolume(id: MoleculeId) {
           )
             best = point.addScaledVector(ray.direction, 4);
         }
-        return best;
+        return best && local(best);
       }
       const sphereHit = ray.intersectSphere(new T.Sphere(vec(), 1600), vec());
       const start = sphereHit
@@ -410,8 +449,8 @@ export function matterVolume(id: MoleculeId) {
         : 0;
       for (let d = start; d < start + 3200; d += 12) {
         const point = ray.at(d, vec());
-        if (insideMatter(point, id))
-          return point.addScaledVector(ray.direction, 8);
+        if (inside(point))
+          return local(point.addScaledVector(ray.direction, 8));
       }
       return null;
     },

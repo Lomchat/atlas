@@ -149,7 +149,7 @@ export function scaleEntry(molecule: MoleculeId, id: ScaleId): Entry {
     },
     get note() {
       return t(
-        "Dimensions are adjusted to connect the scales. Distant specks represent small volumes of matter; individual molecules become visible closer up. This is an illustrative spatial model, not a count or a physical simulation.",
+        "The ruler follows physical dimensions from a roughly 11 cm vessel to molecular bond lengths and nuclear radii. Distant specks represent occupied volumes, not individual molecules. Positions and density are illustrative, not a physical simulation.",
       );
     },
     get facts(): [string, string][] {

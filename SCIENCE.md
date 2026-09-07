@@ -1,0 +1,14 @@
+# Physical size conventions
+
+The scene uses one SI calibration per material. Existing molecule coordinates are divided by their first bond's coordinate length and calibrated to experimental bond lengths: H₂O O–H 95.8 pm, CO₂ C–O 116.2 pm, CH₄ C–H 108.7 pm. References: [NIST water](https://cccbdb.nist.gov/expgeom2x.asp?casno=7732185&charge=0), [NIST CO₂](https://cccbdb.nist.gov/expgeom2x.asp?casno=124389&charge=0), [NIST methane](https://cccbdb.nist.gov/expgeom2x.asp?casno=74828&charge=0). These are approximate reference geometries, not a dynamic calculation in a condensed phase.
+
+- Atomic envelopes: conventional covalent radii H 31 pm, C 76 pm, O 66 pm, from [Cordero et al., *Covalent radii revisited* (2008)](https://doi.org/10.1039/B801115J). Electron clouds have no sharp boundary; the envelopes are size conventions.
+- Nuclei with A > 1: approximate radius R = 1.2 A^(1/3) fm, following [OpenStax, Properties of Nuclei](https://openstax.org/books/university-physics-volume-3/pages/10-1-properties-of-nuclei). This bulk estimate is not a precise measurement of each light isotope.
+- The proton (also the hydrogen-1 nucleus): rms charge radius 0.84075 fm, [PDG/CODATA](https://pdgprod.lbl.gov/pdgprod/pdgLive/DataBlock.action?node=S016CR). Neutron spheres use the same illustrative spatial envelope, not a claimed neutron charge radius. Nucleon positions are a compact explanatory arrangement bounded by the nuclear envelope; they are not static measured positions.
+- Electrons and quarks: selection markers, **no assigned physical diameter**. Marker size is a UI choice and is disclosed in the reference. Gluon curves and interaction highlights are diagrams.
+- Macro model: 4 cm per model unit, giving a vessel roughly 11 cm high. A 10 cm ruler and a 6 mm grain of rice are chosen nominal objects, not universal dimensions.
+- Human hair reference: nominal width 90 µm within the 80–100 µm range; DNA reference width 2.5 nm, from [National Nanotechnology Coordination Office](https://www.nano.gov/about-nanotechnology/just-how-small-is-nano/).
+
+The ruler is calibrated at the camera target plane. Perspective changes the apparent size of nearer and farther objects. Objects are clipped if larger than the comparison window; they are never shrunk to fit while claiming the same scale. Reference selection follows the view's scale, and the numeric ruler stays continuous across reference changes.
+
+Molecular density, fixed cell spacing and quantum clouds remain illustrative. Far dots denote occupied volumes, not individual molecules or a count. Navigation accelerates across the empty scale ranges without altering dimensions. A floating origin retains subatomic precision when exploring a molecular cell far from the vessel's center.

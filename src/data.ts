@@ -434,7 +434,7 @@ export function atomEntry(element: ElementId, id = "atom"): Entry {
     },
     get note() {
       return t(
-        "The molecular model shows bonded atoms. Entering an atom switches to an isolated-atom model with adjusted scales.",
+        "Bond lengths set the scale of the molecule. Atom envelopes use approximate covalent radii and keep their size when opened; quantum clouds are illustrative.",
       );
     },
     get facts(): [string, string][] {
@@ -473,7 +473,7 @@ export function nucleusEntry(element: ElementId): Entry {
     },
     get note() {
       return t(
-        "The nucleus is greatly enlarged in the atomic view to keep it visible. Nucleons are represented by conventional spheres.",
+        "The nucleus keeps its physical radius when opened. Zoom crosses the large gap from the atom to the nucleus. Nucleons use conventional charge-radius spheres; their arrangement is illustrative.",
       );
     },
     get facts(): [string, string][] {
