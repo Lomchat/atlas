@@ -16,6 +16,7 @@ import html
 import io
 import json
 import re
+import struct
 import urllib.request
 import urllib.parse
 import zipfile
@@ -76,11 +77,77 @@ def rounded(value):
     return np.asarray(value).round(10).tolist()
 
 
+def glb_arrays(binary):
+    """Read the actual indexed primitive, so ranges follow GLTFLoader faceIndex.
+
+    A later geometry optimizer may reorder triangles; fail instead of silently
+    attaching anatomical identities to the wrong faces.
+    """
+    magic, version, length = struct.unpack_from("<4sII", binary)
+    assert magic == b"glTF" and version == 2 and length == len(binary)
+    cursor, document, buffer = 12, None, None
+    while cursor < len(binary):
+        size, kind = struct.unpack_from("<I4s", binary, cursor)
+        chunk = binary[cursor + 8:cursor + 8 + size]
+        if kind == b"JSON":
+            document = json.loads(chunk)
+        elif kind == b"BIN\0":
+            buffer = chunk
+        cursor += 8 + size
+    assert document is not None and buffer is not None
+    assert len(document["meshes"]) == 1 and len(document["meshes"][0]["primitives"]) == 1
+    primitive = document["meshes"][0]["primitives"][0]
+    assert primitive.get("mode", 4) == 4
+
+    def accessor(index):
+        item = document["accessors"][index]
+        view = document["bufferViews"][item["bufferView"]]
+        dtype = np.dtype({5126: "<f4", 5125: "<u4", 5123: "<u2"}[item["componentType"]])
+        components = {"SCALAR": 1, "VEC3": 3}[item["type"]]
+        stride = view.get("byteStride", dtype.itemsize * components)
+        offset = view.get("byteOffset", 0) + item.get("byteOffset", 0)
+        return np.ndarray((item["count"], components), dtype=dtype, buffer=buffer,
+                          offset=offset, strides=(stride, dtype.itemsize))
+
+    return accessor(primitive["attributes"]["POSITION"]), accessor(primitive["indices"]).reshape(-1, 3)
+
+
+def approximate_region(name, source_bounds, category):
+    """Navigation hint only: source name + broad source-coordinate regions.
+
+    This is not an FMA region assignment or an anatomical boundary segmentation.
+    Long vessels can cross several regions; their midpoint determines this hint.
+    """
+    if category == "surface":
+        return "unknown"  # the full-body skin is not confined to one region
+    name = (name or "").lower()
+    x, _, z = np.mean(source_bounds, axis=0)
+    explicit_left, explicit_right = "left" in name, "right" in name
+    if explicit_left != explicit_right:
+        side = "left" if explicit_left else "right"
+    else:
+        side = "left" if x > 0 else "right"
+    if any(word in name for word in ["femur", "femoral", "tibia", "tibial", "fibula", "fibular", "saphenous", "popliteal", "patella", "calcane", "tarsal", "metatars", "plantar", "dorsalis pedis", "soleus", "gastrocnem", "biceps femoris", "quadriceps", "vastus", "sartorius", "gracilis", "semitendinos", "semimembranos"]):
+        return side + "-leg"
+    if any(word in name for word in ["brachial", "brachii", "cephalic vein", "basilic", "humerus", "humeral", "ulna", "radius", "radial", "carpal", "metacarp", "palmar", "deltoid", "supraspinatus", "infraspinatus", "teres minor", "teres major"]):
+        return side + "-arm"
+    if any(word in name for word in ["cerebr", "cranial", "skull", "occipital", "maxilla", "mandib", "facial", "nasal", "orbital", "ophthalm", "temporal bone", "frontal bone", "parietal bone"]):
+        return "head"
+    if z > 1380:
+        return "head"
+    if z < 730 and abs(x) > 20:
+        return side + "-leg"
+    if abs(x) > 150 and z > 730:
+        return side + "-arm"
+    return "trunk"
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", type=Path, default=Path("artifacts/bodyparts3d/source"))
     parser.add_argument("--output", type=Path, default=Path("public/models/bodyparts3d"))
     parser.add_argument("--download", action="store_true")
+    parser.add_argument("--metadata-only", action="store_true", help="Recompute face ranges, require byte-identical existing GLBs, and write only picking metadata")
     args = parser.parse_args()
     args.source.mkdir(parents=True, exist_ok=True)
     args.output.mkdir(parents=True, exist_ok=True)
@@ -192,6 +259,26 @@ def main():
         selections[key] -= standalone
 
     assets = {}
+    picking = {
+        "formatVersion": 1,
+        "partFields": ["assetIndex", "name", "fmaId", "categoryIndex", "regionIndex", "center", "extent"],
+        "rangeFields": ["firstTriangle", "triangleCount", "partId", "firstVertex", "vertexCount"],
+        "assetIds": [spec[0] for spec in SPECS],
+        "categories": ["unknown", "surface", "organ", "bone", "muscle", "artery", "vein"],
+        "regions": ["unknown", "head", "trunk", "left-arm", "right-arm", "left-leg", "right-leg"],
+        "assets": {}, "parts": {},
+        "notes": {
+            "en": "Names and FMA IDs are copied from source OBJ headers; null means the source did not identify that part. Categories use the official IS-A classes. Regions are approximate navigation hints inferred from names and broad source-coordinate zones, not anatomical boundaries. A long vessel can cross multiple regions. Ranges refer to the merged GLB's original triangle order; reordering indices invalidates them.",
+            "fr": "Les noms et identifiants FMA proviennent des en-têtes OBJ sources ; null indique une partie non identifiée dans la source. Les catégories utilisent les classes IS-A officielles. Les régions sont des repères approximatifs de navigation déduits des noms et de grandes zones de coordonnées, pas des limites anatomiques. Un long vaisseau peut traverser plusieurs régions. Les plages suivent l’ordre original des triangles du GLB fusionné ; réordonner les indices les invalide.",
+        },
+    }
+
+    def category_for(part, system):
+        for category, concept in [("artery", "FMA50720"), ("vein", "FMA50723"), ("bone", "FMA5018"), ("muscle", "FMA5022"), ("muscle", "FMA85453")]:
+            if part in tables["isa"][concept]["parts"]:
+                return category
+        return "surface" if system == "surface" else "organ" if system == "organs" else "unknown"
+
     for key, system, index, concepts, budget, color in SPECS:
         parts = sorted(selections[key])
         source_meshes = [load_part(part) for part in parts]
@@ -221,7 +308,37 @@ def main():
         scene.add_geometry(adapted, node_name=key, geom_name=key)
         binary = scene.export(file_type="glb", include_normals=True)
         filename = key + ".glb"
-        (args.output / filename).write_bytes(binary)
+        if args.metadata_only:
+            if not (args.output / filename).exists() or (args.output / filename).read_bytes() != binary:
+                raise ValueError(f"{filename} differs from the reproducible geometry; refusing to attach stale anatomical ranges")
+        else:
+            (args.output / filename).write_bytes(binary)
+        positions, faces = glb_arrays(binary)
+        assert np.array_equal(positions, adapted.vertices.astype(np.float32)), f"{key}: exported vertex order changed"
+        assert np.array_equal(faces, adapted.faces), f"{key}: exported triangle order changed"
+        ranges = []
+        triangle_offset, vertex_offset = 0, 0
+        for part, mesh in zip(parts, reduced):
+            face_count, vertex_count = len(mesh.faces), len(mesh.vertices)
+            part_faces = faces[triangle_offset:triangle_offset + face_count]
+            assert np.array_equal(part_faces, mesh.faces + vertex_offset), f"{part}: triangle identity mismatch"
+            assert part_faces.min() >= vertex_offset and part_faces.max() < vertex_offset + vertex_count
+            part_positions = positions[vertex_offset:vertex_offset + vertex_count]
+            part_bounds = np.array([part_positions.min(axis=0), part_positions.max(axis=0)], dtype=float)
+            identity = part_metadata[part]
+            category = category_for(part, system)
+            region = approximate_region(identity["name"], identity["sourceBoundsMillimeters"], category)
+            assert part not in picking["parts"], f"{part}: duplicate ownership"
+            picking["parts"][part] = [
+                picking["assetIds"].index(key), identity["name"] or None, identity["fmaId"] or None,
+                picking["categories"].index(category), picking["regions"].index(region),
+                np.mean(part_bounds, axis=0).round(8).tolist(), round(float(np.ptp(part_bounds, axis=0).max()), 8),
+            ]
+            ranges.append([triangle_offset, face_count, part, vertex_offset, vertex_count])
+            triangle_offset += face_count
+            vertex_offset += vertex_count
+        assert triangle_offset == len(faces) and vertex_offset == len(positions)
+        picking["assets"][key] = {"sha256": sha(binary), "triangleCount": len(faces), "vertexCount": len(positions), "ranges": ranges}
         # Bounds come from the exported float32 positions, rather than assuming
         # that simplification preserved extrema exactly.
         parsed = trimesh.load(io.BytesIO(binary), file_type="glb", force="scene")
@@ -310,6 +427,11 @@ def main():
         "anchors": {"skinForearm": anchor, "veinSegment": vein_anchor},
         "assets": assets,
     }
+    picking_bytes = (json.dumps(picking, ensure_ascii=False, separators=(",", ":")) + "\n").encode()
+    (args.output / "parts.json").write_bytes(picking_bytes)
+    if args.metadata_only:
+        manifest = json.loads((args.output / "manifest.json").read_text())
+    manifest["picking"] = {"file": "parts.json", "formatVersion": 1, "sha256": sha(picking_bytes), "bytes": len(picking_bytes), "parts": len(picking["parts"])}
     (args.output / "manifest.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n")
     provenance = {
         "sourceFiles": {filename: {"url": url, "sha256": sha((args.source / filename).read_bytes())} for filename, url in URLS.items()},
@@ -318,8 +440,10 @@ def main():
                        "trimeshVersion": trimesh.__version__, "numpyVersion": np.__version__},
         "supplement43": {"url": VIEWER + "download.cgi", "method": "POST", "request": json.loads((args.source / "official-supplement-lungs-request.json").read_text()), "sha256": sha((args.source / LUNG_ZIP).read_bytes()), "license": LICENSE_43},
     }
-    (args.output / "provenance.json").write_text(json.dumps(provenance, indent=2, ensure_ascii=False) + "\n")
+    if not args.metadata_only:
+        (args.output / "provenance.json").write_text(json.dumps(provenance, indent=2, ensure_ascii=False) + "\n")
     print(f"Total: {sum(a['bytes'] for a in assets.values()):,} GLB bytes; {sum(a['triangles'] for a in assets.values()):,} triangles", flush=True)
+    print(f"Picking: {len(picking['parts']):,} identified source parts, {len(picking_bytes):,} JSON bytes; GLB triangle and vertex order checked", flush=True)
     print("Forearm anchor:", anchor, flush=True)
 
 

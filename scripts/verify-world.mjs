@@ -156,8 +156,9 @@ try {
           selected,
           ...nodes[selected].children.filter(
             (id) =>
-              selected !== "human" ||
-              !["human/skin", "human/muscle", "human/femur"].includes(id),
+              !nodes[id].spatialOnly &&
+              (selected !== "human" ||
+                !["human/skin", "human/muscle", "human/femur"].includes(id)),
           ),
         ].sort(),
         "Only the selected container and direct contents of its active layer remain",
@@ -189,8 +190,22 @@ try {
       `${root} has a complete route to elementary structure`,
     );
     records.push({ root, terminal: selected });
-    await action("world-home").click();
+    if (root === "cloud") {
+      await canvas.focus();
+      await page.keyboard.press("Home");
+    } else await action("world-home").click();
     await settle("world");
+    await page.waitForFunction(
+      () =>
+        [...document.querySelectorAll(".world-object-label")].filter(
+          (label) => !label.hidden,
+        ).length === 6,
+    );
+    assert.equal(
+      new URL(page.url()).searchParams.has("sites"),
+      false,
+      "Home restores a shareable overview; outward zoom preserves the selected place",
+    );
   }
   const molecule = "water/liquid/molecule";
   await navigate(molecule);
@@ -373,12 +388,54 @@ try {
   await page.mouse.wheel(0, 240);
   await settle(`${molecule}/oxygen`);
   await page.emulateMedia({ reducedMotion: "reduce" });
-  // Actual canvas wheel input enters and leaves the chosen branch.
+  // Wheel navigation follows the actual source vessel under the cursor.
+  // Empty space must not silently choose the old default arm-vein route.
   await goto("human");
-  await page.mouse.move(940, 620);
+  await page.waitForFunction(() =>
+    JSON.parse(
+      document.querySelector("canvas[data-world-scene]").dataset
+        .spatialTargets || "[]",
+    ).some(
+      (target) =>
+        target.parentId === "human" &&
+        target.childId === "human/vein-sample" &&
+        target.source?.region?.endsWith("leg"),
+    ),
+  );
+  const vesselTarget = await canvas.evaluate((c) =>
+    JSON.parse(c.dataset.spatialTargets).find(
+      (target) =>
+        target.parentId === "human" &&
+        target.childId === "human/vein-sample" &&
+        target.source?.region?.endsWith("leg"),
+    ),
+  );
+  await page.mouse.move(vesselTarget.x, vesselTarget.y);
   await page.mouse.wheel(0, -900);
-  await settle("human/vein");
-  await page.mouse.move(940, 620);
+  await settle(vesselTarget.childId);
+  const vesselOrigin = await canvas.evaluate(
+    (c, id) =>
+      JSON.parse(c.dataset.spatialContext).entries.find(
+        (entry) => entry.parentId === "human" && entry.childId === id,
+      ),
+    vesselTarget.childId,
+  );
+  assert.deepEqual(
+    vesselOrigin.source,
+    vesselTarget.source,
+    "Wheel entry preserves the actual source vessel instead of a default organ",
+  );
+  assert.ok(
+    vesselOrigin.point.every(
+      (value, index) => Math.abs(value - vesselTarget.point[index]) < 1e-8,
+    ),
+    "Wheel entry retains the point aimed at in the leg",
+  );
+  const viewport = JSON.parse(await canvas.getAttribute("data-viewport"));
+  await page.mouse.move(
+    viewport.left + viewport.width / 2,
+    viewport.top + viewport.height / 2,
+  );
   await page.mouse.wheel(0, 900);
   await settle("human");
   await page.setViewportSize({ width: 390, height: 844 });

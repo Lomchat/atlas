@@ -1,6 +1,7 @@
 import { Vector3 } from "three";
 import { WORLD_NODES } from "./data";
 import type { WorldNode } from "./data";
+import type { SpatialContext } from "./sample-address";
 
 /** SI lengths describe the largest extent of the depicted specimen, not the
  * diameter of every constituent. Elementary-particle symbols have no diameter. */
@@ -23,6 +24,16 @@ const modelAnchors = new Map<string, Vector3>();
 // A picked specimen is a navigation choice, not a factory-generated landmark.
 // Rebuilding a parent must not replace that choice with its first instance.
 const selectedAnchors = new Map<string, Vector3>();
+export function restoreSelectedAnchors(context: SpatialContext) {
+  selectedAnchors.clear();
+  for (const entry of context.entries)
+    if (entry.kind !== "surface")
+      setSelectedAnchor(
+        entry.parentId,
+        entry.childId,
+        new Vector3(...entry.point),
+      );
+}
 export function setSelectedAnchor(
   parent: string,
   child: string,

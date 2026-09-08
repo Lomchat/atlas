@@ -5,16 +5,29 @@ import { t, useLocale } from "../i18n";
 import { WORLD_NODES } from "./data";
 import type { WorldNode } from "./data";
 import type { WorldModel } from "./models";
-import { createExplorationModel, anatomyVisible } from "./anatomyModels";
+import {
+  createExplorationModel,
+  anatomyVisible,
+  anatomyHit,
+  anatomyFaceSamples,
+} from "./anatomyModels";
 import type { AnatomyMode, AnatomyStatus } from "./anatomyModels";
 import {
   childPosition,
   frameMeters,
   relativeFrame,
   setModelAnchor,
-  setSelectedAnchor,
   selectedAnchorEntries,
+  restoreSelectedAnchors,
+  pathTo,
 } from "./layout";
+import { upsertSpatialEntry } from "./sample-address";
+import type {
+  SpatialContext,
+  SpatialEntry,
+  SpatialSource,
+} from "./sample-address";
+import { sampleTarget } from "./spatial-targets";
 
 export interface WorldSceneInfo {
   metersPerPixel: number;
@@ -24,13 +37,15 @@ export interface WorldSceneInfo {
 }
 interface Props {
   selectedId: string;
+  spatialContext: SpatialContext;
   preferredChildId?: string;
   rotating: boolean;
   focusMode: boolean;
   resetToken: number;
   anatomyMode: AnatomyMode;
   anatomyRetryToken: number;
-  onNavigate: (id: string) => void;
+  onNavigate: (id: string, context?: SpatialContext) => void;
+  onHome: () => void;
   onInfo: (info: WorldSceneInfo) => void;
 }
 type Item = {
@@ -49,6 +64,7 @@ type Flight = {
   start: T.Vector3;
   target: T.Vector3;
   end: T.Vector3;
+  endTarget: T.Vector3;
 };
 const clamp = T.MathUtils.clamp;
 const ease = (v: number) => v * v * (3 - 2 * v);
@@ -144,7 +160,11 @@ export function WorldScene(props: Props) {
     let lastWheel = 0,
       wheelDirection = 0,
       wheelChild: string | undefined;
-    let pickedOrigin: { id: string; point: T.Vector3 } | null = null;
+    let pickedOrigin: SpatialEntry | null = null;
+    let appliedContext = props.spatialContext;
+    restoreSelectedAnchors(appliedContext);
+    let viewTarget = new T.Vector3();
+    let viewScale = 1;
     let disposed = false,
       dragging = false,
       pointerStart = [0, 0];
@@ -152,6 +172,7 @@ export function WorldScene(props: Props) {
     const pressedPointers = new Set<number>();
     const pinchPointers = new Set<number>();
     let lastPickDiagnostics = -Infinity;
+    let lastSpatialSignature = "";
     const raycaster = new T.Raycaster(),
       pointer = new T.Vector2();
     const vector = new T.Vector3();
@@ -188,6 +209,22 @@ export function WorldScene(props: Props) {
       });
       return map;
     };
+    function spatialSeed(id: string) {
+      const ancestors = new Set(pathTo(id));
+      const address = latest.current.spatialContext.entries
+        .filter((entry) => ancestors.has(entry.childId))
+        // Address order records navigation recency; it must not rearrange
+        // the contents of an otherwise identical material sample.
+        .sort((a, b) =>
+          a.childId < b.childId ? -1 : a.childId > b.childId ? 1 : 0,
+        )
+        .map((entry) => entry.point.join(",") + (entry.source?.partId || ""))
+        .join("|");
+      let seed = id.length;
+      for (const character of address)
+        seed = Math.imul(seed ^ character.charCodeAt(0), 16777619);
+      return seed >>> 0;
+    }
     function makeFrame(id: string): Frame {
       const node = WORLD_NODES[id],
         group = new T.Group();
@@ -198,7 +235,7 @@ export function WorldScene(props: Props) {
           ? { group: new T.Group(), update() {}, dispose() {} }
           : createExplorationModel(
               child,
-              child.id.length,
+              spatialSeed(child.id),
               id === "world" ? "surface" : latest.current.anatomyMode,
             );
         if (isChild) {
@@ -214,7 +251,7 @@ export function WorldScene(props: Props) {
           model.group.position.y = -Number(model.group.userData.groundY || 0);
         group.add(model.group);
         const item: Item = { node: child, model, base: materials(model.group) };
-        if (isChild) {
+        if (isChild && !child.spatialOnly) {
           const label = document.createElement("button");
           label.className = "world-object-label";
           label.dataset.worldNode = child.id;
@@ -319,8 +356,13 @@ export function WorldScene(props: Props) {
         embodied.add(child.id);
       });
       node.children.forEach((id) => {
-        add(WORLD_NODES[id], true, node.id === "human" && embodied.has(id));
-        if (embodied.has(id))
+        add(
+          WORLD_NODES[id],
+          true,
+          WORLD_NODES[id].spatialOnly ||
+            (node.id === "human" && embodied.has(id)),
+        );
+        if (embodied.has(id) || WORLD_NODES[id].spatialOnly)
           items[items.length - 1].model.group.visible = false;
       });
       if (node.model === "waterMolecule") {
@@ -442,6 +484,7 @@ export function WorldScene(props: Props) {
             table.add(leg);
           }
         table.scale.setScalar(1 / 24);
+        table.userData.worldSampleChildId = "world/table-wood";
         group.add(table);
         const old = items[0].model.dispose;
         items[0].model.dispose = () => {
@@ -523,12 +566,69 @@ export function WorldScene(props: Props) {
       });
     }
     function reset() {
+      lastWheel = 0;
+      wheelChild = undefined;
+      pickedOrigin = null;
+      canvas.dataset.pickTargets = "[]";
+      canvas.dataset.spatialTargets = "[]";
+      lastPickDiagnostics = -Infinity;
+      lastSpatialSignature = "";
       flight = null;
       ghosts.forEach((f) => f.dispose());
       ghosts = [];
-      controls.target.set(0, current === "world" ? 0.06 : 0, 0);
-      camera.position.copy(fitPosition()).add(controls.target);
+      controls.target.copy(viewTarget);
+      camera.position
+        .copy(fitPosition())
+        .multiplyScalar(viewScale)
+        .add(controls.target);
       controls.update();
+    }
+    function configureView(id: string, from?: string) {
+      viewTarget.set(0, id === "world" ? 0.06 : 0, 0);
+      viewScale = 1;
+      const context = latest.current.spatialContext;
+      const localEntries = context.entries.filter(
+        (entry) => entry.parentId === id,
+      );
+      const returning =
+        [...localEntries]
+          .reverse()
+          .find(
+            (entry) =>
+              entry.childId === from || from?.startsWith(entry.childId + "/"),
+          ) || localEntries.at(-1);
+      if (returning) {
+        viewTarget.fromArray(returning.point);
+        viewScale =
+          id === "world"
+            ? Math.max(
+                1,
+                (frameMeters(WORLD_NODES[returning.childId]) /
+                  frameMeters(WORLD_NODES[id])) *
+                  1.3,
+              )
+            : 0.78;
+        return;
+      }
+      const entry = context.entries.find(
+        (entry) => entry.childId === id && entry.kind === "surface",
+      );
+      if (entry) {
+        const node = WORLD_NODES[id],
+          parent = WORLD_NODES[entry.parentId];
+        viewTarget
+          .fromArray(entry.point)
+          .sub(childPosition(parent, node))
+          .multiplyScalar(frameMeters(parent) / frameMeters(node));
+        viewScale = id === "human" ? 0.55 : 0.8;
+      }
+    }
+    function visit(id: string) {
+      const context =
+        pickedOrigin?.childId === id && pickedOrigin.parentId === current
+          ? upsertSpatialEntry(latest.current.spatialContext, pickedOrigin)
+          : latest.current.spatialContext;
+      latest.current.onNavigate(id, context);
     }
     function retryAnatomy() {
       const replacement = makeFrame(current);
@@ -540,10 +640,23 @@ export function WorldScene(props: Props) {
       language();
     }
     function navigate(id: string) {
-      if (id === current || !WORLD_NODES[id]) return;
+      if (!WORLD_NODES[id]) return;
+      const contextChanged = appliedContext !== latest.current.spatialContext;
+      if (id === current && !contextChanged) return;
+      // A history entry can change the sampled place without changing its
+      // scientific node. Invalidate the previous frame until the new scene
+      // has actually rendered, just as for a change of scale.
+      canvas.dataset.transitioning = "true";
+      tick = -Infinity;
+      appliedContext = latest.current.spatialContext;
+      restoreSelectedAnchors(appliedContext);
       anatomyHover.hidden = true;
-      if (pickedOrigin?.id === id && WORLD_NODES[id].parent === current)
-        setSelectedAnchor(current, id, pickedOrigin.point);
+      if (id === current) {
+        retryAnatomy();
+        configureView(id);
+        reset();
+        return;
+      }
       // A direct link can start inside a parent that has never been built.
       // Register that destination's embodied landmarks before computing the
       // reverse transform; the newly built frame itself must not be rebased.
@@ -551,6 +664,7 @@ export function WorldScene(props: Props) {
       const transform = relativeFrame(current, id);
       pickedOrigin = null;
       canvas.dataset.pickTargets = "[]";
+      canvas.dataset.spatialTargets = "[]";
       lastPickDiagnostics = -Infinity;
       for (const frame of [active, ...ghosts]) {
         frame.group.position
@@ -574,11 +688,17 @@ export function WorldScene(props: Props) {
       active.items
         .find((item) => item.node.id === id)
         ?.model.group.removeFromParent();
+      const from = current;
       current = id;
       active = nextFrame;
+      configureView(id, from);
       language();
       resize();
-      const end = fitPosition();
+      const end = camera.position
+        .clone()
+        .sub(controls.target)
+        .normalize()
+        .multiplyScalar(fitDistance() * viewScale);
       flight = {
         elapsed: 0,
         duration: 1050,
@@ -586,8 +706,16 @@ export function WorldScene(props: Props) {
         start: camera.position.clone(),
         target: controls.target.clone(),
         end,
+        endTarget: viewTarget.clone(),
       };
-      if (reduced.matches) reset();
+      if (reduced.matches) {
+        flight = null;
+        ghosts.forEach((frame) => frame.dispose());
+        ghosts = [];
+        controls.target.copy(viewTarget);
+        camera.position.copy(end).add(viewTarget);
+        controls.update();
+      }
       lastWheel = 0;
     }
     function visibleObject(object: T.Object3D): boolean {
@@ -595,30 +723,67 @@ export function WorldScene(props: Props) {
         if (!part.visible) return false;
       return true;
     }
-    function semanticTarget(object: T.Object3D): {
+    type Target = {
       id?: string;
       annotated: boolean;
       owner?: T.Object3D;
-    } {
-      // A world-level click on the heart drawn inside the human still selects
-      // the human container. Only the current parent's embedded contents resolve
-      // to semantic children at this scale.
+      kind?: SpatialEntry["kind"];
+      source?: SpatialSource;
+    };
+    function semanticTarget(object: T.Object3D, hit?: T.Intersection): Target {
+      const source = hit ? anatomyHit(hit) : undefined;
       for (let part: T.Object3D | null = object; part; part = part.parent) {
         const ownerId = part.userData.node;
         if (
           ownerId &&
           ownerId !== current &&
           active.items.some((i) => i.node.id === ownerId)
-        )
-          return { id: String(ownerId), annotated: false, owner: part };
+        ) {
+          const child = WORLD_NODES[String(ownerId)];
+          return {
+            id: child.id,
+            annotated: false,
+            owner: part,
+            kind:
+              child.atomic ||
+              ["nucleus", "proton", "neutron", "quark", "electron"].includes(
+                child.model,
+              )
+                ? "instance"
+                : "surface",
+            source,
+          };
+        }
       }
-      let annotated = false;
       for (let part: T.Object3D | null = object; part; part = part.parent) {
         const data = part.userData;
-        if (data.worldContext) return { annotated: true };
+        if (data.worldContext) {
+          const category = source?.category;
+          const candidate =
+            category &&
+            (
+              {
+                vein: "human/vein-sample",
+                artery: "human/artery-sample",
+                muscle: "human/muscle-sample",
+                bone: "human/bone-sample",
+              } as Record<string, string>
+            )[category];
+          return {
+            id:
+              current === "human" &&
+              candidate &&
+              WORLD_NODES[current].children.includes(candidate) &&
+              anatomyVisible(candidate, latest.current.anatomyMode)
+                ? candidate
+                : undefined,
+            annotated: true,
+            kind: "sample",
+            source,
+          };
+        }
         if (!data.worldChildModel && !data.constituent && !data.worldChildId)
           continue;
-        annotated = true;
         const match = active.items
           .slice(1)
           .find(
@@ -639,11 +804,23 @@ export function WorldScene(props: Props) {
             !anatomyVisible(match.node.id, latest.current.anatomyMode)
           )
             return { annotated: true };
-          return { id: match.node.id, annotated: true };
+          return {
+            id: match.node.id,
+            annotated: true,
+            kind:
+              current === "human"
+                ? match.node.id === "human/skin"
+                  ? "sample"
+                  : "surface"
+                : "instance",
+            source,
+          };
         }
+        // A constituent known to be absent cannot be relabeled through its container.
         return { annotated: true };
       }
-      return { annotated };
+      const id = sampleTarget(WORLD_NODES[current], object);
+      return { id, annotated: Boolean(id), kind: "sample", source };
     }
     function hitCenter(hit: T.Intersection, owner?: T.Object3D): T.Vector3 {
       if (!owner) {
@@ -681,7 +858,7 @@ export function WorldScene(props: Props) {
       x: number,
       y: number,
       commit = false,
-      report?: { point?: T.Vector3; replica?: boolean },
+      report?: { point?: T.Vector3; replica?: boolean; entry?: SpatialEntry },
     ) {
       const rect = canvas.getBoundingClientRect();
       pointer.set(
@@ -689,24 +866,41 @@ export function WorldScene(props: Props) {
         (-(y - rect.top) / rect.height) * 2 + 1,
       );
       raycaster.setFromCamera(pointer, camera);
-      const roots = active.items
-        .filter((item) => item.model.group.visible)
-        .map((item) => item.model.group);
-      const hits = raycaster.intersectObjects(roots, true);
-      const remember = (id: string, point: T.Vector3, replica: boolean) => {
-        if (commit) pickedOrigin = { id, point: point.clone() };
+      const hits = raycaster.intersectObject(active.group, true);
+      const remember = (
+        id: string,
+        point: T.Vector3,
+        replica: boolean,
+        kind: SpatialEntry["kind"] = "instance",
+        source?: SpatialSource,
+      ) => {
+        const entry: SpatialEntry = {
+          parentId: current,
+          childId: id,
+          point: point.toArray() as [number, number, number],
+          kind,
+          ...(source ? { source } : {}),
+        };
+        if (commit) pickedOrigin = entry;
         if (report) {
           report.point = point.clone();
           report.replica = replica;
+          report.entry = entry;
         }
         return id;
       };
       let translucent:
-        | { id: string; point: T.Vector3; replica: boolean }
+        | {
+            id: string;
+            point: T.Vector3;
+            replica: boolean;
+            kind?: SpatialEntry["kind"];
+            source?: SpatialSource;
+          }
         | undefined;
       for (const hit of hits) {
         if (!visibleObject(hit.object)) continue;
-        const target = semanticTarget(hit.object);
+        const target = semanticTarget(hit.object, hit);
         const material =
           hit.object instanceof T.Mesh
             ? Array.isArray(hit.object.material)
@@ -717,13 +911,28 @@ export function WorldScene(props: Props) {
           material?.transparent && material.opacity < 0.7,
         );
         if (target.id) {
-          const point = hitCenter(hit, target.owner);
+          const point =
+            target.kind === "sample" || target.kind === "surface"
+              ? active.group.worldToLocal(hit.point.clone())
+              : hitCenter(hit, target.owner);
           const replica = Boolean(hit.object.userData.worldReplica);
           if (seeThrough) {
-            translucent ??= { id: target.id, point, replica };
+            translucent ??= {
+              id: target.id,
+              point,
+              replica,
+              kind: target.kind,
+              source: target.source,
+            };
             continue;
           }
-          return remember(target.id, point, replica);
+          return remember(
+            target.id,
+            point,
+            replica,
+            target.kind,
+            target.source,
+          );
         }
         // Never turn a click on an unsupported annotated structure into a
         // different nearby organelle through the screen-distance fallback.
@@ -733,6 +942,8 @@ export function WorldScene(props: Props) {
               translucent.id,
               translucent.point,
               translucent.replica,
+              translucent.kind,
+              translucent.source,
             );
           return undefined;
         }
@@ -740,27 +951,30 @@ export function WorldScene(props: Props) {
         return undefined;
       }
       if (translucent)
-        return remember(translucent.id, translucent.point, translucent.replica);
-      let best: string | undefined,
-        dist = 80;
-      for (const item of active.items.slice(1)) {
-        if (
-          current === "human" &&
-          !anatomyVisible(item.node.id, latest.current.anatomyMode)
-        )
-          continue;
-        item.model.group.getWorldPosition(vector).project(camera);
-        const d = Math.hypot(
-          (vector.x * 0.5 + 0.5) * width - (x - rect.left),
-          (-vector.y * 0.5 + 0.5) * height - (y - rect.top),
+        return remember(
+          translucent.id,
+          translucent.point,
+          translucent.replica,
+          translucent.kind,
+          translucent.source,
         );
-        if (vector.z >= -1 && vector.z < 1 && d < dist) {
-          best = item.node.id;
-          dist = d;
-        }
+      if (current === "world" && WORLD_NODES["world/air"]) {
+        const point = active.group.worldToLocal(
+          raycaster.ray.at(
+            Math.max(0.5, camera.position.distanceTo(controls.target)),
+            new T.Vector3(),
+          ),
+        );
+        return remember("world/air", point, false, "sample", {
+          region: "air",
+          category: "air",
+        });
       }
-      return best;
+      // Empty space is not a nearby constituent. The visible labels remain
+      // explicit, accessible navigation choices for unresolved structures.
+      return undefined;
     }
+
     function updatePickDiagnostics() {
       if (flight) {
         canvas.dataset.pickTargets = "[]";
@@ -867,6 +1081,123 @@ export function WorldScene(props: Props) {
       }
       canvas.dataset.pickTargets = JSON.stringify(targets);
     }
+    function updateSpatialDiagnostics() {
+      if (flight) {
+        canvas.dataset.spatialTargets = "[]";
+        lastSpatialSignature = "";
+        return;
+      }
+      const signature = [
+        current,
+        latest.current.anatomyMode,
+        latest.current.locale,
+        width,
+        height,
+        active.items[0].model.group.userData.anatomyRevision || 0,
+        ...camera.matrixWorld.elements.map((value) => value.toPrecision(5)),
+      ].join("|");
+      if (signature === lastSpatialSignature) return;
+      lastSpatialSignature = signature;
+      const rect = canvas.getBoundingClientRect();
+      const candidates: T.Vector3[] = [];
+      active.group.traverseVisible((object) => {
+        if (!(object instanceof T.Mesh)) return;
+        const position = object.geometry.getAttribute("position");
+        if (!position) return;
+        const index = object.geometry.getIndex();
+        const count = Math.floor((index?.count || position.count) / 3);
+        const assetId = object.userData.anatomyAssetId;
+        const faces = assetId
+          ? anatomyFaceSamples(assetId)
+          : Array.from({ length: Math.min(12, count) }, (_, i) =>
+              Math.floor(((i + 0.5) * count) / Math.min(12, count)),
+            );
+        const instance = new T.Matrix4();
+        const instances =
+          object instanceof T.InstancedMesh ? Math.min(object.count, 3) : 1;
+        for (let i = 0; i < instances; i++) {
+          if (object instanceof T.InstancedMesh)
+            object.getMatrixAt(
+              Math.floor((i * object.count) / instances),
+              instance,
+            );
+          for (const face of faces) {
+            const point = new T.Vector3();
+            for (let vertex = 0; vertex < 3; vertex++)
+              point.add(
+                new T.Vector3().fromBufferAttribute(
+                  position,
+                  index ? index.getX(face * 3 + vertex) : face * 3 + vertex,
+                ),
+              );
+            point.divideScalar(3);
+            if (object instanceof T.InstancedMesh) point.applyMatrix4(instance);
+            point.applyMatrix4(object.matrixWorld);
+            if (assetId?.startsWith("context-")) candidates.unshift(point);
+            else candidates.push(point);
+          }
+        }
+      });
+      const targets: Array<
+        SpatialEntry & { x: number; y: number; hit: string }
+      > = [];
+      const buckets = new Map<string, number>();
+      const inspect = (x: number, y: number) => {
+        // Pointer and wheel events have different subpixel precision in Chromium.
+        // Whole CSS pixels are representable by both real input paths.
+        x = Math.round(x);
+        y = Math.round(y);
+        if (targets.length >= 64 || document.elementFromPoint(x, y) !== canvas)
+          return;
+        const report: { entry?: SpatialEntry } = {};
+        pick(x, y, false, report);
+        const entry = report.entry;
+        if (!entry) return;
+        const key = WORLD_NODES[entry.childId].spatialOnly
+          ? `${entry.childId}:${entry.source?.category || ""}:${entry.source?.region || ""}`
+          : entry.childId;
+        if ((buckets.get(key) || 0) >= 2) return;
+        if (
+          targets.some(
+            (target) =>
+              target.childId === entry.childId &&
+              new T.Vector3(...target.point).distanceTo(
+                new T.Vector3(...entry.point),
+              ) < 0.015,
+          )
+        )
+          return;
+        buckets.set(key, (buckets.get(key) || 0) + 1);
+        targets.push({
+          ...entry,
+          x,
+          y,
+          hit: entry.source?.category === "air" ? "air" : "mesh",
+        });
+      };
+      let attempts = 0;
+      for (const candidate of candidates) {
+        const p = candidate.project(camera);
+        if (p.z < -1 || p.z >= 1) continue;
+        const x = rect.left + (p.x * 0.5 + 0.5) * width;
+        const y = rect.top + (-p.y * 0.5 + 0.5) * height;
+        if (
+          x < rect.left ||
+          x > rect.right ||
+          y < rect.top + 80 ||
+          y > rect.bottom - 95
+        )
+          continue;
+        if (++attempts > 280) break;
+        inspect(x, y);
+      }
+      if (current === "world") {
+        for (const x of [0.24, 0.4, 0.65])
+          for (const y of [0.15, 0.35, 0.68])
+            inspect(rect.left + width * x, rect.top + height * y);
+      }
+      canvas.dataset.spatialTargets = JSON.stringify(targets);
+    }
     function accelerateOrReverseFlight(direction: number): boolean {
       if (!flight) return false;
       lastWheel = 0;
@@ -880,6 +1211,7 @@ export function WorldScene(props: Props) {
       return true;
     }
     const down = (event: PointerEvent) => {
+      lastWheel = 0;
       pressedPointers.add(event.pointerId);
       pointerStart = [event.clientX, event.clientY];
       dragging = false;
@@ -951,7 +1283,7 @@ export function WorldScene(props: Props) {
       if (!pressedHere) return;
       if (!pinching && !dragging && event.button === 0) {
         const id = pick(event.clientX, event.clientY, true);
-        if (id) latest.current.onNavigate(id);
+        if (id) visit(id);
       }
     };
     const cancelPointer = (event: PointerEvent) => {
@@ -979,16 +1311,17 @@ export function WorldScene(props: Props) {
         event.preventDefault();
       }
       if (event.key === "Home") {
-        latest.current.onNavigate("world");
+        latest.current.onHome();
         event.preventDefault();
       }
     };
     canvas.addEventListener("pointerdown", down);
-    canvas.addEventListener("pointermove", move);
+    canvas.addEventListener("pointermove", move, { capture: true });
     canvas.addEventListener("pointerleave", leave);
     canvas.addEventListener("pointerup", up);
     canvas.addEventListener("pointercancel", cancelPointer);
-    canvas.addEventListener("wheel", wheel, { passive: true });
+    // Capture the material before OrbitControls moves the camera towards the cursor.
+    canvas.addEventListener("wheel", wheel, { passive: true, capture: true });
     canvas.addEventListener("keydown", keyDown);
     const observer = new ResizeObserver(resize);
     observer.observe(element);
@@ -1001,9 +1334,19 @@ export function WorldScene(props: Props) {
       });
     active = makeFrame(current);
     resize();
+    configureView(current);
     reset();
     language();
-    api.current = { navigate, reset, language, retryAnatomy };
+    api.current = {
+      navigate,
+      reset: () => {
+        viewTarget.set(0, current === "world" ? 0.06 : 0, 0);
+        viewScale = 1;
+        reset();
+      },
+      language,
+      retryAnatomy,
+    };
     function animate(now: number) {
       if (disposed) return;
       raf = requestAnimationFrame(animate);
@@ -1031,7 +1374,7 @@ export function WorldScene(props: Props) {
           distance = Math.exp(
             T.MathUtils.lerp(Math.log(startDistance), Math.log(endDistance), a),
           );
-        controls.target.copy(flight.target).multiplyScalar(1 - a);
+        controls.target.copy(flight.target).lerp(flight.endTarget, a);
         const direction = flight.start
           .clone()
           .sub(flight.target)
@@ -1052,17 +1395,14 @@ export function WorldScene(props: Props) {
         controls.autoRotate = latest.current.rotating && !reduced.matches;
         controls.autoRotateSpeed = 0.35;
         controls.update();
-        if (now - lastWheel < 500) {
+        if (lastWheel > 0) {
           const distance = camera.position.distanceTo(controls.target),
             fit = fitDistance();
           if (wheelDirection < 0 && distance < fit * 0.76) {
-            const id =
-              wheelChild ||
-              latest.current.preferredChildId ||
-              WORLD_NODES[current].defaultChild;
+            const id = wheelChild;
             if (id) {
               lastWheel = 0;
-              latest.current.onNavigate(id);
+              visit(id);
             }
           }
           if (
@@ -1204,18 +1544,25 @@ export function WorldScene(props: Props) {
         const visibleIds = active.items
           .filter(
             (item) =>
-              current !== "human" ||
-              item.node.id === "human" ||
-              anatomyVisible(item.node.id, latest.current.anatomyMode),
+              (item.node.id === current || !item.node.spatialOnly) &&
+              (current !== "human" ||
+                item.node.id === "human" ||
+                anatomyVisible(item.node.id, latest.current.anatomyMode)),
           )
           .map((i) => i.node.id);
         canvas.dataset.selected = current;
+        canvas.dataset.spatialContext = JSON.stringify(appliedContext);
+        canvas.dataset.cameraPose = JSON.stringify({
+          position: camera.position.toArray(),
+          target: controls.target.toArray(),
+        });
         canvas.dataset.selectedAnchors = JSON.stringify(
           selectedAnchorEntries(),
         );
         if (diagnosticsEnabled && now - lastPickDiagnostics > 750) {
           lastPickDiagnostics = now;
           updatePickDiagnostics();
+          updateSpatialDiagnostics();
         }
         canvas.dataset.transitioning = String(Boolean(flight));
         canvas.dataset.visibleIds = JSON.stringify(visibleIds);
@@ -1256,11 +1603,11 @@ export function WorldScene(props: Props) {
       uiObserver.disconnect();
       controls.dispose();
       canvas.removeEventListener("pointerdown", down);
-      canvas.removeEventListener("pointermove", move);
+      canvas.removeEventListener("pointermove", move, true);
       canvas.removeEventListener("pointerleave", leave);
       canvas.removeEventListener("pointerup", up);
       canvas.removeEventListener("pointercancel", cancelPointer);
-      canvas.removeEventListener("wheel", wheel);
+      canvas.removeEventListener("wheel", wheel, true);
       canvas.removeEventListener("keydown", keyDown);
       pressedPointers.clear();
       pinchPointers.clear();
@@ -1277,9 +1624,9 @@ export function WorldScene(props: Props) {
   }, []);
   useEffect(() => {
     api.current?.navigate(props.selectedId);
-  }, [props.selectedId]);
+  }, [props.selectedId, props.spatialContext]);
   useEffect(() => {
-    api.current?.reset();
+    if (props.resetToken) api.current?.reset();
   }, [props.resetToken]);
   useEffect(() => {
     if (props.anatomyRetryToken) api.current?.retryAnatomy();

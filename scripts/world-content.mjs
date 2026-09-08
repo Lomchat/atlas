@@ -134,6 +134,7 @@ export function assertWorldContent(locale) {
     WORLD_JOURNEYS: journeys,
     WORLD_QUIZZES: quizzes,
     WORLD_MECHANISMS: mechanisms,
+    WORLD_SAMPLE_REGIONS: sampleRegions,
     worldPath,
   } = registry;
   assert.ok(
@@ -162,11 +163,30 @@ export function assertWorldContent(locale) {
     "A composite landscape has no physical diameter",
   );
   assert.deepEqual(
-    nodes.world.children,
+    nodes.world.children.filter((id) => !nodes[id]?.spatialOnly),
     roots,
-    "The world links to each object family once",
+    "The six named object families remain separate from spatial material samples",
   );
+  for (const id of nodes.world.children.filter((id) => !roots.includes(id))) {
+    assert.equal(nodes[id]?.spatialOnly, true, `${id}: extra world regions are spatial samples`);
+    assert.equal(nodes[id]?.category, "world", `${id}: ambient material stays in its world context`);
+  }
   const implementedModels = modelKinds();
+  assert.ok(
+    sampleRegions && typeof sampleRegions === "object",
+    "Material regions have an explicit semantic destination registry",
+  );
+  for (const [region, kinds] of Object.entries(sampleRegions)) {
+    assert.match(region, /^[a-z]+(?:-[a-z]+)*$/, `${region}: stable material region`);
+    assert.ok(Array.isArray(kinds), `${region}: explicit accepted model collection`);
+    assert.equal(new Set(kinds).size, kinds.length, `${region}: no duplicate destinations`);
+    for (const kind of kinds) {
+      assert.ok(implementedModels.has(kind), `${region}: destination model ${kind} exists`);
+    }
+  }
+  for (const region of ["electron-cloud", "atomic-nucleus", "nucleon", "elementary-particle"]) {
+    assert.deepEqual(sampleRegions[region], [], `${region}: a symbolic envelope cannot select an unrelated sample`);
+  }
   const usedModels = new Set();
   const sources = new Set();
   const incoming = new Map(values.map((node) => [node.id, 0]));
@@ -193,6 +213,9 @@ export function assertWorldContent(locale) {
       `${label}: category follows its root`,
     );
     assert.match(node.color, /^#[a-f\d]{6}$/i, `${label}: explicit color`);
+    if (node.spatialOnly !== undefined) {
+      assert.equal(typeof node.spatialOnly, "boolean", `${label}: spatial-only behavior is explicit`);
+    }
     assert.ok(
       implementedModels.has(node.model),
       `${label}: model ${node.model} has a real dispatch case, not a silent fallback`,
@@ -372,6 +395,37 @@ export function assertWorldContent(locale) {
     false,
     "Mature human red cells do not contain a cellular nucleus, DNA, mitochondria or ribosomes; their atomic nuclei remain allowed",
   );
+  for (const redCell of values.filter((node) => node.model === "redBloodCell")) {
+    assert.equal(
+      descendants(redCell.id).some((node) => excludedFromMatureRedCell.has(node.model)),
+      false,
+      `${redCell.id}: every contextual mature red-cell copy preserves its biological exclusions`,
+    );
+    const siblings = nodes[redCell.parent].children.map((id) => nodes[id]);
+    const whiteCell = siblings.find((node) => node.model === "whiteBloodCell");
+    assert.ok(whiteCell, `${redCell.id}: the suggested neighboring white cell exists`);
+    assert.ok(descendants(whiteCell.id).some((node) => node.model === "dna"), `${redCell.id}: the alternate DNA path remains in this blood sample`);
+  }
+  for (const [id, model] of [
+    ["human/vein-sample", "vein"],
+    ["human/artery-sample", "artery"],
+    ["human/muscle-sample", "muscle"],
+    ["human/bone-sample", "boneTissue"],
+  ]) {
+    assert.equal(nodes[id]?.parent, "human", `${id}: local anatomy samples keep the body context`);
+    assert.equal(nodes[id]?.model, model, `${id}: source tissue is not renamed as a different anatomical structure`);
+    assert.equal(nodes[id]?.spatialOnly, true, `${id}: a material window is not a second floating anatomical object`);
+    assert.ok(descendants(id).some((node) => node.model === "quark"), `${id}: the tissue route reaches established atomic constituents`);
+  }
+  for (const rootCell of values.filter((node) => node.model === "rootCell")) {
+    assert.equal(descendants(rootCell.id).some((node) => node.model === "chloroplast"), false, `${rootCell.id}: the non-photosynthetic root example does not inherit leaf chloroplasts`);
+    assert.ok(rootCell.children.some((id) => nodes[id].model === "mitochondrion"), `${rootCell.id}: the root cell still has mitochondria`);
+  }
+  for (const hemoglobin of values.filter((node) => node.model === "hemoglobin")) {
+    for (const kind of ["heme", "protein"]) {
+      assert.ok(hemoglobin.children.some((id) => nodes[id].model === kind), `${hemoglobin.id}: both the heme and surrounding globin have their own targets`);
+    }
+  }
   assert.equal(
     nodes[wbc]?.model,
     "whiteBloodCell",
@@ -447,11 +501,17 @@ export function assertWorldContent(locale) {
   const isotopes = {
     H: { atomicNumber: 1, massNumber: 1, charge: 0 },
     C: { atomicNumber: 6, massNumber: 12, charge: 0 },
+    N: { atomicNumber: 7, massNumber: 14, charge: 0 },
     O: { atomicNumber: 8, massNumber: 16, charge: 0 },
     Mg: { atomicNumber: 12, massNumber: 24, charge: 2 },
     Si: { atomicNumber: 14, massNumber: 28, charge: 0 },
+    P: { atomicNumber: 15, massNumber: 31, charge: 0 },
+    Ca: { atomicNumber: 20, massNumber: 40, charge: 0 },
     Fe: { atomicNumber: 26, massNumber: 56, charge: 2 },
   };
+  // RSC's referenced covalent radii are 0.71, 1.09 and 1.74 Å.
+  // Protect these reviewed conversions when contextual branches are regenerated.
+  const addedCovalentExtents = { N: 0.142e-9, P: 0.218e-9, Ca: 0.348e-9 };
   for (const atom of values.filter((node) => node.model === "atom")) {
     const expected = isotopes[atom.element];
     assert.ok(expected, `${atom.id}: a reviewed isotope and element identity`);
@@ -460,6 +520,14 @@ export function assertWorldContent(locale) {
       expected,
       `${atom.id}: exact isotope and formal ionic charge`,
     );
+    if (addedCovalentExtents[atom.element]) {
+      assert.equal(atom.sizeMeters, addedCovalentExtents[atom.element],
+        `${atom.id}: doubled covalent radius matches the cited RSC convention`);
+      if (["Ca", "P"].includes(atom.element)) {
+        assert.match(atom.sizeNote[locale], locale === "en" ? /[Nn]eutral/ : /neutre/,
+          `${atom.id}: the isolated neutral-atom convention remains explicit`);
+      }
+    }
     const electronCount = atom.atomic.atomicNumber - atom.atomic.charge;
     assert.ok(
       Number.isInteger(electronCount) && electronCount > 0,

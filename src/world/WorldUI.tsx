@@ -47,13 +47,17 @@ import {
 import type { WorldNode } from "./data";
 import { anatomyVisible } from "./anatomyModels";
 import type { AnatomyMode } from "./anatomyModels";
+import { LocalSampleOrigin } from "./LocalSampleOrigin";
+import { validateSampleAddress, writeSampleAddress } from "./sample-address";
+import type { SpatialContext } from "./sample-address";
 import "./world.css";
 
 export interface WorldUIProps {
   selectedId: string;
   preferredChildId?: string;
   onNextTargetChange?: (parentId: string, childId: string | undefined) => void;
-  onNavigate: (id: string) => void;
+  onNavigate: (id: string, context?: SpatialContext) => void;
+  spatialContext: SpatialContext;
   onBack: () => void;
   onHome: () => void;
   sceneInfo: {
@@ -82,8 +86,18 @@ export interface WorldUIProps {
 
 type Modal = "discover" | "quiz" | "share" | null;
 type DiscoverTab = "worlds" | "journeys" | "notebook";
-type Journal = { visited: string[]; saved: string[]; understood: string[] };
-const emptyJournal: Journal = { visited: [], saved: [], understood: [] };
+type Journal = {
+  visited: string[];
+  saved: string[];
+  understood: string[];
+  addresses: Record<string, SpatialContext>;
+};
+const emptyJournal: Journal = {
+  visited: [],
+  saved: [],
+  understood: [],
+  addresses: {},
+};
 const journalKey = "atlas-world-notebook-v1";
 const sizeFormatters = {
   en: new Intl.NumberFormat("en", { maximumSignificantDigits: 3 }),
@@ -109,10 +123,23 @@ function readJournal(): Journal {
             .filter((id): id is string => typeof id === "string")
             .slice(-500)
         : [];
+    const saved = list("saved");
+    const addresses =
+      value.addresses && typeof value.addresses === "object"
+        ? (value.addresses as Record<string, unknown>)
+        : {};
     return {
       visited: list("visited"),
-      saved: list("saved"),
+      saved,
       understood: list("understood"),
+      addresses: Object.fromEntries(
+        saved
+          .filter(
+            (id) =>
+              Object.hasOwn(WORLD_NODES, id) && Object.hasOwn(addresses, id),
+          )
+          .map((id) => [id, validateSampleAddress(addresses[id])]),
+      ),
     };
   } catch {
     return emptyJournal;
@@ -248,6 +275,7 @@ export function WorldUI({
   preferredChildId,
   onNextTargetChange,
   onNavigate,
+  spatialContext,
   onBack,
   onHome,
   sceneInfo,
@@ -267,7 +295,36 @@ export function WorldUI({
   const locale = useLocale();
   const node = WORLD_NODES[selectedId] || WORLD_NODES.world;
   const path = useMemo(() => pathTo(node.id), [node.id]);
-  const children = node.children.map((id) => WORLD_NODES[id]).filter(Boolean);
+  const addressHere = useMemo(() => {
+    const ancestors = new Set(path.map((item) => item.id));
+    return {
+      v: 1 as const,
+      entries: spatialContext.entries.filter(
+        (entry) => ancestors.has(entry.childId) || entry.parentId === node.id,
+      ),
+    };
+  }, [path, spatialContext]);
+  const localOrigin =
+    [...addressHere.entries]
+      .reverse()
+      .find((entry) => entry.parentId === node.id) ||
+    [...addressHere.entries]
+      .reverse()
+      .find((entry) => entry.kind === "sample") ||
+    addressHere.entries.at(-1);
+  const availableSpatialIds = useMemo(
+    () =>
+      new Set([
+        ...path.map((item) => item.id),
+        ...spatialContext.entries.map((entry) => entry.childId),
+      ]),
+    [path, spatialContext],
+  );
+  const availablePlace = (item: WorldNode) =>
+    !item.spatialOnly || availableSpatialIds.has(item.id);
+  const children = node.children
+    .map((id) => WORLD_NODES[id])
+    .filter((item) => Boolean(item) && availablePlace(item));
   const parent = node.parent ? WORLD_NODES[node.parent] : undefined;
   const isWorld = node.id === "world";
   const [inspector, setInspector] = useState(() => window.innerWidth >= 980);
@@ -300,14 +357,22 @@ export function WorldUI({
     trail && trailIndex >= 0
       ? WORLD_NODES[trail.path[trailIndex + 1]]
       : undefined;
-  const next =
-    (trailNext &&
-    (node.id !== "human" || anatomyVisible(trailNext.id, anatomyMode))
-      ? trailNext
-      : undefined) ||
-    WORLD_NODES[preferredChildId || node.defaultChild || node.children[0]];
+  const next = [
+    trailNext,
+    WORLD_NODES[preferredChildId || ""],
+    WORLD_NODES[node.defaultChild || ""],
+    ...children,
+  ].find(
+    (item) =>
+      item &&
+      item.parent === node.id &&
+      (node.id !== "human" || anatomyVisible(item.id, anatomyMode)),
+  );
   const quiz = WORLD_QUIZZES[quizIndex % Math.max(1, WORLD_QUIZZES.length)];
-  const saved = journal.saved.includes(node.id);
+  const saved =
+    journal.saved.includes(node.id) &&
+    JSON.stringify(journal.addresses[node.id]?.entries || []) ===
+      JSON.stringify(addressHere.entries);
   const completedTrail = Boolean(trail && trailIndex === trail.path.length - 1);
   const located = journal.visited.filter(
     (id) => id !== "world" && WORLD_NODES[id],
@@ -410,10 +475,10 @@ export function WorldUI({
     }
   }, [selectedId, mechanismId]);
 
-  const go = (id: string) => {
+  const go = (id: string, context?: SpatialContext) => {
     setMechanismId(null);
     setMechanismPlaying(false);
-    onNavigate(id);
+    onNavigate(id, context);
     setMapOpen(false);
     setModal(null);
   };
@@ -429,15 +494,28 @@ export function WorldUI({
     toastTimer.current = setTimeout(() => setToast(""), 2400);
   };
   const save = () =>
-    setJournal((previous) => ({
-      ...previous,
-      saved: previous.saved.includes(node.id)
-        ? previous.saved.filter((id) => id !== node.id)
-        : [...previous.saved, node.id],
-    }));
+    setJournal((previous) => {
+      const addresses = { ...previous.addresses };
+      if (saved) delete addresses[node.id];
+      else addresses[node.id] = validateSampleAddress(addressHere);
+      return {
+        ...previous,
+        saved: saved
+          ? previous.saved.filter((id) => id !== node.id)
+          : [...previous.saved.filter((id) => id !== node.id), node.id],
+        addresses,
+      };
+    });
+  const shareAddress = () => {
+    const url = new URL(location.href);
+    url.searchParams.set("world", node.id);
+    url.searchParams.set("lang", locale);
+    writeSampleAddress(url, spatialContext);
+    return url.href;
+  };
   const share = async () => {
     try {
-      await navigator.clipboard.writeText(location.href);
+      await navigator.clipboard.writeText(shareAddress());
       notify("Link copied");
     } catch {
       setModal("share");
@@ -502,13 +580,17 @@ export function WorldUI({
     item: WorldNode,
     compact = false,
     showQuestion = false,
+    address?: SpatialContext,
   ) => (
     <button
       key={item.id}
       className={`world-place-card ${compact ? "compact" : ""}`}
       data-node={item.id}
       data-action="world-discover-place"
-      onClick={() => go(item.id)}
+      data-saved-address={Boolean(address?.entries.length)}
+      onClick={() =>
+        go(item.id, address ? validateSampleAddress(address) : undefined)
+      }
       style={{ "--place-color": item.color } as CSSProperties}
     >
       <span className="world-place-symbol">
@@ -527,6 +609,11 @@ export function WorldUI({
         {showQuestion && (
           <p className="world-result-question">{item.question[locale]}</p>
         )}
+        {address?.entries.length ? (
+          <span className="world-saved-origin">
+            {t("Saved with its selected point")}
+          </span>
+        ) : null}
       </span>
       <ArrowUpRightIcon />
     </button>
@@ -553,7 +640,7 @@ export function WorldUI({
         {expanded &&
           item.children
             .map((id) => WORLD_NODES[id])
-            .filter(Boolean)
+            .filter((child) => Boolean(child) && availablePlace(child))
             .map((child) => mapRow(child, depth + 1))}
       </div>
     );
@@ -806,6 +893,14 @@ export function WorldUI({
                     <h1>{node.name[locale]}</h1>
                   </div>
                 </div>
+                {localOrigin && (
+                  <LocalSampleOrigin
+                    entry={localOrigin}
+                    selectedId={node.id}
+                    context={spatialContext}
+                    onNavigate={(id) => go(id)}
+                  />
+                )}
                 {anatomyControls}
                 {!anatomyControls &&
                   sceneInfo.anatomyStatus &&
@@ -1437,7 +1532,14 @@ export function WorldUI({
                   <div className="world-notebook-list">
                     {journal.saved
                       .filter((id) => WORLD_NODES[id])
-                      .map((id) => placeCard(WORLD_NODES[id], true))}
+                      .map((id) =>
+                        placeCard(
+                          WORLD_NODES[id],
+                          true,
+                          false,
+                          journal.addresses[id],
+                        ),
+                      )}
                   </div>
                 ) : (
                   <p className="world-empty-line">
@@ -1585,7 +1687,7 @@ export function WorldUI({
           <p>{t("Copy this address to share your place.")}</p>
           <input
             aria-label={t("Share this place")}
-            value={location.href}
+            value={shareAddress()}
             readOnly
             onFocus={(event) => event.currentTarget.select()}
           />

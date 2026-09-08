@@ -222,6 +222,8 @@ function builder(kind: string) {
  */
 export function createQuartzGrain(seed = 1): WorldModel {
   const b = builder("quartz");
+  b.content.userData.worldSampleChildModel = "crystalLattice";
+  b.content.userData.worldMaterialRegion = "quartz";
   let state = seed | 0 || 1;
   const random = () => {
     state = (Math.imul(state, 1664525) + 1013904223) | 0;
@@ -358,9 +360,23 @@ export function createQuartzGrain(seed = 1): WorldModel {
   return b.finish();
 }
 
-export function createQuartzNetwork(): WorldModel {
-  const b = builder("crystalLattice");
+export function createQuartzNetwork(
+  kind: "crystalLattice" | "glassNetwork" = "crystalLattice",
+): WorldModel {
+  const b = builder(kind);
   const network = createQuartzNetworkData();
+  if (kind === "glassNetwork") {
+    // Local Si–O connectivity guide only: smoothly distort the finite scaffold
+    // to distinguish disorder. This is not a measured amorphous coordinate set.
+    for (const atom of network.atoms) {
+      const [x, y, z] = atom.position;
+      atom.position = [
+        x + 0.5 * Math.sin(y * 0.7 + z * 0.3),
+        y + 0.45 * Math.sin(z * 0.8 + x * 0.4),
+        z + 0.45 * Math.sin(x * 0.7 - y * 0.3),
+      ];
+    }
+  }
   const sphere = new T.SphereGeometry(1, 20, 14);
   const transform = new T.Object3D();
   const atomColors = { Si: "#baa9e8", O: "#ef7b80" };
@@ -440,8 +456,12 @@ export function createQuartzNetwork(): WorldModel {
     }),
   );
   b.group.userData.networkDiagram = true;
-  b.group.userData.representation = "crystallographic-network";
-  b.group.userData.crystallography = { ...QUARTZ_CELL, ...network };
+  b.group.userData.representation =
+    kind === "glassNetwork"
+      ? "disordered-connectivity-diagram"
+      : "crystallographic-network";
+  if (kind === "crystalLattice")
+    b.group.userData.crystallography = { ...QUARTZ_CELL, ...network };
   const result = b.finish();
   b.group.userData.physicalExtentMeters = b.group.userData.nativeExtent * 1e-10;
   return result;

@@ -47,6 +47,8 @@ export function createWorldModel(
       return createQuartzGrain(seed);
     case "crystalLattice":
       return createQuartzNetwork();
+    case "glassNetwork":
+      return createQuartzNetwork("glassNetwork");
     case "celluloseMicrofibril":
       return createCelluloseMicrofibril();
     case "cellulose":
@@ -277,6 +279,29 @@ export function createWorldModel(
     return object;
   };
 
+  /** A material sample starts at the actual surface hit. It is not an
+   * already resolved constituent and must not register a fixed model anchor.
+   * Arrays are alternatives resolved only against direct children; ambiguity
+   * must never be broken by choosing an unrelated nearby object. */
+  const sampleSurface = <O extends T.Object3D>(
+    object: O,
+    target: string | readonly string[] | undefined,
+    region: string,
+  ): O => {
+    object.userData.worldMaterialRegion = region;
+    if (target) object.userData.worldSampleChildModel = target;
+    return object;
+  };
+  const regionGroup = (
+    parent: T.Object3D,
+    target: string | readonly string[] | undefined,
+    region: string,
+  ) => {
+    const part = new T.Group();
+    parent.add(part);
+    return sampleSurface(part, target, region);
+  };
+
   const redCellGeometry = () => {
     // Smooth surface of revolution: a shallow centre and a thick rounded rim.
     // The shape is a biconcave disc, not a torus (there is no hole).
@@ -374,7 +399,10 @@ export function createWorldModel(
     const tree = new T.Group();
     parent.add(tree);
     const bark = "#886148";
-    branch([0, -0.45, 0], [0.022, 0.15, 0], 0.065, bark, tree);
+    const stem = regionGroup(tree, "wood", "woody-stem");
+    const foliage = regionGroup(tree, "leaf", "foliage");
+    const roots = regionGroup(tree, "root", "root");
+    branch([0, -0.45, 0], [0.022, 0.15, 0], 0.065, bark, stem);
     for (let i = 0; i < 7; i++) {
       const a = i * 2.399;
       const end: Point = [
@@ -382,12 +410,12 @@ export function createWorldModel(
         0.2 + (i % 3) * 0.065,
         Math.sin(a) * 0.21,
       ];
-      branch([0.008, -0.06 + i * 0.025, 0], end, 0.028, bark, tree);
+      branch([0.008, -0.06 + i * 0.025, 0], end, 0.028, bark, stem);
       ball(
         end,
         [0.18, 0.165, 0.175],
         ["#477f63", "#5f9c6f", "#7eac73"][i % 3],
-        tree,
+        foliage,
       );
       tube(
         [
@@ -397,10 +425,10 @@ export function createWorldModel(
         ],
         0.014,
         bark,
-        tree,
+        roots,
       );
     }
-    ball([0.01, 0.32, 0], [0.21, 0.19, 0.19], "#75a575", tree);
+    ball([0.01, 0.32, 0], [0.21, 0.19, 0.19], "#75a575", foliage);
     for (let i = 0; i < 6; i++) {
       const a = (i * TAU) / 6;
       tube(
@@ -411,7 +439,7 @@ export function createWorldModel(
         ],
         0.003,
         "#b18a61",
-        tree,
+        stem,
       );
     }
     return tree;
@@ -420,6 +448,8 @@ export function createWorldModel(
   function makeGlass(parent: T.Object3D = model) {
     const glass = new T.Group();
     parent.add(glass);
+    const solid = regionGroup(glass, "glassSample", "glass");
+    const liquid = regionGroup(glass, "droplet", "liquid-water");
     const wall = mat("#b8e8ee", 0.15, 0.1);
     const profile = [
       [0, -0.43],
@@ -435,13 +465,13 @@ export function createWorldModel(
         56,
       ),
       wall,
-      glass,
+      solid,
     );
     const water = mat("#66c2dc", 0.38, 0.16);
-    cylinder(0.235, 0.58, water, [0, -0.1, 0], glass, 0.276);
-    ring(0.303, 0.011, mat("#d0f0f3", 0.8), [0, 0.44, 0], glass).rotation.x =
+    cylinder(0.235, 0.58, water, [0, -0.1, 0], liquid, 0.276);
+    ring(0.303, 0.011, mat("#d0f0f3", 0.8), [0, 0.44, 0], solid).rotation.x =
       Math.PI / 2;
-    ring(0.242, 0.013, mat("#a3d1df", 0.65), [0, -0.417, 0], glass).rotation.x =
+    ring(0.242, 0.013, mat("#a3d1df", 0.65), [0, -0.417, 0], solid).rotation.x =
       Math.PI / 2;
     for (let i = 0; i < 3; i++)
       ring(
@@ -449,7 +479,7 @@ export function createWorldModel(
         0.0025,
         mat("#d8faff", 0.32),
         [0, 0.193 + i * 0.0005, 0],
-        glass,
+        liquid,
       ).rotation.x = Math.PI / 2;
     tube(
       [
@@ -459,13 +489,14 @@ export function createWorldModel(
       ],
       0.005,
       mat("#f0fdff", 0.68),
-      glass,
+      solid,
     );
     return glass;
   }
 
   function makeCloud(parent: T.Object3D = model) {
     const cloud = new T.Group();
+    sampleSurface(cloud, "droplet", "cloud-condensate");
     parent.add(cloud);
     const lobes: Array<[Point, Point]> = [
       [
@@ -564,7 +595,11 @@ export function createWorldModel(
   function makeMitochondrion(parent: T.Object3D = model) {
     const mito = new T.Group();
     parent.add(mito);
-    ball([0, 0, 0], [0.41, 0.19, 0.2], mat("#d99572", 0.25), mito);
+    sampleSurface(
+      ball([0, 0, 0], [0.41, 0.19, 0.2], mat("#d99572", 0.25), mito),
+      "membrane",
+      "mitochondrial-membrane",
+    );
     const inner = add(
       new T.SphereGeometry(1, 32, 20, 0, Math.PI),
       mat("#ba6e61"),
@@ -572,6 +607,7 @@ export function createWorldModel(
     );
     inner.scale.set(0.39, 0.175, 0.175);
     inner.rotation.y = Math.PI;
+    sampleSurface(inner, "membrane", "mitochondrial-membrane");
     // Continuous cristae folds are connected to the inner membrane.
     const cristae: Point[] = [];
     for (let i = 0; i <= 40; i++) {
@@ -584,8 +620,17 @@ export function createWorldModel(
         0.04,
       ]);
     }
-    tube(cristae, 0.022, "#f0bd88", mito);
-    ring(0.07, 0.006, palette.violet, [0.21, 0.04, 0.035], mito).scale.y = 0.7;
+    sampleSurface(
+      tube(cristae, 0.022, "#f0bd88", mito),
+      "membrane",
+      "mitochondrial-membrane",
+    );
+    const dnaRing = sampleSurface(
+      ring(0.07, 0.006, palette.violet, [0.21, 0.04, 0.035], mito),
+      "dna",
+      "mitochondrial-dna",
+    );
+    dnaRing.scale.y = 0.7;
     return mito;
   }
 
@@ -610,6 +655,7 @@ export function createWorldModel(
       leaf,
     );
     blade.position.z = -0.01;
+    sampleSurface(blade, "plantCell", "leaf-lamina");
     tube(
       [
         [0, -0.49, 0.019],
@@ -640,9 +686,294 @@ export function createWorldModel(
   }
 
   switch (kind) {
+    case "tissue": {
+      sampleSurface(model, "cell", "living-tissue");
+      const cytoplasm = mat(color || "#cda2a4", 0.65);
+      for (let x = -1; x <= 1; x++)
+        for (let y = -1; y <= 1; y++) {
+          const cell = new T.Group();
+          model.add(cell);
+          cell.position.set(
+            x * 0.25 + (y % 2) * 0.04,
+            y * 0.23,
+            Math.sin(x + y) * 0.025,
+          );
+          childModel(
+            ball([0, 0, 0], [0.13, 0.12, 0.09], cytoplasm, cell),
+            "cell",
+          );
+          childModel(
+            ball([0.018, 0.007, 0.065], 0.035, "#9b83b6", cell),
+            "cell",
+          );
+        }
+      break;
+    }
+    case "cytoplasm":
+    case "nucleoplasm": {
+      sampleSurface(
+        shell([0, 0, 0], [0.47, 0.31, 0.33], "#9ac8d0", 0.12),
+        "waterMolecule",
+        "aqueous-sample",
+      );
+      for (let i = 0; i < 8; i++) {
+        const protein = makeProtein(
+          model,
+          ["#9bafcb", "#d5ac8d", "#a7c7a2"][i % 3],
+          i,
+        );
+        protein.scale.setScalar(0.18 + (i % 3) * 0.035);
+        protein.position.set(
+          Math.cos(i * 2.399) * 0.3,
+          Math.sin(i * 2.399) * 0.19,
+          Math.sin(i * 1.3) * 0.2,
+        );
+        childModel(protein, "protein");
+      }
+      break;
+    }
+    case "boneTissue": {
+      // A cortical-tissue window, not a complete long bone. Concentric lamellae
+      // surround the canal; cell lacunae do not fill the entire matrix.
+      const lamellae = regionGroup(model, "boneMatrix", "bone-matrix");
+      const body = add(
+        new T.CylinderGeometry(0.4, 0.4, 0.4, 48, 1, true),
+        mat("#d8c49b"),
+        lamellae,
+      );
+      body.rotation.x = Math.PI / 2;
+      for (let i = 0; i < 7; i++) {
+        const band = ring(
+          0.09 + i * 0.043,
+          0.018,
+          i % 2 ? "#e9d8b3" : "#c8b790",
+          [0, 0, 0.205],
+          lamellae,
+        );
+        band.scale.y = 0.94;
+      }
+      const canal = add(
+        new T.CylinderGeometry(0.058, 0.058, 0.42, 28, 1, true),
+        mat("#b49388"),
+      );
+      canal.rotation.x = Math.PI / 2;
+      sampleSurface(canal, "blood", "bone-canal");
+      for (let i = 0; i < 12; i++) {
+        const angle = i * 2.399,
+          radius = 0.12 + (i % 3) * 0.071;
+        const p: Point = [
+          Math.cos(angle) * radius,
+          Math.sin(angle) * radius * 0.94,
+          0.223,
+        ];
+        const cell = ball(p, [0.031, 0.014, 0.011], "#947d92");
+        cell.rotation.z = angle;
+        childModel(cell, "cell");
+        for (const sign of [-1, 1]) {
+          const end: Point = [
+            p[0] + Math.cos(angle + sign * 0.8) * 0.06,
+            p[1] + Math.sin(angle + sign * 0.8) * 0.06,
+            p[2],
+          ];
+          sampleSurface(
+            rod(p, end, 0.0025, "#b0a096"),
+            "boneMatrix",
+            "bone-matrix",
+          );
+        }
+      }
+      break;
+    }
+    case "boneMatrix": {
+      for (let strand = 0; strand < 6; strand++) {
+        const points: Point[] = [];
+        for (let j = 0; j < 35; j++)
+          points.push([
+            -0.42 + j * 0.025,
+            -0.19 + strand * 0.074 + Math.sin(j * 0.35) * 0.012,
+            Math.cos(j * 0.27 + strand) * 0.028,
+          ]);
+        sampleSurface(tube(points, 0.014, "#c1a985"), "protein", "collagen");
+      }
+      for (let i = 0; i < 21; i++) {
+        const plate = box([0.082, 0.012, 0.045], "#a7bbc9", [
+          -0.32 + (i % 7) * 0.105,
+          -0.16 + Math.floor(i / 7) * 0.15,
+          0.02,
+        ]);
+        plate.rotation.set(0.12, ((i % 3) - 1) * 0.15, (i % 2 ? 1 : -1) * 0.12);
+        sampleSurface(plate, "apatite", "bone-mineral");
+      }
+      break;
+    }
+    case "apatite": {
+      // Ca10(PO4)6(OH)2 compositional motif. Positions are explanatory, not an
+      // experimental hydroxyapatite unit cell or a free apatite molecule.
+      const marker = (point: Point, z: number, tint: string, radius: number) =>
+        childModel(ball(point, radius, tint), "atom", z);
+      for (let i = 0; i < 6; i++) {
+        const angle = ((i % 3) * TAU) / 3 + (i < 3 ? 0 : 0.35);
+        const p: Point = [
+          Math.cos(angle) * 0.23,
+          i < 3 ? -0.19 : 0.19,
+          Math.sin(angle) * 0.23,
+        ];
+        marker(p, 15, "#d9b366", 0.043);
+        for (const t of [
+          [1, 1, 1],
+          [-1, -1, 1],
+          [-1, 1, -1],
+          [1, -1, -1],
+        ]) {
+          const o = p.map((v, k) => v + t[k] * 0.068) as Point;
+          marker(o, 8, palette.oxygen, 0.032);
+          rod(p, o, 0.009, "#d6b28e");
+        }
+      }
+      for (let i = 0; i < 10; i++) {
+        const a = i * 2.399;
+        marker(
+          [Math.cos(a) * 0.33, -0.3 + i * 0.066, Math.sin(a) * 0.33],
+          20,
+          "#90b8a0",
+          0.05,
+        );
+      }
+      for (const sign of [-1, 1]) {
+        const o: Point = [0, sign * 0.15, 0],
+          h: Point = [0.04, sign * 0.19, 0];
+        marker(o, 8, palette.oxygen, 0.032);
+        marker(h, 1, palette.hydrogen, 0.019);
+        rod(o, h, 0.008, "#d8cbbe");
+      }
+      group.userData.formula = "Ca10(PO4)6(OH)2";
+      group.userData.compositionDiagram = true;
+      break;
+    }
+    case "soil":
+    case "mineralGrains": {
+      const soil = kind === "soil";
+      if (soil)
+        sampleSurface(
+          box([0.84, 0.34, 0.62], "#77604e", [0, -0.08, 0]),
+          "polymer",
+          "soil-organic-matter",
+        );
+      for (let i = 0; i < 19; i++) {
+        const stone = add(
+          new T.DodecahedronGeometry(0.047 + (i % 4) * 0.009, 0),
+          mat(i % 3 ? "#b9b2a6" : "#cabbd5"),
+        );
+        stone.position.set(
+          Math.cos(i * 2.399) * (0.08 + Math.sqrt(i / 19) * 0.29),
+          soil ? 0.09 + (i % 3) * 0.017 : Math.sin(i * 2.399) * 0.24,
+          Math.sin(i * 3.1) * 0.2,
+        );
+        stone.rotation.set(i * 0.14, i * 0.6, 0);
+        sampleSurface(stone, "quartz", "quartz");
+      }
+      if (soil) {
+        const water = ball(
+          [0.13, 0.02, 0.16],
+          [0.12, 0.016, 0.09],
+          mat("#83b9cb", 0.65),
+        );
+        sampleSurface(water, "droplet", "liquid-water");
+      }
+      break;
+    }
+    case "glassSample": {
+      const slab = box([0.76, 0.58, 0.13], mat("#b2d1df", 0.57, 0.1));
+      slab.rotation.y = 0.22;
+      sampleSurface(slab, "glassNetwork", "silicate-glass");
+      const edge = new T.LineSegments(
+        new T.EdgesGeometry(slab.geometry),
+        new T.LineBasicMaterial({
+          color: "#d6eaf3",
+          transparent: true,
+          opacity: 0.55,
+        }),
+      );
+      geometries.add(edge.geometry);
+      materials.add(edge.material);
+      edge.rotation.copy(slab.rotation);
+      model.add(edge);
+      break;
+    }
+    case "aminoAcidResidue": {
+      // Glycine peptide residue: C2H3NO plus connections beyond the sample.
+      const atoms: [Point, number, string][] = [
+        [[-0.27, 0.06, 0], 7, palette.nitrogen],
+        [[-0.07, -0.07, 0], 6, palette.carbon],
+        [[0.16, 0.055, 0], 6, palette.carbon],
+        [[0.18, 0.28, 0], 8, palette.oxygen],
+        [[-0.31, 0.22, 0.015], 1, palette.hydrogen],
+        [[-0.075, -0.16, 0.15], 1, palette.hydrogen],
+        [[-0.075, -0.16, -0.15], 1, palette.hydrogen],
+      ];
+      atoms.forEach(([point, z, tint]) =>
+        childModel(ball(point, z === 1 ? 0.043 : 0.066, tint), "atom", z),
+      );
+      for (const [a, b] of [
+        [0, 1],
+        [1, 2],
+        [2, 3],
+        [0, 4],
+        [1, 5],
+        [1, 6],
+      ])
+        molecularBond(
+          atoms[a][0],
+          atoms[b][0],
+          atoms[a][2],
+          atoms[b][2],
+          0.018,
+        );
+      rod([0.205, 0.063, 0], [0.225, 0.26, 0], 0.008, palette.oxygen);
+      sampleSurface(
+        rod([-0.27, 0.06, 0], [-0.44, -0.025, 0], 0.017, "#a9b2c2"),
+        undefined,
+        "peptide-continuation",
+      );
+      sampleSurface(
+        rod([0.16, 0.055, 0], [0.35, -0.075, 0], 0.017, "#a9b2c2"),
+        undefined,
+        "peptide-continuation",
+      );
+      group.userData.formula = "C2H3NO";
+      break;
+    }
+    case "hydrocarbon": {
+      for (let i = 0; i < 6; i++) {
+        const p: Point = [-0.35 + i * 0.14, i % 2 ? 0.07 : -0.07, 0];
+        childModel(ball(p, 0.055, palette.carbon), "atom", 6);
+        for (const sign of [-1, 1]) {
+          const h: Point = [p[0], p[1] * 1.5, sign * 0.11];
+          childModel(ball(h, 0.03, palette.hydrogen), "atom", 1);
+          molecularBond(p, h, palette.carbon, palette.hydrogen, 0.012);
+        }
+        if (i)
+          molecularBond(
+            [-0.35 + (i - 1) * 0.14, (i - 1) % 2 ? 0.07 : -0.07, 0],
+            p,
+            palette.carbon,
+            palette.carbon,
+            0.018,
+          );
+      }
+      break;
+    }
     case "world": {
-      ball([0, -0.107, 0], [0.65, 0.1, 0.44], "#665f4d");
-      ball([0, -0.055, 0], [0.635, 0.055, 0.43], "#59795e");
+      sampleSurface(
+        ball([0, -0.107, 0], [0.65, 0.1, 0.44], "#665f4d"),
+        "soil",
+        "soil",
+      );
+      sampleSurface(
+        ball([0, -0.055, 0], [0.635, 0.055, 0.43], "#59795e"),
+        "soil",
+        "soil",
+      );
       const groundHeight = (x: number, z: number) =>
         -0.055 +
         0.055 * Math.sqrt(Math.max(0, 1 - (x / 0.635) ** 2 - (z / 0.43) ** 2));
@@ -685,10 +1016,26 @@ export function createWorldModel(
         geometry.computeVertexNormals();
         const material = mat(tint, 1, 0.66);
         material.side = T.DoubleSide;
-        add(geometry, material);
+        const surface = sampleSurface(
+          add(geometry, material),
+          tint === "#568e9b" ? "droplet" : "soil",
+          tint === "#568e9b" ? "liquid-water" : "soil",
+        );
+        if (tint === "#568e9b")
+          surface.userData.worldSampleChildId = "world/liquid-sample";
       };
       ribbon(0.041, "#b1a37d", 0.002);
       ribbon(0.033, "#568e9b", 0.003);
+      const pond = sampleSurface(
+        ball(
+          [-0.34, groundHeight(-0.34, -0.2) + 0.006, -0.2],
+          [0.092, 0.005, 0.055],
+          mat("#609fae", 0.87, 0.24),
+        ),
+        "droplet",
+        "liquid-water",
+      );
+      pond.userData.worldSampleChildId = "world/liquid-sample";
       // Selectable world specimens are placed independently by the atlas using
       // their physical dimensions. Only background terrain belongs here.
       for (let i = 0; i < 8; i++) {
@@ -700,6 +1047,7 @@ export function createWorldModel(
           z = -0.3 + rand() * 0.6;
         stone.position.set(x, groundHeight(x, z) + 0.006, z);
         stone.scale.set(1, 0.65, 0.9);
+        sampleSurface(stone, "rock", "rock");
       }
       const grass: Point[] = [];
       for (let i = 0; i < 42; i++) {
@@ -722,6 +1070,8 @@ export function createWorldModel(
         tuft.updateMatrix();
         tufts.setMatrixAt(i, tuft.matrix);
       });
+      sampleSurface(tufts, "leaf", "grass");
+      tufts.userData.worldSampleChildId = "world/grass";
       tufts.instanceMatrix.needsUpdate = true;
       tufts.computeBoundingSphere();
       break;
@@ -754,6 +1104,7 @@ export function createWorldModel(
         position.setXYZ(i, x * f, y * f * 0.78, z * f * 0.85);
       }
       rock.geometry.computeVertexNormals();
+      sampleSurface(rock, "mineralGrains", "rock-matrix");
       for (let i = 0; i < 5; i++) {
         const crystal = add(
           new T.CylinderGeometry(0.045, 0.07, 0.23, 6),
@@ -766,6 +1117,8 @@ export function createWorldModel(
           .copy(crystal.position)
           .add(new T.Vector3(0, 0.14, 0).applyEuler(crystal.rotation));
         tip.rotation.copy(crystal.rotation);
+        sampleSurface(crystal, "quartz", "quartz");
+        sampleSurface(tip, "quartz", "quartz");
       }
       break;
     }
@@ -917,6 +1270,7 @@ export function createWorldModel(
       );
       break;
     }
+    case "artery":
     case "vein":
     case "vessel":
     case "capillary": {
@@ -969,7 +1323,11 @@ export function createWorldModel(
       break;
     }
     case "blood": {
-      shell([0, 0, 0], [0.49, 0.29, 0.31], "#e5b177", 0.07);
+      sampleSurface(
+        shell([0, 0, 0], [0.49, 0.29, 0.31], "#e5b177", 0.07),
+        "droplet",
+        "blood-plasma",
+      );
       const geometry = redCellGeometry();
       geometries.add(geometry);
       for (let i = 0; i < 15; i++) {
@@ -1009,17 +1367,19 @@ export function createWorldModel(
       const cell = add(redCellGeometry(), mat(color || "#d84b65", 1, 0.3));
       cell.rotation.x = 0.7;
       cell.rotation.z = -0.16;
+      sampleSurface(cell, "membrane", "cell-membrane");
       break;
     }
     case "whiteBloodCell": {
-      childModel(
+      sampleSurface(
         shell([0, 0, 0], [0.4, 0.39, 0.4], "#d5d3ed", 0.47),
         "membrane",
+        "cell-membrane",
       );
       // The content selects a lymphocyte: one large, rounded nucleus,
       // rather than the segmented nucleus of a neutrophil.
       childModel(
-        ball([-0.035, 0.025, 0.055], [0.20, 0.21, 0.19], "#9675bd"),
+        ball([-0.035, 0.025, 0.055], [0.2, 0.21, 0.19], "#9675bd"),
         "cellNucleus",
       );
       const p: Point[] = [];
@@ -1064,10 +1424,15 @@ export function createWorldModel(
     }
     case "cell":
     case "animalCell":
-    case "plantCell": {
-      const plant = kind === "plantCell";
+    case "plantCell":
+    case "rootCell": {
+      const plant = kind === "plantCell" || kind === "rootCell";
       if (plant) {
-        box([0.9, 0.73, 0.53], mat("#87b78e", 0.12));
+        sampleSurface(
+          box([0.9, 0.73, 0.53], mat("#87b78e", 0.12)),
+          "cellWall",
+          "plant-cell-wall",
+        );
         for (const y of [-0.365, 0.365])
           for (const z of [-0.265, 0.265])
             rod([-0.45, y, z], [0.45, y, z], 0.021, "#8bb587");
@@ -1077,12 +1442,16 @@ export function createWorldModel(
         for (const x of [-0.45, 0.45])
           for (const y of [-0.365, 0.365])
             rod([x, y, -0.265], [x, y, 0.265], 0.021, "#8bb587");
-        ball([0.03, 0.02, -0.03], [0.265, 0.26, 0.19], mat("#8cccd0", 0.3));
+        sampleSurface(
+          ball([0.03, 0.02, -0.03], [0.265, 0.26, 0.19], mat("#8cccd0", 0.3)),
+          "droplet",
+          "vacuole",
+        );
         childModel(
           ball([-0.29, -0.14, 0.09], [0.12, 0.12, 0.1], "#b296d4"),
           "cellNucleus",
         );
-        for (let i = 0; i < 5; i++) {
+        for (let i = 0; i < (kind === "rootCell" ? 0 : 5); i++) {
           const a = (i * TAU) / 5;
           const c = ball(
             [Math.cos(a) * 0.33, Math.sin(a) * 0.27, 0.1],
@@ -1093,9 +1462,10 @@ export function createWorldModel(
           childModel(c, "chloroplast");
         }
       } else {
-        childModel(
+        sampleSurface(
           shell([0, 0, 0], [0.48, 0.37, 0.34], color || "#d19bab", 0.16),
           "membrane",
+          "cell-membrane",
         );
         const back = add(
           new T.SphereGeometry(1, 32, 24, 0, Math.PI),
@@ -1103,6 +1473,7 @@ export function createWorldModel(
         );
         back.scale.set(0.48, 0.37, 0.34);
         back.rotation.y = Math.PI;
+        sampleSurface(back, "cytoplasm", "cytoplasm");
         childModel(
           ball([-0.1, 0.05, 0.035], [0.155, 0.145, 0.135], "#aa8bd0"),
           "cellNucleus",
@@ -1118,7 +1489,11 @@ export function createWorldModel(
               0.01 + i * 0.02,
             ]);
           }
-          tube(path, 0.012, i % 2 ? "#d9a8c3" : "#b280ae");
+          sampleSurface(
+            tube(path, 0.012, i % 2 ? "#d9a8c3" : "#b280ae"),
+            "membrane",
+            "endomembrane",
+          );
         }
       }
       for (let i = 0; i < 3; i++) {
@@ -1145,8 +1520,16 @@ export function createWorldModel(
     }
     case "nucleus":
     case "cellNucleus": {
-      shell([0, 0, 0], [0.4, 0.4, 0.4], "#ac92d0", 0.21);
-      ball([0.1, -0.07, 0.07], 0.12, "#d0abd9");
+      sampleSurface(
+        shell([0, 0, 0], [0.4, 0.4, 0.4], "#ac92d0", 0.21),
+        "membrane",
+        "nuclear-envelope",
+      );
+      sampleSurface(
+        ball([0.1, -0.07, 0.07], 0.12, "#d0abd9"),
+        undefined,
+        "nucleolus",
+      );
       for (let c = 0; c < 3; c++) {
         const points: Point[] = [];
         for (let i = 0; i < 45; i++) {
@@ -1184,15 +1567,23 @@ export function createWorldModel(
     case "phospholipid": {
       const single = kind === "phospholipid";
       const size = single ? 1 : 7;
+      const lipidLayer = single
+        ? model
+        : regionGroup(model, "phospholipid", "phospholipid");
       for (let x = 0; x < size; x++)
         for (let z = 0; z < (single ? 1 : 5); z++)
           for (const side of single ? [1] : [-1, 1]) {
+            const lipid = lipidLayer;
+            const tails = single
+              ? regionGroup(model, "hydrocarbon", "lipid-tail")
+              : lipid;
             const px = (x - (size - 1) / 2) * 0.11,
               pz = (z - (single ? 0 : 2)) * 0.11;
             ball(
               [px, side * 0.17, pz],
               single ? 0.075 : 0.045,
               side > 0 ? "#86c5d3" : "#c89ace",
+              lipid,
             );
             for (const offset of [-0.017, 0.017])
               tube(
@@ -1207,6 +1598,7 @@ export function createWorldModel(
                 ],
                 single ? 0.014 : 0.009,
                 "#e1be7e",
+                tails,
               );
           }
       if (!single) {
@@ -1221,6 +1613,8 @@ export function createWorldModel(
           mat("#ae83b8", 0.88),
         );
         channelWall.position.set(0.14, 0, 0);
+        sampleSurface(channel, "protein", "membrane-protein");
+        sampleSurface(channelWall, "protein", "membrane-protein");
       }
       break;
     }
@@ -1294,7 +1688,11 @@ export function createWorldModel(
           0.21 + i * 0.015,
           0.17 + Math.cos(i * 0.85) * 0.025,
         ]);
-      tube(nascent, 0.012, palette.gold);
+      sampleSurface(
+        tube(nascent, 0.012, palette.gold),
+        "protein",
+        "nascent-protein",
+      );
       break;
     }
     case "polymer":
@@ -1318,6 +1716,16 @@ export function createWorldModel(
           chitin ? (i % 2) * Math.PI : i * 0.34,
           0,
         );
+        if (kind === "polymer" && (i === 2 || i === units - 3)) {
+          // Representative elemental samples only: this coarse polymer drawing
+          // carries no full formula, sequence or experimental atomic coordinates.
+          const oxygen = childModel(
+            ball([p[0], p[1], p[2] + 0.038], 0.023, palette.oxygen),
+            "atom",
+            8,
+          );
+          oxygen.userData.worldElement = "O";
+        }
         if (chitin) {
           const n: Point = [p[0] + (i % 2 ? -0.095 : 0.095), p[1], p[2]];
           molecularBond(p, n, palette.carbon, palette.nitrogen, 0.012);
@@ -1327,7 +1735,7 @@ export function createWorldModel(
             n[1] + 0.035,
             n[2],
           ];
-          ball(carbonyl, 0.02, palette.carbon);
+          childModel(ball(carbonyl, 0.02, palette.carbon), "atom", 6);
           molecularBond(n, carbonyl, palette.nitrogen, palette.carbon, 0.01);
           ball(
             [carbonyl[0], carbonyl[1] + 0.045, carbonyl[2]],
@@ -1346,6 +1754,11 @@ export function createWorldModel(
       if (!chitin)
         for (let i = 2; i < units - 1; i += 3)
           rod(centers[i - 2], centers[i + 1], 0.009, "#c4ae83");
+      if (kind === "polymer") {
+        model.userData.worldSampleAtomicNumber = 6;
+        group.userData.representation = "representative-polymer-network";
+        group.userData.compositionDiagram = true;
+      }
       break;
     }
     case "heme":
@@ -1353,7 +1766,7 @@ export function createWorldModel(
       const green = kind === "chlorophyll";
       // Porphyrin/chlorin topology is schematic; the central metal is explicit.
       const centerColor = green ? "#83b481" : "#dc9f61";
-      ball([0, 0, 0], 0.07, centerColor);
+      childModel(ball([0, 0, 0], 0.07, centerColor), "atom", green ? 12 : 26);
       for (let i = 0; i < 4; i++) {
         const a = (i * Math.PI) / 2 + Math.PI / 4;
         const points: Point[] = [];
@@ -1456,14 +1869,22 @@ export function createWorldModel(
       break;
     }
     case "nucleotide": {
-      ball([-0.3, 0.04, 0], 0.082, "#e3b96e");
+      sampleSurface(
+        ball([-0.3, 0.04, 0], 0.082, "#e3b96e"),
+        undefined,
+        "phosphate-group",
+      );
       const points: Point[] = [];
       for (let i = 0; i < 5; i++) {
         const a = (i / 5) * TAU + Math.PI / 2;
         points.push([Math.cos(a) * 0.13 - 0.06, Math.sin(a) * 0.13, 0]);
       }
       points.forEach((p, i) => {
-        ball(p, 0.035, i === 1 ? palette.oxygen : palette.carbon);
+        childModel(
+          ball(p, 0.035, i === 1 ? palette.oxygen : palette.carbon),
+          "atom",
+          i === 1 ? 8 : 6,
+        );
         molecularBond(p, points[(i + 1) % 5], palette.carbon, palette.carbon);
       });
       molecularBond([-0.3, 0.04, 0], points[1], palette.gold, palette.carbon);
@@ -1473,6 +1894,7 @@ export function createWorldModel(
       );
       base.rotation.x = Math.PI / 2;
       base.position.set(0.25, 0.035, 0);
+      sampleSurface(base, undefined, "nucleotide-base");
       molecularBond(
         points[4],
         [0.14, 0.035, 0],
@@ -1677,7 +2099,11 @@ export function createWorldModel(
       break;
     }
     case "cellWall": {
-      box([0.88, 0.65, 0.22], mat("#bdc992", 0.24));
+      sampleSurface(
+        box([0.88, 0.65, 0.22], mat("#bdc992", 0.24)),
+        "polymer",
+        "cell-wall-matrix",
+      );
       for (let layer = 0; layer < 3; layer++)
         for (let strand = 0; strand < 6; strand++) {
           const points: Point[] = [];
@@ -1695,6 +2121,11 @@ export function createWorldModel(
             ["#cbdba1", "#9fb987", "#e6d7a2"][layer],
           );
           fiber.rotation.z = layer === 1 ? 0.13 : -0.025;
+          sampleSurface(
+            fiber,
+            ["celluloseMicrofibril", "chitin"],
+            "cell-wall-fiber",
+          );
         }
       break;
     }
@@ -1905,8 +2336,11 @@ export function createWorldModel(
         const tint = nitrogen ? palette.nitrogen : palette.oxygen;
         const molecule = new T.Group();
         model.add(molecule);
-        ball([-0.095, 0, 0], 0.082, tint, molecule);
-        ball([0.095, 0, 0], 0.082, tint, molecule);
+        if (isAir) childModel(molecule, nitrogen ? "nitrogen" : "oxygen");
+        for (const x of [-0.095, 0.095]) {
+          const atom = ball([x, 0, 0], 0.082, tint, molecule);
+          if (!isAir) childModel(atom, "atom", nitrogen ? 7 : 8);
+        }
         const multiplicity = nitrogen ? [-1, 0, 1] : [-0.6, 0.6];
         multiplicity.forEach((bond) =>
           rod(
@@ -1975,7 +2409,7 @@ export function createWorldModel(
           ]);
         }
       vertices.forEach((p, i) => {
-        ball(p, 0.058, palette.oxygen);
+        childModel(ball(p, 0.058, palette.oxygen), "waterMolecule");
         const a = (i * TAU) / 6;
         for (const turn of [-0.912, 0.912]) {
           const h: Point = [
@@ -1983,7 +2417,7 @@ export function createWorldModel(
             p[1],
             p[2] + Math.sin(a + turn) * 0.085,
           ];
-          ball(h, 0.031, palette.hydrogen);
+          childModel(ball(h, 0.031, palette.hydrogen), "waterMolecule");
           molecularBond(p, h, palette.oxygen, palette.hydrogen, 0.014);
         }
         const next = Math.floor(i / 6) * 6 + ((i + 1) % 6);
@@ -2361,6 +2795,40 @@ export function createWorldModel(
     }
   }
 
+  const uniformMaterials: Record<
+    string,
+    [string | readonly string[] | undefined, string]
+  > = {
+    wood: ["xylem", "wood"],
+    xylem: ["cellWall", "plant-cell-wall"],
+    mushroom: ["hypha", "fungal-tissue"],
+    hypha: ["cellWall", "cell-wall"],
+    root: [["plantCell", "rootCell"], "root-epidermis"],
+    protein: ["aminoAcidResidue", "protein"],
+    actin: ["aminoAcidResidue", "protein"],
+    myosin: ["aminoAcidResidue", "protein"],
+    dna: ["nucleotide", "dna"],
+    thylakoid: ["chlorophyll", "thylakoid-membrane"],
+    droplet: ["waterMolecule", "aqueous-sample"],
+    ice: ["iceLattice", "ice"],
+    hair: ["protein", "keratin"],
+    platelet: ["membrane", "cell-membrane"],
+    ribosome: [undefined, "ribosomal-complex"],
+    nucleotide: [undefined, "nucleotide-diagram"],
+    phospholipid: [undefined, "phospholipid-head"],
+    chitin: [undefined, "chitin-diagram"],
+    heme: [undefined, "porphyrin-ring"],
+    chlorophyll: [undefined, "chlorin-ring"],
+    polymer: ["atom", "carbon-rich-polymer"],
+    atom: [undefined, "electron-cloud"],
+    atomicNucleus: [undefined, "atomic-nucleus"],
+    nucleon: [undefined, "nucleon"],
+    quark: [undefined, "elementary-particle"],
+    electron: [undefined, "elementary-particle"],
+  };
+  const uniform = uniformMaterials[kind];
+  if (uniform) sampleSurface(model, uniform[0], uniform[1]);
+
   // Batch static teaching detail by parent and material. Transform-bearing
   // groups (the beating heart, for example) remain intact, while hundreds of
   // lipid heads or actin beads cost a few draws instead of hundreds. Atomic
@@ -2370,7 +2838,10 @@ export function createWorldModel(
     if (object.children.length) parents.push(object);
   });
   parents.forEach((parent) => {
-    const batches = new Map<T.Material, T.Mesh[]>();
+    const batches = new Map<
+      string,
+      { material: T.Material; meshes: T.Mesh[] }
+    >();
     parent.children.forEach((child) => {
       if (
         !(child instanceof T.Mesh) ||
@@ -2382,11 +2853,15 @@ export function createWorldModel(
         return;
       if (!child.geometry.attributes.normal || !child.geometry.attributes.uv)
         return;
-      const batch = batches.get(child.material) ?? [];
-      batch.push(child);
-      batches.set(child.material, batch);
+      const key = child.material.uuid + ":" + JSON.stringify(child.userData);
+      const batch = batches.get(key) ?? {
+        material: child.material,
+        meshes: [] as T.Mesh[],
+      };
+      batch.meshes.push(child);
+      batches.set(key, batch);
     });
-    batches.forEach((meshes, material) => {
+    batches.forEach(({ meshes, material }) => {
       if (meshes.length < 6) return;
       const sharedGeometry = meshes.every(
         (mesh) => mesh.geometry === meshes[0].geometry,
@@ -2402,6 +2877,7 @@ export function createWorldModel(
           instanced.setMatrixAt(i, mesh.matrix);
           parent.remove(mesh);
         });
+        instanced.userData = { ...meshes[0].userData };
         instanced.instanceMatrix.needsUpdate = true;
         instanced.computeBoundingSphere();
         parent.add(instanced);
@@ -2417,7 +2893,7 @@ export function createWorldModel(
         const merged = mergeGeometries(transformed, false);
         transformed.forEach((geometry) => geometry.dispose());
         if (!merged) return;
-        add(merged, material, parent);
+        add(merged, material, parent).userData = { ...meshes[0].userData };
         meshes.forEach((mesh) => parent.remove(mesh));
       }
     });

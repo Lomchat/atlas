@@ -2647,5 +2647,12 @@
       "sha256": "fa321af0426f94a3650b5970a03824105d4d9b5e7bdbb63cdebf0cc05544e9d7",
       "route": null
     }
+  },
+  "picking": {
+    "file": "parts.json",
+    "formatVersion": 1,
+    "sha256": "cd99340dabdec857fa057531902539ce302338d1f2afebe6ad1454dd3024b936",
+    "bytes": 232823,
+    "parts": 1670
   }
 }

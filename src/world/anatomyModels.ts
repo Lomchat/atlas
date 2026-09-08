@@ -1,8 +1,11 @@
 import * as T from "three";
 import type { WorldNode } from "./data";
+import { WORLD_NODES } from "./data";
 import { createWorldModel } from "./models";
 import type { WorldModel } from "./models";
 import metadata from "../../public/models/bodyparts3d/manifest.json";
+import partMetadata from "../../public/models/bodyparts3d/parts.json";
+import type { SpatialSource } from "./sample-address";
 
 export type AnatomyMode = "organs" | "skeleton" | "muscles" | "surface";
 export type AnatomyStatus = "loading" | "ready" | "error";
@@ -16,6 +19,84 @@ type Asset = {
   version?: string;
 };
 const assets = metadata.assets as unknown as Record<string, Asset>;
+type PartRow = [
+  number,
+  string | null,
+  string | null,
+  number,
+  number,
+  Point,
+  number,
+];
+type PartRange = [number, number, string, number, number];
+const partTable = partMetadata as unknown as {
+  assetIds: string[];
+  categories: string[];
+  regions: string[];
+  parts: Record<string, PartRow>;
+  assets: Record<string, { sha256: string; ranges: PartRange[] }>;
+};
+/** Sparse source-face candidates for opt-in diagnostics, never a runtime pick map. */
+export function anatomyFaceSamples(assetId: string): number[] {
+  const ranges = partTable.assets[assetId]?.ranges || [];
+  const buckets = new Map<string, PartRange[]>();
+  for (const range of ranges) {
+    const row = partTable.parts[range[2]];
+    if (!row) continue;
+    const key = `${partTable.categories[row[3]]}:${partTable.regions[row[4]]}`;
+    const bucket = buckets.get(key) || [];
+    bucket.push(range);
+    buckets.set(key, bucket);
+  }
+  const result: number[] = [];
+  for (const bucket of buckets.values()) {
+    for (let n = 0; n < Math.min(4, bucket.length); n++) {
+      const range =
+        bucket[Math.floor((n * bucket.length) / Math.min(4, bucket.length))];
+      for (const fraction of [0.17, 0.47, 0.73])
+        result.push(range[0] + Math.floor(range[1] * fraction));
+    }
+  }
+  return result.slice(0, 144);
+}
+export function anatomyHit(
+  hit: T.Intersection,
+): (SpatialSource & { category: string }) | undefined {
+  const assetId = hit.object.userData.anatomyAssetId as string | undefined;
+  if (!assetId || hit.faceIndex == null) return;
+  const indexed = partTable.assets[assetId];
+  if (!indexed || indexed.sha256 !== assets[assetId]?.sha256) return;
+  let lo = 0,
+    hi = indexed.ranges.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >>> 1;
+    const [first, count, partId] = indexed.ranges[mid];
+    if (hit.faceIndex < first) hi = mid - 1;
+    else if (hit.faceIndex >= first + count) lo = mid + 1;
+    else {
+      const row = partTable.parts[partId];
+      if (!row) return;
+      const category = partTable.categories[row[3]];
+      let region = partTable.regions[row[4]];
+      if (category === "surface") {
+        const p = hit.object.worldToLocal(hit.point.clone());
+        region =
+          p.y > 0.3
+            ? "head"
+            : p.y < -0.12
+              ? p.x >= 0
+                ? "left-leg"
+                : "right-leg"
+              : Math.abs(p.x) > 0.095
+                ? p.x >= 0
+                  ? "left-arm"
+                  : "right-arm"
+                : "trunk";
+      }
+      return { assetId, partId, category, region };
+    }
+  }
+}
 export const anatomyVersions = [
   ...new Set(Object.values(assets).map((asset) => asset.version || "4.0")),
 ].sort();
@@ -79,6 +160,11 @@ function bytes(key: string): Promise<ArrayBuffer> {
 }
 
 export function anatomyVisible(id: string, mode: AnatomyMode): boolean {
+  if (id === "human/vein-sample" || id === "human/artery-sample")
+    return mode === "organs";
+  if (id === "human/bone-sample")
+    return mode === "skeleton" || mode === "muscles";
+  if (id === "human/muscle-sample") return mode === "muscles";
   if (id === "human/skin") return mode === "surface";
   const key = routes[id];
   if (!key) return true;
@@ -90,8 +176,8 @@ export function anatomyVisible(id: string, mode: AnatomyMode): boolean {
 
 export function anatomyModeFor(id: string): AnatomyMode {
   if (id === "human/skin") return "surface";
-  if (id === "human/femur") return "skeleton";
-  if (id === "human/muscle") return "muscles";
+  if (id === "human/femur" || id === "human/bone-sample") return "skeleton";
+  if (id === "human/muscle" || id === "human/muscle-sample") return "muscles";
   return "organs";
 }
 
@@ -255,6 +341,7 @@ function anatomyModel(
     const originalMaterials = new Set<T.Material>();
     root.traverse((object) => {
       if (!(object instanceof T.Mesh)) return;
+      object.userData.anatomyAssetId = assetKey;
       (Array.isArray(object.material)
         ? object.material
         : [object.material]
@@ -328,15 +415,26 @@ export function createExplorationModel(
   bodyMode: AnatomyMode = "surface",
 ): WorldModel {
   if (node.model === "human") return anatomyModel("skin", true, bodyMode);
-  if (node.id === "human/vein/segment") return createVeinSection();
+  if (
+    node.id === "human/vein/segment" ||
+    node.id === "human/vein-sample" ||
+    node.id === "human/artery-sample"
+  )
+    return createVeinSection(node.id === "human/artery-sample");
   const key = (node.id && routes[node.id]) || anatomyKeyForModel(node.model);
-  if (key) return anatomyModel(key, false);
+  if (key) {
+    const model = anatomyModel(key, false);
+    if (node.id)
+      model.group.userData.worldSampleChildId =
+        WORLD_NODES[node.id]?.defaultChild;
+    return model;
+  }
   return createWorldModel(node.model, node.color, seed, node.atomic);
 }
 
 /** A 4 cm vessel specimen with a roughly 3 mm lumen, not millimetre-sized
  * erythrocytes. Blood stays a continuous volume until its microscopic sample. */
-function createVeinSection(): WorldModel {
+function createVeinSection(artery = false): WorldModel {
   const group = new T.Group();
   const geometries: T.BufferGeometry[] = [];
   const materials: T.Material[] = [];
@@ -354,6 +452,8 @@ function createVeinSection(): WorldModel {
       depthWrite: !transparent,
     });
     const object = new T.Mesh(geometry, material);
+    object.userData.worldSampleChildModel = transparent ? "blood" : "tissue";
+    object.userData.worldMaterialRegion = transparent ? "blood" : "vessel-wall";
     group.add(object);
     geometries.push(geometry);
     materials.push(material);
@@ -361,7 +461,7 @@ function createVeinSection(): WorldModel {
   };
   mesh(
     new T.CylinderGeometry(0.042, 0.042, 1, 48, 1, true, 0.6, Math.PI * 1.5),
-    "#7b86bd",
+    artery ? "#ad535c" : "#7b86bd",
   );
   mesh(
     new T.CylinderGeometry(
@@ -386,6 +486,7 @@ function createVeinSection(): WorldModel {
     ring.position.y = y;
   }
   group.userData.childNodeAnchors = { "human/vein/blood": [0, 0, 0.01] };
+  group.userData.childAnchors = { blood: [0, 0, 0.01], tissue: [0.039, 0, 0] };
   group.userData.modelKind = "vein";
   group.userData.normalizedExtent = 1;
   return {

@@ -1,0 +1,66 @@
+.world-local-origin {
+  padding: 10px 11px;
+  margin: 0 0 16px;
+  border: 1px solid #a8d9ef24;
+  border-radius: 11px;
+  background: #a8d9ef05;
+}
+.world-local-origin-heading {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  color: var(--world-accent);
+  font-size: 10px;
+  line-height: 1.6;
+}
+.world-local-origin-heading > strong {
+  font-weight: 500;
+}
+.world-local-origin-heading > span {
+  margin-left: auto;
+  color: var(--world-muted);
+  font-size: 9px;
+}
+.world-local-origin > p {
+  margin: 5px 0 7px;
+  color: var(--world-muted);
+  font-size: 10px;
+  line-height: 1.7;
+}
+.world-local-origin-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 5px 9px;
+}
+.world-local-origin-footer > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 28px;
+  padding: 4px 0;
+  color: var(--world-accent);
+  font-size: 9px;
+  text-align: left;
+}
+.world-local-origin-footer > small {
+  color: var(--world-faint);
+  font-size: 8px;
+  line-height: 1.5;
+}
+.world-place-card .world-saved-origin {
+  display: block;
+  margin-top: 4px;
+  color: var(--world-accent);
+  font-size: 9px;
+}
+@media (max-width: 700px), (max-height: 520px) and (orientation: landscape) {
+  .world-local-origin {
+    margin-bottom: 12px;
+  }
+  .world-local-origin-footer > button {
+    min-height: 32px;
+  }
+}

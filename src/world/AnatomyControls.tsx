@@ -101,7 +101,7 @@ export function AnatomyControls({
   const selectedMode = modes.find((entry) => entry.id === mode)!;
   const available = WORLD_NODES.human.children
     .map((id) => WORLD_NODES[id])
-    .filter((node): node is WorldNode => Boolean(node));
+    .filter((node): node is WorldNode => Boolean(node) && !node.spatialOnly);
   const belongsToLayer = (node: WorldNode) =>
     selectedMode.routes.includes(node.id.slice("human/".length));
   const matching = available.filter(belongsToLayer);

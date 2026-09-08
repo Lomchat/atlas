@@ -26,12 +26,14 @@ export interface WorldNode {
   relation: WorldRelation;
   children: string[];
   defaultChild?: string;
+  /** Available at a material hit; not a positioned constituent or default locator. */
+  spatialOnly?: boolean;
   facts: Bilingual[];
   question: Bilingual;
   answer: Bilingual;
   sources: WorldSource[];
   molecule?: "water" | "methane" | "co2";
-  element?: "H" | "C" | "N" | "O" | "Mg" | "Si" | "Fe";
+  element?: "H" | "C" | "N" | "O" | "Mg" | "Si" | "Fe" | "Ca" | "P";
   atomic?: { atomicNumber: number; massNumber: number; charge: number };
   quarkFlavor?: "up" | "down";
 }
@@ -2264,6 +2266,45 @@ type AtomSpec = {
   note: Pair;
 };
 const ATOMS = {
+  N: {
+    element: "N",
+    name: ["Nitrogen atom", "Atome d’azote"],
+    z: 7,
+    a: 14,
+    charge: 0,
+    extent: 0.142e-9,
+    color: "#819edf",
+    note: [
+      "Covalent diameter convention about 0.142 nm; not a hard spherical boundary.",
+      "Convention de diamètre covalent d’environ 0,142 nm ; pas une limite sphérique dure.",
+    ],
+  },
+  Ca: {
+    element: "Ca",
+    name: ["Calcium atom", "Atome de calcium"],
+    z: 20,
+    a: 40,
+    charge: 0,
+    extent: 0.348e-9,
+    color: "#95bba0",
+    note: [
+      "Neutral-atom covalent diameter convention about 0.348 nm. Calcium in bone mineral is bonded and has ionic character; this is not the radius of Ca²⁺ in the lattice.",
+      "Convention de diamètre covalent de l’atome neutre d’environ 0,348 nm. Le calcium minéral osseux est lié et présente un caractère ionique ; ce n’est pas le rayon du Ca²⁺ dans le réseau.",
+    ],
+  },
+  P: {
+    element: "P",
+    name: ["Phosphorus atom", "Atome de phosphore"],
+    z: 15,
+    a: 31,
+    charge: 0,
+    extent: 0.218e-9,
+    color: "#d9b566",
+    note: [
+      "Neutral-atom covalent diameter convention about 0.218 nm; phosphorus in phosphate participates in chemical bonding.",
+      "Convention de diamètre covalent de l’atome neutre d’environ 0,218 nm ; le phosphore du phosphate participe à des liaisons chimiques.",
+    ],
+  },
   Fe: {
     element: "Fe",
     name: ["Iron center · Fe²⁺", "Centre de fer · Fe²⁺"],
@@ -2347,7 +2388,7 @@ const ATOMS = {
 function atomicBranch(id: string, parent: string, a: AtomSpec) {
   const radiusSource = src(
     "Royal Society of Chemistry · " + a.element,
-    `https://periodic-table.rsc.org/element/${a.z}/${({ Fe: "iron", Mg: "magnesium", C: "carbon", O: "oxygen", H: "hydrogen", Si: "silicon", N: "nitrogen" } as const)[a.element]}`,
+    `https://periodic-table.rsc.org/element/${a.z}/${({ Fe: "iron", Mg: "magnesium", C: "carbon", O: "oxygen", H: "hydrogen", Si: "silicon", N: "nitrogen", Ca: "calcium", P: "phosphorus" } as const)[a.element]}`,
   );
   const ionic = a.charge !== 0;
   add(
@@ -3015,6 +3056,987 @@ WORLD_NODES["human/lungs"].sources.push(BP3D_LUNGS);
 WORLD_NODES.human.defaultChild = "human/vein";
 WORLD_NODES["human/vein/blood"].defaultChild = RBC;
 WORLD_NODES["tree/wood/xylem/wall/lignin"].model = "polymer";
+
+/** Material hits choose a local sample, never a pre-positioned mini-object.
+ * A sample target resolves only among the current node's direct children. */
+export const WORLD_SAMPLE_REGIONS: Readonly<Record<string, readonly string[]>> =
+  {
+    soil: ["soil"],
+    "rock-matrix": ["mineralGrains"],
+    rock: ["rock"],
+    quartz: ["quartz", "crystalLattice"],
+    "silicate-glass": ["glassNetwork"],
+    glass: ["glassSample"],
+    "liquid-water": ["droplet"],
+    "aqueous-sample": ["waterMolecule"],
+    "cloud-condensate": ["droplet"],
+    air: ["air"],
+    "woody-stem": ["wood"],
+    wood: ["xylem"],
+    foliage: ["leaf"],
+    root: ["root"],
+    "root-epidermis": ["plantCell", "rootCell"],
+    "leaf-lamina": ["plantCell"],
+    "plant-cell-wall": ["cellWall"],
+    "cell-wall": ["cellWall"],
+    "cell-wall-fiber": ["celluloseMicrofibril", "chitin"],
+    "cell-wall-matrix": ["polymer"],
+    "fungal-tissue": ["hypha"],
+    "soil-organic-matter": ["polymer"],
+    blood: ["blood"],
+    "blood-plasma": ["droplet"],
+    "vessel-wall": ["tissue"],
+    "living-tissue": ["cell"],
+    "bone-matrix": ["boneMatrix"],
+    "bone-mineral": ["apatite"],
+    "bone-canal": ["blood"],
+    collagen: ["protein"],
+    keratin: ["protein"],
+    "cell-membrane": ["membrane"],
+    "membrane-protein": ["protein"],
+    cytoplasm: ["cytoplasm"],
+    "nuclear-envelope": ["membrane"],
+    nucleoplasm: ["nucleoplasm"],
+    vacuole: ["droplet"],
+    protein: ["aminoAcidResidue"],
+    phospholipid: ["phospholipid"],
+    dna: ["nucleotide"],
+    "thylakoid-membrane": ["chlorophyll"],
+    ice: ["iceLattice"],
+    // Probability clouds and symbolic links do not locate another hidden object.
+    "electron-cloud": [],
+    "atomic-nucleus": [],
+    nucleon: [],
+    "elementary-particle": [],
+    "peptide-continuation": [],
+    nucleolus: [],
+    grass: ["leaf"],
+    "lipid-tail": ["hydrocarbon"],
+    "phospholipid-head": [],
+    "mitochondrial-membrane": ["membrane"],
+    "mitochondrial-dna": ["dna"],
+    endomembrane: ["membrane"],
+    "nascent-protein": ["protein"],
+    "ribosomal-complex": [],
+    "phosphate-group": [],
+    "nucleotide-base": [],
+    "nucleotide-diagram": [],
+    "chitin-diagram": [],
+    "porphyrin-ring": [],
+    "chlorin-ring": [],
+    "carbon-rich-polymer": ["atom"],
+  };
+
+const SPATIAL_SOURCES = {
+  plantWallMatrix: src(
+    "Plant Physiology · Native primary-wall cellulose–pectin contacts",
+    "https://academic.oup.com/plphys/article/168/3/871/6113743",
+  ),
+  fungalWallMatrix: src(
+    "Nature Communications · Fungal wall polysaccharides by solid-state NMR",
+    "https://www.nature.com/articles/s41467-021-26749-z",
+  ),
+  soil: src(
+    "USGS · What's in my soil?",
+    "https://www.usgs.gov/educational-resources/whats-my-soil",
+  ),
+  soilCarbon: src(
+    "USGS · Soil organic carbon",
+    "https://pubs.usgs.gov/sir/2017/5118/elements/C_Org/C_Org_txt.html",
+  ),
+  bone: src(
+    "NCBI Endotext · Anatomy and ultrastructure of bone",
+    "https://www.ncbi.nlm.nih.gov/books/NBK279149/",
+  ),
+  apatite: src(
+    "NCBI Bookshelf · Osteoblasts and mineralized matrix",
+    "https://www.ncbi.nlm.nih.gov/books/NBK557792/",
+  ),
+  glass: src(
+    "NIST · Noncrystal ionic model for silica glass",
+    "https://nvlpubs.nist.gov/nistpubs/jres/59/jresv59n2p139_A1b.pdf",
+  ),
+  proteins: src(
+    "NCBI Bookshelf · The shape and structure of proteins",
+    "https://www.ncbi.nlm.nih.gov/books/NBK26830/",
+  ),
+  cytosol: src(
+    "NCBI Bookshelf · The compartmentalization of cells",
+    "https://www.ncbi.nlm.nih.gov/books/NBK26907/",
+  ),
+  liver: src(
+    "NIDDK · Your digestive system and how it works",
+    "https://www.niddk.nih.gov/health-information/digestive-diseases/digestive-system-how-it-works",
+  ),
+  kidneys: src(
+    "NIDDK · Your kidneys and how they work",
+    "https://www.niddk.nih.gov/health-information/kidney-disease/kidneys-how-they-work",
+  ),
+};
+
+function selectedFieldNote(size: number): Pair {
+  const scale =
+    size >= 0.001
+      ? [size * 1e3, "mm"]
+      : size >= 1e-6
+        ? [size * 1e6, "µm"]
+        : [size * 1e9, "nm"];
+  const value = Number(Number(scale[0]).toPrecision(4));
+  return [
+    `Selected field extent: ${value} ${scale[1]}. This is an illustrative sample window, not the size of the whole material or organ.`,
+    `Dimension du champ choisi : ${String(value).replace(".", ",")} ${scale[1]}. C’est une fenêtre d’échantillonnage illustrative, pas la taille de toute la matière ou de l’organe.`,
+  ];
+}
+function spatialRecord(
+  id: string,
+  parent: string,
+  model: string,
+  size: number,
+  color: string,
+  name: Pair,
+  description: Pair,
+  fact: Pair,
+  sources: WorldSource[],
+  spatialOnly = false,
+) {
+  add(
+    id,
+    parent,
+    model,
+    size,
+    color,
+    name,
+    description,
+    selectedFieldNote(size),
+    fact,
+    [
+      "What does this closer view represent?",
+      "Que représente cette vue rapprochée ?",
+    ],
+    description,
+    sources,
+    "sample",
+  );
+  if (spatialOnly) WORLD_NODES[id].spatialOnly = true;
+}
+function cloneContextTree(
+  sourceId: string,
+  id: string,
+  parent: string,
+): WorldNode {
+  const source = WORLD_NODES[sourceId];
+  const sourceChildren = [...source.children];
+  copyNode(id, parent, sourceId);
+  const copied = WORLD_NODES[id];
+  copied.category = WORLD_NODES[parent].category;
+  copied.spatialOnly = source.spatialOnly;
+  copied.sources = [...source.sources];
+  copied.facts = [...source.facts];
+  for (const child of sourceChildren)
+    cloneContextTree(child, id + "/" + child.split("/").pop(), id);
+  if (source.defaultChild)
+    copied.defaultChild = id + "/" + source.defaultChild.split("/").pop();
+  return copied;
+}
+function waterContents(parent: string) {
+  if (
+    WORLD_NODES[parent].children.some(
+      (id) => WORLD_NODES[id].model === "waterMolecule",
+    )
+  )
+    return;
+  cloneContextTree("water/liquid/molecule", parent + "/water", parent);
+  WORLD_NODES[parent + "/water"].relation = "madeOf";
+}
+function proteinSample(
+  parent: string,
+  id = parent + "/protein",
+  name: Pair = ["Protein fragment", "Fragment de protéine"],
+  size = 8e-9,
+) {
+  if (WORLD_NODES[id]) return;
+  spatialRecord(
+    id,
+    parent,
+    "protein",
+    size,
+    "#b9a6ce",
+    name,
+    [
+      "This selected polypeptide fragment illustrates a chain of amino-acid residues. Its fold and sequence are schematic; it does not identify a measured protein at this point.",
+      "Ce fragment de polypeptide choisi illustre une chaîne de résidus d’acides aminés. Son repliement et sa séquence sont schématiques ; il n’identifie pas une protéine mesurée à cet endroit.",
+    ],
+    [
+      "A protein is chemically bonded matter, not a miniature cell.",
+      "Une protéine est de la matière liée chimiquement, pas une cellule miniature.",
+    ],
+    [SPATIAL_SOURCES.proteins],
+  );
+}
+function livingCellSample(
+  parent: string,
+  id: string,
+  name: Pair,
+  description: Pair,
+) {
+  // These are generic teaching cells with their own biological ancestry, not
+  // keratinocytes transplanted into every organ. The original DNA links survive.
+  cloneContextTree("human/skin/cell", id, parent);
+  const cell = WORLD_NODES[id];
+  cell.name = b(name);
+  cell.description = b(description);
+  cell.sizeMeters = 20e-6;
+  cell.sizeNote = b(selectedFieldNote(20e-6));
+  cell.relation = "sample";
+  cell.question = b([
+    "Is every cell here identical?",
+    "Toutes les cellules présentes ici sont-elles identiques ?",
+  ]);
+  cell.answer = b([
+    "No. This is one selected living-cell example; real tissues contain several cell types and variable shapes.",
+    "Non. C’est un exemple choisi de cellule vivante ; les tissus réels contiennent plusieurs types cellulaires et des formes variables.",
+  ]);
+  cell.facts = [
+    b([
+      "A living nucleated human cell contains DNA and organelles; this does not describe a mature red blood cell.",
+      "Une cellule humaine vivante nucléée contient de l’ADN et des organites ; cela ne décrit pas un globule rouge mature.",
+    ]),
+  ];
+  cell.sources = [S.cells, SPATIAL_SOURCES.cytosol];
+}
+
+// First fill existing molecular endpoints, so subsequent contextual clones
+// inherit the same chemistry rather than ending at arbitrary model boundaries.
+for (const node of Object.values(WORLD_NODES)) {
+  if (node.model === "protein" || node.model === "ribosome") {
+    if (node.model === "ribosome") {
+      proteinSample(node.id);
+      continue;
+    }
+    spatialRecord(
+      node.id + "/residue",
+      node.id,
+      "aminoAcidResidue",
+      0.7e-9,
+      "#c9b7d4",
+      ["Glycine residue example", "Exemple de résidu de glycine"],
+      [
+        "A glycine residue provides a simple example of a peptide backbone. Other amino-acid residues have different side chains; this is not a sequence assignment for the schematic parent protein.",
+        "Un résidu de glycine fournit un exemple simple de squelette peptidique. Les autres résidus ont des chaînes latérales différentes ; ce n’est pas l’attribution d’une séquence à la protéine schématique parente.",
+      ],
+      [
+        "A residue within a polypeptide differs from a free amino acid: peptide links continue beyond this sample.",
+        "Un résidu dans un polypeptide diffère d’un acide aminé libre : les liaisons peptidiques continuent au-delà de cet échantillon.",
+      ],
+      [SPATIAL_SOURCES.proteins],
+    );
+    for (const element of ["C", "H", "N", "O"] as const)
+      atomicBranch(
+        node.id + "/residue/" + element.toLowerCase(),
+        node.id + "/residue",
+        ATOMS[element],
+      );
+  }
+}
+
+// Sparse phase/material samples are selectable by hits but do not add a row
+// of fake miniature objects to the initial landscape or body.
+spatialRecord(
+  "world/soil",
+  "world",
+  "soil",
+  0.035,
+  "#8e7053",
+  ["Soil sample", "Échantillon de sol"],
+  [
+    "This selected soil field contains a quartz-rich mineral fraction, organic material and water-filled or air-filled pores. Real soil composition varies greatly.",
+    "Ce champ de sol choisi contient une fraction minérale riche en quartz, de la matière organique et des pores remplis d’eau ou d’air. La composition réelle du sol varie beaucoup.",
+  ],
+  [
+    "Soil is a mixture and a habitat; it is not one giant molecule.",
+    "Le sol est un mélange et un habitat ; ce n’est pas une molécule géante.",
+  ],
+  [SPATIAL_SOURCES.soil],
+  true,
+);
+cloneContextTree("rock/quartz", "world/soil/quartz", "world/soil");
+spatialRecord(
+  "world/soil/organic",
+  "world/soil",
+  "polymer",
+  5e-9,
+  "#917757",
+  ["Soil organic fragment", "Fragment organique du sol"],
+  [
+    "Soil organic matter contains many compounds from organisms and their transformations. This carbon-containing network is an example, not a unique humus molecule.",
+    "La matière organique du sol contient de nombreux composés issus d’organismes et de leurs transformations. Ce réseau carboné est un exemple, pas une molécule unique d’humus.",
+  ],
+  [
+    "Organic carbon abundance changes with soil conditions and land use.",
+    "La quantité de carbone organique varie avec les conditions du sol et son usage.",
+  ],
+  [SPATIAL_SOURCES.soilCarbon],
+);
+atomicBranch("world/soil/organic/carbon", "world/soil/organic", ATOMS.C);
+cloneContextTree("water/liquid", "world/soil/water", "world/soil");
+cloneContextTree("cloud/air", "world/soil/air", "world/soil");
+WORLD_NODES["world/soil/air"].name = b([
+  "Air in soil pores",
+  "Air dans les pores du sol",
+]);
+cloneContextTree("cloud/air", "world/air", "world").spatialOnly = true;
+WORLD_NODES["world/air"].name = b([
+  "Ambient air sample",
+  "Échantillon d’air ambiant",
+]);
+cloneContextTree("water/liquid", "world/liquid-sample", "world").spatialOnly =
+  true;
+WORLD_NODES["world/liquid-sample"].name = b([
+  "Local water sample",
+  "Échantillon d’eau local",
+]);
+cloneContextTree("tree/wood", "world/table-wood", "world").spatialOnly = true;
+WORLD_NODES["world/table-wood"].name = b([
+  "Table wood sample",
+  "Échantillon de bois de la table",
+]);
+WORLD_NODES["world/table-wood"].description = b([
+  "A selected piece of worked wood retains plant cell-wall structure. This route explores the table material, independently of the living tree.",
+  "Un morceau de bois travaillé conserve la structure des parois végétales. Ce parcours explore la matière de la table, indépendamment de l’arbre vivant.",
+]);
+
+spatialRecord(
+  "rock/grains",
+  "rock",
+  "mineralGrains",
+  0.02,
+  "#bdb3a1",
+  ["Quartz-rich grain field", "Champ de grains riche en quartz"],
+  [
+    "This selected field follows quartz grains in the example rock. It does not assert that every mineral in the whole rock is quartz.",
+    "Ce champ choisi suit des grains de quartz dans la roche d’exemple. Il ne suppose pas que tous les minéraux de la roche entière sont du quartz.",
+  ],
+  [
+    "A material sample and a complete inventory of minerals are different things.",
+    "Un échantillon de matière et un inventaire complet des minéraux sont deux choses différentes.",
+  ],
+  [S.rocks, S.quartz],
+  true,
+);
+cloneContextTree("rock/quartz", "rock/grains/quartz", "rock/grains");
+
+spatialRecord(
+  "water/glass",
+  "water",
+  "glassSample",
+  0.002,
+  "#b7d9df",
+  ["Glass wall sample", "Échantillon de paroi de verre"],
+  [
+    "This is the solid glass wall, separate from the liquid water. Ordinary drinking glasses are commonly modified silicate glasses; the next diagram focuses on their silicon–oxygen framework.",
+    "Il s’agit de la paroi solide en verre, distincte de l’eau liquide. Les verres à boire sont souvent des verres silicatés modifiés ; le schéma suivant se concentre sur leur réseau silicium-oxygène.",
+  ],
+  [
+    "Glass is not a liquid-water layer. Its solid network has no quartz-like long-range periodicity.",
+    "Le verre n’est pas une couche d’eau liquide. Son réseau solide n’a pas la périodicité à longue distance du quartz.",
+  ],
+  [SPATIAL_SOURCES.glass],
+  true,
+);
+spatialRecord(
+  "water/glass/network",
+  "water/glass",
+  "glassNetwork",
+  1.8e-9,
+  "#bac9dd",
+  ["Silicate-glass connectivity", "Connexions du verre silicaté"],
+  [
+    "This distorted Si–O scaffold illustrates local network connectivity without crystalline repetition. Positions are explanatory, not a measured amorphous structure; modifier ions and defects are omitted.",
+    "Cet assemblage Si–O déformé illustre les connexions locales sans répétition cristalline. Les positions sont explicatives, pas une structure amorphe mesurée ; les ions modificateurs et défauts sont omis.",
+  ],
+  [
+    "A silicon–oxygen framework does not make glass a collection of free SiO₂ molecules.",
+    "Un réseau silicium-oxygène ne fait pas du verre une collection de molécules SiO₂ libres.",
+  ],
+  [SPATIAL_SOURCES.glass],
+);
+atomicBranch("water/glass/network/silicon", "water/glass/network", ATOMS.Si);
+atomicBranch("water/glass/network/oxygen", "water/glass/network", ATOMS.O);
+
+// Region-selected vessel examples intentionally do not claim the clicked
+// background vessel is the named cephalic specimen.
+for (const [id, model, name] of [
+  [
+    "human/vein-sample",
+    "vein",
+    ["Venous wall sample", "Échantillon de paroi veineuse"],
+  ],
+  [
+    "human/artery-sample",
+    "artery",
+    ["Arterial wall sample", "Échantillon de paroi artérielle"],
+  ],
+] as const) {
+  spatialRecord(
+    id,
+    "human",
+    model,
+    0.04,
+    model === "artery" ? "#b96e73" : "#7287b2",
+    name,
+    [
+      "A schematic four-centimeter vessel section samples this region. The lumen contains blood; the vessel wall contains living tissue. This is not the identification of a named individual vessel.",
+      "Un segment vasculaire schématique de quatre centimètres échantillonne cette région. La lumière contient du sang ; la paroi contient des tissus vivants. Ce n’est pas l’identification d’un vaisseau individuel nommé.",
+    ],
+    model === "artery"
+      ? [
+          "Arteries carry blood away from the heart; this does not always mean oxygen-rich blood.",
+          "Les artères conduisent le sang depuis le cœur ; cela ne signifie pas toujours un sang riche en oxygène.",
+        ]
+      : [
+          "Veins return blood toward the heart; venous blood is red, not blue.",
+          "Les veines ramènent le sang vers le cœur ; le sang veineux est rouge, pas bleu.",
+        ],
+    [S.vessels],
+    true,
+  );
+  cloneContextTree("human/vein/blood", id + "/blood", id);
+}
+cloneContextTree("human/muscle", "human/muscle-sample", "human").spatialOnly =
+  true;
+WORLD_NODES["human/muscle-sample"].model = "muscle";
+WORLD_NODES["human/muscle-sample"].sizeMeters = 0.01;
+WORLD_NODES["human/muscle-sample"].sizeNote = b(selectedFieldNote(0.01));
+WORLD_NODES["human/muscle-sample"].name = b([
+  "Skeletal muscle sample",
+  "Échantillon de muscle squelettique",
+]);
+WORLD_NODES["human/muscle-sample"].description = b([
+  "A selected local muscle sample leads to a fiber and its contractile structures. Its procedural shape is not a reconstruction of an identified named muscle.",
+  "Un échantillon musculaire local choisi mène à une fibre et à ses structures contractiles. Sa forme procédurale ne reconstruit pas un muscle nommé identifié.",
+]);
+WORLD_NODES["human/muscle-sample"].sources = [S.muscle, S.contraction];
+
+for (const [organ, name, cellName, description] of [
+  [
+    "liver",
+    ["Liver tissue sample", "Échantillon de tissu hépatique"],
+    ["Hepatocyte example", "Exemple d’hépatocyte"],
+    [
+      "This selected liver-cell example represents living hepatocyte material. Liver tissue also contains vessels, ducts and other cell types.",
+      "Cet exemple de cellule hépatique représente la matière vivante d’un hépatocyte. Le foie contient aussi des vaisseaux, des canaux et d’autres types cellulaires.",
+    ],
+  ],
+  [
+    "kidneys",
+    ["Renal tissue sample", "Échantillon de tissu rénal"],
+    ["Renal tubular cell example", "Exemple de cellule tubulaire rénale"],
+    [
+      "This example selects a living renal tubular epithelial cell. It is not a whole nephron or a spatial claim that every point of a kidney belongs to one tubule.",
+      "Cet exemple sélectionne une cellule épithéliale tubulaire rénale vivante. Ce n’est pas un néphron entier ni l’affirmation que chaque point d’un rein appartient à un tubule.",
+    ],
+  ],
+  [
+    "stomach",
+    ["Stomach lining sample", "Échantillon de muqueuse gastrique"],
+    [
+      "Gastric epithelial cell example",
+      "Exemple de cellule épithéliale gastrique",
+    ],
+    [
+      "This selected living epithelial cell belongs to a teaching sample of the stomach lining. The model does not resolve a measured gland or assign acid production to every epithelial cell.",
+      "Cette cellule épithéliale vivante choisie appartient à un échantillon pédagogique de muqueuse gastrique. Le modèle ne résout pas une glande mesurée et n’attribue pas la production d’acide à toutes les cellules épithéliales.",
+    ],
+  ],
+  [
+    "intestines",
+    ["Intestinal lining sample", "Échantillon de muqueuse intestinale"],
+    [
+      "Intestinal epithelial cell example",
+      "Exemple de cellule épithéliale intestinale",
+    ],
+    [
+      "This selected epithelial-cell example introduces living intestinal material. Cell types and their functions differ between the small intestine and colon.",
+      "Cet exemple de cellule épithéliale introduit la matière intestinale vivante. Les types cellulaires et leurs fonctions diffèrent entre intestin grêle et côlon.",
+    ],
+  ],
+] as const) {
+  const id = "human/" + organ + "/tissue";
+  spatialRecord(
+    id,
+    "human/" + organ,
+    "tissue",
+    0.00015,
+    "#caa0a0",
+    name,
+    description,
+    [
+      "This microscopic field is a separate teaching sample, not histology reconstructed from the outer anatomical mesh.",
+      "Ce champ microscopique est un échantillon pédagogique distinct, pas une histologie reconstruite depuis le maillage anatomique externe.",
+    ],
+    [
+      S.cells,
+      organ === "kidneys" ? SPATIAL_SOURCES.kidneys : SPATIAL_SOURCES.liver,
+    ],
+  );
+  livingCellSample(id, id + "/cell", cellName, description);
+}
+
+spatialRecord(
+  "human/bone-sample",
+  "human",
+  "boneTissue",
+  0.0003,
+  "#d9c7a5",
+  ["Cortical bone tissue sample", "Échantillon de tissu osseux cortical"],
+  [
+    "A selected cortical field shows concentric matrix lamellae around a canal and small osteocyte locations. It does not depict every bone region; spongy bone is organized differently.",
+    "Un champ cortical choisi montre des lamelles matricielles concentriques autour d’un canal et de petits emplacements d’ostéocytes. Il ne représente pas toutes les régions osseuses ; l’os spongieux est organisé autrement.",
+  ],
+  [
+    "Bone combines living cells, collagen-rich organic matrix and mineral.",
+    "L’os associe cellules vivantes, matrice organique riche en collagène et minéral.",
+  ],
+  [SPATIAL_SOURCES.bone],
+  true,
+);
+livingCellSample(
+  "human/bone-sample",
+  "human/bone-sample/cell",
+  ["Osteocyte cell-body example", "Exemple de corps cellulaire d’ostéocyte"],
+  [
+    "This selected living bone-cell body contains a nucleus and organelles. Real osteocytes extend long processes through canaliculi, omitted from this generic cell view.",
+    "Ce corps cellulaire osseux vivant choisi contient un noyau et des organites. Les vrais ostéocytes étendent de longs prolongements dans des canalicules, omis de cette vue cellulaire générique.",
+  ],
+);
+spatialRecord(
+  "human/bone-sample/matrix",
+  "human/bone-sample",
+  "boneMatrix",
+  100e-9,
+  "#c6b792",
+  ["Mineralized bone matrix", "Matrice osseuse minéralisée"],
+  [
+    "This selected nanoscale field separates collagen-rich organic strands and calcium-phosphate mineral plates. Their packing and colors are schematic.",
+    "Ce champ nanométrique choisi distingue des filaments organiques riches en collagène et des plaquettes minérales de phosphate de calcium. Leur organisation et leurs couleurs sont schématiques.",
+  ],
+  [
+    "Bone mineral is not quartz. Biological apatite also contains substitutions and imperfections.",
+    "Le minéral osseux n’est pas du quartz. L’apatite biologique contient aussi des substitutions et imperfections.",
+  ],
+  [SPATIAL_SOURCES.bone, SPATIAL_SOURCES.apatite],
+);
+proteinSample("human/bone-sample/matrix", "human/bone-sample/matrix/collagen", [
+  "Collagen peptide fragment",
+  "Fragment peptidique de collagène",
+]);
+spatialRecord(
+  "human/bone-sample/matrix/apatite",
+  "human/bone-sample/matrix",
+  "apatite",
+  1e-9,
+  "#a9bec7",
+  ["Hydroxyapatite composition motif", "Motif de composition d’hydroxyapatite"],
+  [
+    "The diagram counts a Ca₁₀(PO₄)₆(OH)₂ composition motif. Its positions are illustrative, not an experimental crystal unit cell or a free molecule; biological bone apatite is chemically less ideal.",
+    "Le schéma compte un motif de composition Ca₁₀(PO₄)₆(OH)₂. Ses positions sont illustratives, pas une maille cristalline expérimentale ni une molécule libre ; l’apatite osseuse biologique est chimiquement moins idéale.",
+  ],
+  [
+    "Calcium and phosphate help mineralize a collagen-containing matrix.",
+    "Le calcium et le phosphate contribuent à minéraliser une matrice contenant du collagène.",
+  ],
+  [SPATIAL_SOURCES.apatite],
+);
+for (const e of ["Ca", "P", "O", "H"] as const)
+  atomicBranch(
+    "human/bone-sample/matrix/apatite/" + e.toLowerCase(),
+    "human/bone-sample/matrix/apatite",
+    ATOMS[e],
+  );
+cloneContextTree(
+  "human/vein/blood",
+  "human/bone-sample/blood",
+  "human/bone-sample",
+).spatialOnly = true;
+cloneContextTree(
+  "human/bone-sample",
+  "human/femur/tissue",
+  "human/femur",
+).spatialOnly = false;
+
+// Vessel walls select an endothelial-tissue example only when their surface
+// is hit; the lumen retains its independent blood sample.
+for (const node of Object.values(WORLD_NODES))
+  if (
+    ["vein", "artery", "capillary"].includes(node.model) &&
+    node.id !== "human/vein"
+  ) {
+    const id = node.id + "/wall";
+    if (node.model === "capillary") {
+      cloneContextTree(RBC + "/membrane", id, node.id).spatialOnly = true;
+      WORLD_NODES[id].name = b([
+        "Endothelial membrane patch",
+        "Fragment de membrane endothéliale",
+      ]);
+      WORLD_NODES[id].description = b([
+        "This molecular patch samples an endothelial cell membrane beside the capillary lumen; it does not depict a complete endothelial cell or the entire capillary wall.",
+        "Ce fragment moléculaire échantillonne une membrane de cellule endothéliale près de la lumière capillaire ; il ne représente ni une cellule endothéliale complète ni toute la paroi capillaire.",
+      ]);
+      continue;
+    }
+    spatialRecord(
+      id,
+      node.id,
+      "tissue",
+      0.0001,
+      "#ccaaa5",
+      ["Vessel wall tissue sample", "Échantillon de tissu de paroi vasculaire"],
+      [
+        "This selected field approaches the living endothelial lining. Larger vessel walls also contain connective tissue and variable amounts of smooth muscle.",
+        "Ce champ choisi approche le revêtement endothélial vivant. Les parois des gros vaisseaux contiennent aussi du tissu conjonctif et une quantité variable de muscle lisse.",
+      ],
+      [
+        "Endothelium is the cell lining; blood occupies the lumen beside it.",
+        "L’endothélium est le revêtement cellulaire ; le sang occupe la lumière à côté.",
+      ],
+      [S.vessels],
+      true,
+    );
+    livingCellSample(
+      id,
+      id + "/cell",
+      ["Endothelial cell example", "Exemple de cellule endothéliale"],
+      [
+        "A living endothelial cell lines a blood vessel. This generic organelle diagram does not reproduce its thin, flattened shape.",
+        "Une cellule endothéliale vivante borde un vaisseau sanguin. Ce schéma générique d’organites ne reproduit pas sa forme fine et aplatie.",
+      ],
+    );
+  }
+
+// Add a root epidermal sample without turning a plant root hair into a fungus.
+cloneContextTree("tree/leaf/cell", "tree/root/cell", "tree/root").spatialOnly =
+  true;
+const rootCell = WORLD_NODES["tree/root/cell"];
+rootCell.model = "rootCell";
+rootCell.question = b([
+  "Does this root cell photosynthesize?",
+  "Cette cellule racinaire photosynthétise-t-elle ?",
+]);
+rootCell.answer = b([
+  "This selected non-photosynthetic root epidermal cell has no chloroplasts. It still respires using mitochondria.",
+  "Cette cellule épidermique racinaire non photosynthétique ne possède pas de chloroplastes. Elle respire néanmoins grâce aux mitochondries.",
+]);
+rootCell.name = b([
+  "Root epidermal cell example",
+  "Exemple de cellule épidermique racinaire",
+]);
+rootCell.description = b([
+  "A living root epidermal cell has a wall, nucleus, mitochondria and a vacuole. This non-photosynthetic example has no chloroplast branch.",
+  "Une cellule épidermique racinaire vivante possède une paroi, un noyau, des mitochondries et une vacuole. Cet exemple non photosynthétique n’a pas de branche chloroplaste.",
+]);
+// Remove the copied photosynthetic branch completely, not just its menu row.
+for (const id of [...rootCell.children])
+  if (WORLD_NODES[id].model === "chloroplast") {
+    const remove = (part: string) => {
+      for (const child of WORLD_NODES[part].children) remove(child);
+      delete WORLD_NODES[part];
+    };
+    remove(id);
+    rootCell.children = rootCell.children.filter((child) => child !== id);
+  }
+rootCell.defaultChild = rootCell.children.find(
+  (id) => WORLD_NODES[id].model === "cellNucleus",
+);
+rootCell.facts = [
+  b([
+    "Root cells can respire without photosynthesizing.",
+    "Les cellules racinaires peuvent respirer sans photosynthétiser.",
+  ]),
+];
+rootCell.sources = [S.roots, S.cells];
+
+// A ground grass blade is its own botanical context, not a sample of the tree.
+cloneContextTree("tree/leaf", "world/grass", "world").spatialOnly = true;
+WORLD_NODES["world/grass"].name = b([
+  "Grass leaf sample",
+  "Échantillon de feuille d’herbe",
+]);
+WORLD_NODES["world/grass"].sizeMeters = 0.035;
+WORLD_NODES["world/grass"].sizeNote = b(selectedFieldNote(0.035));
+WORLD_NODES["world/grass"].description = b([
+  "A selected leaf sample represents living grass tissue. The stylized blade is a teaching surface, not an identified grass species or a leaf from the tree.",
+  "Un échantillon de feuille représente un tissu d’herbe vivant. Le limbe stylisé est une surface pédagogique, pas une espèce de graminée identifiée ni une feuille de l’arbre.",
+]);
+WORLD_NODES["world/grass"].sources = [S.plant];
+
+// Enrich all living-cell contexts after cloning, keeping their own local IDs.
+for (const node of Object.values(WORLD_NODES)) {
+  if (
+    ["cell", "whiteBloodCell", "plantCell", "rootCell", "platelet"].includes(
+      node.model,
+    )
+  ) {
+    if (!node.children.some((id) => WORLD_NODES[id].model === "membrane"))
+      cloneContextTree(
+        RBC + "/membrane",
+        node.id + "/membrane",
+        node.id,
+      ).spatialOnly = true;
+    spatialRecord(
+      node.id + "/cytoplasm",
+      node.id,
+      "cytoplasm",
+      60e-9,
+      "#9dc5ca",
+      ["Cytosolic sample", "Échantillon cytosolique"],
+      [
+        "A selected region of the aqueous cytosol contains dissolved substances and proteins. This is the fluid phase between organelles, not a sample that turns every location into a nucleus.",
+        "Une région choisie du cytosol aqueux contient des substances dissoutes et des protéines. Il s’agit de la phase fluide entre les organites, pas d’un échantillon qui transforme chaque endroit en noyau.",
+      ],
+      [
+        "Cytoplasm includes cytosol and cellular structures outside the nucleus.",
+        "Le cytoplasme comprend le cytosol et les structures cellulaires hors du noyau.",
+      ],
+      [SPATIAL_SOURCES.cytosol],
+      true,
+    );
+    waterContents(node.id + "/cytoplasm");
+    proteinSample(node.id + "/cytoplasm");
+    if (node.model === "plantCell" || node.model === "rootCell") {
+      cloneContextTree(
+        "tree/wood/xylem/wall",
+        node.id + "/wall",
+        node.id,
+      ).spatialOnly = true;
+      WORLD_NODES[node.id + "/wall"].name = b([
+        "Plant wall material sample",
+        "Échantillon de matière de paroi végétale",
+      ]);
+      WORLD_NODES[node.id + "/wall"].description = b([
+        "This cellulose-rich wall sample illustrates a plant wall. Primary walls of living cells are not assumed to have the same lignification as wood.",
+        "Cet échantillon de paroi riche en cellulose illustre une paroi végétale. Les parois primaires des cellules vivantes ne sont pas supposées avoir la même lignification que le bois.",
+      ]);
+      const lignin = node.id + "/wall/lignin";
+      if (WORLD_NODES[lignin]) {
+        WORLD_NODES[node.id + "/wall"].children = WORLD_NODES[
+          node.id + "/wall"
+        ].children.filter((id) => id !== lignin);
+        delete WORLD_NODES[lignin];
+      }
+      cloneContextTree(
+        "water/liquid",
+        node.id + "/vacuole",
+        node.id,
+      ).spatialOnly = true;
+      WORLD_NODES[node.id + "/vacuole"].name = b([
+        "Vacuolar fluid sample",
+        "Échantillon de liquide vacuolaire",
+      ]);
+      WORLD_NODES[node.id + "/vacuole"].description = b([
+        "A selected aqueous sample inside a plant vacuole. Vacuolar sap contains solutes; this route follows its water component.",
+        "Un échantillon aqueux choisi dans une vacuole végétale. Le suc vacuolaire contient des solutés ; ce parcours suit sa composante eau.",
+      ]);
+    }
+  }
+  if (node.model === "cellNucleus") {
+    cloneContextTree(
+      RBC + "/membrane",
+      node.id + "/envelope",
+      node.id,
+    ).spatialOnly = true;
+    WORLD_NODES[node.id + "/envelope"].name = b([
+      "Nuclear membrane patch",
+      "Fragment de membrane nucléaire",
+    ]);
+    WORLD_NODES[node.id + "/envelope"].description = b([
+      "This selects one membrane of the double nuclear envelope. The diagram does not claim that the envelope is only one bilayer.",
+      "Ce fragment sélectionne une membrane de la double enveloppe nucléaire. Le schéma ne prétend pas que cette enveloppe ne contient qu’une bicouche.",
+    ]);
+    spatialRecord(
+      node.id + "/fluid",
+      node.id,
+      "nucleoplasm",
+      60e-9,
+      "#a6b7cc",
+      ["Nucleoplasmic fluid sample", "Échantillon de liquide nucléoplasmique"],
+      [
+        "This aqueous region between nuclear structures contains proteins and solutes. Chromatin is explored through its own visible strands.",
+        "Cette région aqueuse entre les structures nucléaires contient des protéines et des solutés. La chromatine s’explore par ses propres filaments visibles.",
+      ],
+      [
+        "Nucleoplasm is not an atomic nucleus.",
+        "Le nucléoplasme n’est pas un noyau atomique.",
+      ],
+      [SPATIAL_SOURCES.cytosol],
+      true,
+    );
+    waterContents(node.id + "/fluid");
+    proteinSample(node.id + "/fluid");
+  }
+  if (node.model === "droplet") waterContents(node.id);
+  if (node.model === "nitrogen" && !node.children.length)
+    atomicBranch(node.id + "/nitrogen", node.id, ATOMS.N);
+  if (node.model === "oxygen" && !node.children.length)
+    atomicBranch(node.id + "/oxygen", node.id, ATOMS.O);
+}
+
+// Finish visible biological and chemical regions before filling peptide endpoints.
+for (const node of Object.values(WORLD_NODES)) {
+  if (node.model === "hemoglobin")
+    proteinSample(
+      node.id,
+      node.id + "/globin",
+      ["Globin-chain sample", "Échantillon de chaîne de globine"],
+      4e-9,
+    );
+  if (node.model === "membrane") {
+    if (!node.children.some((id) => WORLD_NODES[id].model === "protein"))
+      proteinSample(node.id);
+    if (
+      WORLD_NODES[node.parent || ""]?.model !== "redBloodCell" &&
+      !node.id.endsWith("/envelope") &&
+      !node.id.endsWith("/wall")
+    )
+      node.description = b([
+        "A selected lipid bilayer patch contains embedded proteins. Lipid and protein composition vary with the cell and membrane; this is not a red-cell-specific protein skeleton.",
+        "Un fragment choisi de bicouche lipidique contient des protéines insérées. La composition lipidique et protéique dépend de la cellule et de la membrane ; il ne s’agit pas d’un squelette protéique propre au globule rouge.",
+      ]);
+  }
+  if (node.model === "hair")
+    proteinSample(node.id, node.id + "/keratin", [
+      "Keratin peptide fragment",
+      "Fragment peptidique de kératine",
+    ]);
+  if (node.model === "mitochondrion") {
+    node.answer = b([
+      "This mitochondrion belongs to the selected living eukaryotic cell. Mature human red blood cells contain no mitochondria.",
+      "Cette mitochondrie appartient à la cellule eucaryote vivante sélectionnée. Les globules rouges humains matures ne contiennent pas de mitochondries.",
+    ]);
+    cloneContextTree(
+      RBC + "/membrane",
+      node.id + "/membrane",
+      node.id,
+    ).spatialOnly = true;
+    WORLD_NODES[node.id + "/membrane"].description = b([
+      "This patch samples one mitochondrial membrane. The inner membrane folds into cristae; the outer membrane is distinct.",
+      "Ce fragment échantillonne une membrane mitochondriale. La membrane interne se replie en crêtes ; la membrane externe est distincte.",
+    ]);
+    proteinSample(node.id + "/membrane");
+    cloneContextTree(DNA, node.id + "/dna", node.id).spatialOnly = true;
+    WORLD_NODES[node.id + "/dna"].name = b([
+      "Mitochondrial DNA segment",
+      "Segment d’ADN mitochondrial",
+    ]);
+    WORLD_NODES[node.id + "/dna"].description = b([
+      "A short double-helix segment samples mitochondrial DNA. It is not a complete mitochondrial genome or a nuclear chromosome; its illustrative sequence is unspecified.",
+      "Un court segment de double hélice échantillonne l’ADN mitochondrial. Ce n’est ni un génome mitochondrial complet ni un chromosome nucléaire ; sa séquence illustrative n’est pas spécifiée.",
+    ]);
+  }
+  if (
+    node.model === "nucleotide" &&
+    !node.children.some((id) => WORLD_NODES[id].atomic?.atomicNumber === 8)
+  )
+    atomicBranch(node.id + "/oxygen", node.id, ATOMS.O);
+  if (node.model === "polymer" && !node.children.length)
+    atomicBranch(node.id + "/carbon", node.id, ATOMS.C);
+}
+// Generic skeletal tissue must not inherit the named biceps specimen's answer.
+const muscleSample = WORLD_NODES["human/muscle-sample"];
+muscleSample.question = b([
+  "Is this a named muscle reconstruction?",
+  "Est-ce la reconstruction d’un muscle nommé ?",
+]);
+muscleSample.answer = muscleSample.description;
+muscleSample.facts = [
+  b([
+    "Skeletal muscle contains long multinucleated fibers with repeating contractile units.",
+    "Le muscle squelettique contient de longues fibres multinucléées et des unités contractiles répétées.",
+  ]),
+];
+
+// Protein fragments introduced above receive the same peptide-residue route.
+for (const node of Object.values(WORLD_NODES))
+  if (node.model === "protein" && !node.children.length) {
+    const template = "human/muscle/fiber/sarcomere/actin/residue";
+    cloneContextTree(template, node.id + "/residue", node.id);
+  }
+for (const node of Object.values(WORLD_NODES))
+  if (node.model === "phospholipid" && !node.children.length) {
+    spatialRecord(
+      node.id + "/tail",
+      node.id,
+      "hydrocarbon",
+      1.2e-9,
+      "#c9bb92",
+      ["Hydrocarbon-tail segment", "Segment de queue hydrocarbonée"],
+      [
+        "This short saturated chain excerpt samples a phospholipid tail. Tail length and unsaturation vary, and the phosphate-containing head is a different region.",
+        "Ce court extrait de chaîne saturée échantillonne une queue de phospholipide. La longueur et l’insaturation varient ; la tête contenant du phosphate est une autre région.",
+      ],
+      [
+        "A tail excerpt does not represent all atoms in a complete phospholipid.",
+        "Un extrait de queue ne représente pas tous les atomes d’un phospholipide complet.",
+      ],
+      [S.lipids],
+    );
+    atomicBranch(node.id + "/tail/carbon", node.id + "/tail", ATOMS.C);
+    atomicBranch(node.id + "/tail/hydrogen", node.id + "/tail", ATOMS.H);
+  }
+
+// A wall's hydrated matrix is a separate material from its reinforcing fibers.
+// This does not infer pectin in fungi or identify every plant matrix as lignin.
+for (const wall of Object.values(WORLD_NODES)) {
+  if (
+    wall.model !== "cellWall" ||
+    wall.children.some((id) => WORLD_NODES[id].model === "polymer")
+  )
+    continue;
+  const fungal = wall.children.some((id) => WORLD_NODES[id].model === "chitin");
+  const id = wall.id + "/matrix";
+  spatialRecord(
+    id,
+    wall.id,
+    "polymer",
+    10e-9,
+    fungal ? "#b7a47e" : "#b6be87",
+    fungal
+      ? [
+          "Fungal wall matrix sample",
+          "Échantillon de matrice de paroi fongique",
+        ]
+      : [
+          "Plant wall matrix sample",
+          "Échantillon de matrice de paroi végétale",
+        ],
+    fungal
+      ? [
+          "This selected heterogeneous wall matrix represents glucans and other non-chitin polymers, including mannose-containing components found in many fungi. Composition and organization vary by species; this is not a measured reconstruction of the displayed mushroom.",
+          "Cette matrice hétérogène choisie représente des glucanes et d’autres polymères distincts de la chitine, dont des composants contenant du mannose présents chez de nombreux champignons. Composition et organisation varient selon l’espèce ; ce n’est pas une reconstruction mesurée du champignon affiché.",
+        ]
+      : [
+          "This selected primary-wall matrix represents non-cellulosic polysaccharides, including pectins and hemicelluloses. Their proportions and structures vary among cells and plant groups, including grasses; it is not a pure cellulose fiber or a lignin sample.",
+          "Cette matrice de paroi primaire choisie représente des polysaccharides non cellulosiques, dont des pectines et des hémicelluloses. Leurs proportions et structures varient selon les cellules et les groupes végétaux, dont les graminées ; ce n’est ni une fibre de cellulose pure ni un échantillon de lignine.",
+        ],
+    [
+      "The schematic polymer network and its selected carbon and oxygen markers show elemental composition, not a measured sequence, stoichiometry, bond geometry or molecular inventory. Zooming does not chemically separate free atoms.",
+      "Le réseau polymérique schématique et ses marqueurs choisis de carbone et d’oxygène montrent la composition élémentaire, pas une séquence, une stœchiométrie, une géométrie de liaison ou un inventaire moléculaire mesurés. Zoomer ne sépare pas chimiquement des atomes libres.",
+    ],
+    [
+      fungal
+        ? SPATIAL_SOURCES.fungalWallMatrix
+        : SPATIAL_SOURCES.plantWallMatrix,
+    ],
+  );
+  atomicBranch(id + "/carbon", id, ATOMS.C);
+  atomicBranch(id + "/oxygen", id, ATOMS.O);
+}
+// Existing lignin/organic-polymer examples also contain oxygen; direct picks
+// distinguish element identity instead of ambiguously selecting any atom child.
+for (const node of Object.values(WORLD_NODES)) {
+  if (node.model !== "polymer") continue;
+  if (!node.children.some((id) => WORLD_NODES[id].atomic?.atomicNumber === 8))
+    atomicBranch(node.id + "/oxygen", node.id, ATOMS.O);
+}
 
 export function worldPath(id: string): string[] {
   const path: string[] = [];

@@ -9,7 +9,9 @@ import {
   assertLocale,
 } from "./locale-fixture.mjs";
 import { loadWorldContent } from "./world-content.mjs";
+import { assertAnatomyParts } from "./anatomy-parts.mjs";
 
+assertAnatomyParts(locale);
 const { WORLD_NODES: nodes, worldPath } = loadWorldContent();
 const base = process.env.ATLAS_URL || "http://127.0.0.1:3017";
 const opposite = locale === "en" ? "fr" : "en";
@@ -295,14 +297,22 @@ try {
   await assertSource("human/heart");
   assert.deepEqual(
     JSON.parse(await scene().getAttribute("data-visible-ids")).sort(),
-    ["human/heart", ...nodes["human/heart"].children].sort(),
+    [
+      "human/heart",
+      ...nodes["human/heart"].children.filter((id) => !nodes[id].spatialOnly),
+    ].sort(),
     "Entering the heart removes the surrounding anatomical systems",
   );
-  const heartAnchor = JSON.parse(
-    await scene().getAttribute("data-selected-anchors"),
-  )["human>human/heart"];
+  const heartEntry = JSON.parse(
+    await scene().getAttribute("data-spatial-context"),
+  ).entries.find((entry) => entry.childId === "human/heart");
+  assert.equal(
+    heartEntry.kind,
+    "surface",
+    "A source organ keeps its original position when its surface is selected",
+  );
   assert.ok(
-    heartAnchor.every(
+    heartEntry.point.every(
       (value, index) => Math.abs(value - heart.point[index]) < 1e-7,
     ),
     "The mesh pick supplies the actual entry origin",
@@ -322,6 +332,23 @@ try {
   await assertSource("human/femur");
   await action("world-out").click();
   await assertSource("human");
+  const namedReturn = await scene().evaluate((canvas) => ({
+    entries: JSON.parse(canvas.dataset.spatialContext).entries,
+    target: JSON.parse(canvas.dataset.cameraPose).target,
+  }));
+  assert.equal(
+    namedReturn.entries.some(
+      (entry) =>
+        entry.childId === "human/heart" ||
+        entry.childId.startsWith("human/heart/"),
+    ),
+    false,
+    "A named bone return does not retain an unrelated picked heart origin",
+  );
+  assert.ok(
+    namedReturn.target.every((value) => Math.abs(value) < 1e-7),
+    "Without a picked bone origin, returning frames the body at its center",
+  );
   await assertLayer("skeleton");
   await chooseMode("muscles");
   await routeButton("human/muscle").click();
@@ -375,7 +402,10 @@ try {
   await settle(blood);
   assert.deepEqual(
     JSON.parse(await scene().getAttribute("data-visible-ids")).sort(),
-    [blood, ...nodes[blood].children].sort(),
+    [
+      blood,
+      ...nodes[blood].children.filter((id) => !nodes[id].spatialOnly),
+    ].sort(),
   );
   assert.equal((await snapshot()).renderer, initial.renderer);
 

@@ -612,5 +612,21 @@
   "BodyParts3D · source & licenses": "BodyParts3D · sources et licences",
   "4.3 source and CC BY-SA 2.1 Japan license": "Source 4.3 et licence CC BY-SA 2.1 Japon",
   "BodyParts3D, © The Database Center for Life Science. Supplementary 4.3 surfaces: CC BY-SA 2.1 Japan; simplified and colored by Atlas.": "BodyParts3D, © The Database Center for Life Science. Surfaces complémentaires 4.3 : CC BY-SA 2.1 Japon ; simplifiées et colorées par Atlas.",
-  "The lung surfaces supplement the 4.0 atlas with official 4.3 data. Their adaptation retains the source’s separate share-alike license.": "Les surfaces des poumons complètent l’atlas 4.0 avec les données officielles 4.3. Leur adaptation conserve la licence distincte de partage à l’identique de la source."
+  "The lung surfaces supplement the 4.0 atlas with official 4.3 data. Their adaptation retains the source’s separate share-alike license.": "Les surfaces des poumons complètent l’atlas 4.0 avec les données officielles 4.3. Leur adaptation conserve la licence distincte de partage à l’identique de la source.",
+  "Left arm": "Bras gauche",
+  "Right arm": "Bras droit",
+  "Left leg": "Jambe gauche",
+  "Right leg": "Jambe droite",
+  "Head": "Tête",
+  "Trunk": "Tronc",
+  "Selected point": "Point sélectionné",
+  "Local sample": "Échantillon local",
+  "Selected instance": "Constituant sélectionné",
+  "This view is a representative sample at the point you selected.": "Cette vue est un échantillon représentatif à l’endroit que vous avez sélectionné.",
+  "You selected this visible constituent.": "Vous avez sélectionné ce constituant visible.",
+  "You selected a point on this object's surface.": "Vous avez sélectionné un point à la surface de cet objet.",
+  "Explore the selected sample": "Explorer l’échantillon sélectionné",
+  "Return to the selected point": "Revenir au point sélectionné",
+  "Source part {id}": "Élément source {id}",
+  "Saved with its selected point": "Enregistré avec son point sélectionné"
 }
