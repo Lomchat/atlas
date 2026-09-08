@@ -219,6 +219,7 @@ try {
   const targets = [
     "human",
     "human/vein",
+    "human/vein/segment",
     "human/vein/blood",
     RBC,
     HEMOGLOBIN,

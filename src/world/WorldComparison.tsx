@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import * as T from "three";
 import { t, useLocale } from "../i18n";
 import { WORLD_NODES } from "./data";
-import { createWorldModel } from "./models";
+import { createExplorationModel } from "./anatomyModels";
 import type { WorldModel } from "./models";
 import "./comparison.css";
 const references = [
@@ -52,7 +52,9 @@ export function WorldComparison({ selectedId }: { selectedId: string }) {
     const camera = new T.OrthographicCamera(-1.45, 1.45, 0.66, -0.66, 0.01, 10);
     camera.position.set(0, 0, 4);
     let models: WorldModel[] = [];
+    let disposed = false;
     const render = () => {
+      if (disposed) return;
       renderer.setSize(element.clientWidth, element.clientHeight, false);
       renderer.render(scene, camera);
     };
@@ -66,7 +68,9 @@ export function WorldComparison({ selectedId }: { selectedId: string }) {
         ref = referenceFor(id),
         largest = Math.max(n.sizeMeters || 0, ref.meters);
       if (n.sizeMeters) {
-        const model = createWorldModel(n.model, n.color, 2, n.atomic);
+        const model = createExplorationModel(n, 2);
+        model.group.userData.setAnatomyMode?.("surface");
+        void model.ready?.then(render);
         model.group.scale.setScalar(n.sizeMeters / largest);
         model.group.position.x = -0.72;
         model.group.rotation.y = 0.2;
@@ -92,7 +96,9 @@ export function WorldComparison({ selectedId }: { selectedId: string }) {
             material.dispose();
           },
         };
-      } else model = createWorldModel(ref.model, undefined, 3);
+      } else model = createExplorationModel({ model: ref.model }, 3);
+      model.group.userData.setAnatomyMode?.("surface");
+      void model.ready?.then(render);
       model.group.scale.setScalar(ref.meters / largest);
       model.group.position.x = 0.72;
       model.group.rotation.y = 0.2;
@@ -114,6 +120,7 @@ export function WorldComparison({ selectedId }: { selectedId: string }) {
     const observer = new ResizeObserver(render);
     observer.observe(element);
     return () => {
+      disposed = true;
       observer.disconnect();
       models.forEach((model) => model.dispose());
       renderer.dispose();
@@ -143,6 +150,21 @@ export function WorldComparison({ selectedId }: { selectedId: string }) {
         </span>
         <span>{t(reference.key)}</span>
       </div>
+      {(reference.model === "human" ||
+        selectedId === "human" ||
+        node.parent === "human") && (
+        <a
+          className="world-anatomy-credit"
+          href="/models/bodyparts3d/README.md"
+          target="_blank"
+          rel="noreferrer"
+          title={t(
+            "BodyParts3D, © The Database Center for Life Science licensed under CC Attribution 4.0 International.",
+          )}
+        >
+          {t("BodyParts3D · source & licenses")}
+        </a>
+      )}
       {unresolved && (
         <p>{t("The smaller object is below this view’s resolution.")}</p>
       )}

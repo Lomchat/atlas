@@ -1,5 +1,11 @@
 import * as T from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
+import {
+  createQuartzGrain,
+  createQuartzNetwork,
+  createCelluloseMicrofibril,
+  createCelluloseChain,
+} from "./mineralModels";
 
 /** Procedural teaching models. Shapes are idealised, not medical imaging.
  * All dimensions below are local drawing coordinates. The enclosing atlas owns
@@ -7,6 +13,7 @@ import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
  * There are deliberately no embedded words or language-dependent resources. */
 export type WorldModel = {
   group: T.Group;
+  ready?: Promise<void>;
   update: (time: number, opened?: number) => void;
   dispose: () => void;
 };
@@ -35,6 +42,16 @@ export function createWorldModel(
   seed = 1,
   atomic?: { atomicNumber?: number; massNumber?: number; charge?: number },
 ): WorldModel {
+  switch (kind) {
+    case "quartz":
+      return createQuartzGrain(seed);
+    case "crystalLattice":
+      return createQuartzNetwork();
+    case "celluloseMicrofibril":
+      return createCelluloseMicrofibril();
+    case "cellulose":
+      return createCelluloseChain();
+  }
   const group = new T.Group();
   group.name = `world-model:${kind}`;
   const model = new T.Group();
@@ -1681,29 +1698,6 @@ export function createWorldModel(
         }
       break;
     }
-    case "cellulose": {
-      for (let chain = 0; chain < 4; chain++) {
-        const points: Point[] = [];
-        for (let i = 0; i < 11; i++) {
-          const y = -0.43 + i * 0.086,
-            angle = i * 0.23 + (chain * Math.PI) / 2;
-          const p: Point = [Math.cos(angle) * 0.09, y, Math.sin(angle) * 0.09];
-          points.push(p);
-          const sugar = add(
-            new T.TorusGeometry(0.04, 0.01, 6, 6),
-            mat(["#bdd3a0", "#87ba9c", "#dec88e", "#a7cbbb"][chain]),
-          );
-          sugar.position.set(...p);
-          sugar.rotation.set(Math.PI / 2, angle + (i % 2) * Math.PI, 0);
-        }
-        tube(
-          points,
-          0.011,
-          ["#b9d09a", "#85af8a", "#d7be84", "#9dc5af"][chain],
-        );
-      }
-      break;
-    }
     case "glucose":
     case "glucoseResidue": {
       const residue = kind === "glucoseResidue";
@@ -1996,53 +1990,6 @@ export function createWorldModel(
         rod(p, vertices[next], 0.007, "#89b9d0");
         if (i < 6) rod(p, vertices[i + 6], 0.007, "#89b9d0");
       });
-      break;
-    }
-    case "quartz":
-    case "crystalLattice": {
-      const tetra: Point[] = [
-        [1, 1, 1],
-        [-1, -1, 1],
-        [-1, 1, -1],
-        [1, -1, -1],
-      ];
-      const centers: Point[] = [
-        [0, 0, 0],
-        ...tetra.map((p) => p.map((v) => v * 0.21) as Point),
-      ];
-      const oxygenPositions = new Set<string>();
-      centers.forEach((center, index) => {
-        ball(center, 0.058, "#b9a5d5");
-        const vertices: Point[] = tetra.map((p) => [
-          center[0] + p[0] * 0.105 * (index ? -1 : 1),
-          center[1] + p[1] * 0.105 * (index ? -1 : 1),
-          center[2] + p[2] * 0.105 * (index ? -1 : 1),
-        ]);
-        vertices.forEach((p) => {
-          const key = p.map((v) => v.toFixed(5)).join(":");
-          if (!oxygenPositions.has(key)) {
-            ball(p, 0.044, palette.oxygen);
-            oxygenPositions.add(key);
-          }
-          molecularBond(center, p, "#b9a5d5", palette.oxygen, 0.018);
-        });
-        const tetraGeo = new T.BufferGeometry();
-        const positions: number[] = [];
-        for (const face of [
-          [0, 1, 2],
-          [0, 3, 1],
-          [0, 2, 3],
-          [1, 3, 2],
-        ])
-          face.forEach((i) => positions.push(...vertices[i]));
-        tetraGeo.setAttribute(
-          "position",
-          new T.Float32BufferAttribute(positions, 3),
-        );
-        tetraGeo.computeVertexNormals();
-        add(tetraGeo, mat("#c7aedf", 0.11));
-      });
-      group.userData.networkDiagram = true;
       break;
     }
     case "muscle":

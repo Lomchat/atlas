@@ -4,8 +4,9 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { t, useLocale } from "../i18n";
 import { WORLD_NODES } from "./data";
 import type { WorldNode } from "./data";
-import { createWorldModel } from "./models";
 import type { WorldModel } from "./models";
+import { createExplorationModel, anatomyVisible } from "./anatomyModels";
+import type { AnatomyMode, AnatomyStatus } from "./anatomyModels";
 import {
   childPosition,
   frameMeters,
@@ -19,6 +20,7 @@ export interface WorldSceneInfo {
   metersPerPixel: number;
   transitioning: boolean;
   visibleIds: string[];
+  anatomyStatus?: AnatomyStatus;
 }
 interface Props {
   selectedId: string;
@@ -26,6 +28,8 @@ interface Props {
   rotating: boolean;
   focusMode: boolean;
   resetToken: number;
+  anatomyMode: AnatomyMode;
+  anatomyRetryToken: number;
   onNavigate: (id: string) => void;
   onInfo: (info: WorldSceneInfo) => void;
 }
@@ -35,6 +39,7 @@ type Item = {
   label?: HTMLButtonElement;
   leader?: SVGLineElement;
   base: Map<T.Material, number>;
+  revision?: number;
 };
 type Frame = { id: string; group: T.Group; items: Item[]; dispose: () => void };
 type Flight = {
@@ -59,6 +64,7 @@ export function WorldScene(props: Props) {
         navigate: (id: string) => void;
         reset: () => void;
         language: () => void;
+        retryAnatomy: () => void;
       }
     | undefined
   >(undefined);
@@ -91,6 +97,10 @@ export function WorldScene(props: Props) {
     const labels = document.createElement("div");
     labels.className = "world-scene-labels";
     element.append(labels);
+    const anatomyHover = document.createElement("div");
+    anatomyHover.className = "world-anatomy-hover";
+    anatomyHover.hidden = true;
+    element.append(anatomyHover);
     const leaders = document.createElementNS(
       "http://www.w3.org/2000/svg",
       "svg",
@@ -183,13 +193,14 @@ export function WorldScene(props: Props) {
         group = new T.Group();
       scene.add(group);
       const items: Item[] = [];
-      const add = (child: WorldNode, isChild: boolean) => {
-        const model = createWorldModel(
-          child.model,
-          child.color,
-          child.id.length,
-          child.atomic,
-        );
+      const add = (child: WorldNode, isChild: boolean, placeholder = false) => {
+        const model: WorldModel = placeholder
+          ? { group: new T.Group(), update() {}, dispose() {} }
+          : createExplorationModel(
+              child,
+              child.id.length,
+              id === "world" ? "surface" : latest.current.anatomyMode,
+            );
         if (isChild) {
           model.group.position.copy(childPosition(node, child));
           model.group.scale.setScalar(frameMeters(child) / frameMeters(node));
@@ -248,7 +259,19 @@ export function WorldScene(props: Props) {
         | Record<string, [number, number, number]>
         | undefined;
       for (const child of node.children.map((id) => WORLD_NODES[id]))
-        if (anchors?.[child.model])
+        if (items[0].model.group.userData.childNodeAnchors?.[child.id])
+          setModelAnchor(
+            node.id,
+            child.id,
+            new T.Vector3(
+              ...(items[0].model.group.userData.childNodeAnchors[child.id] as [
+                number,
+                number,
+                number,
+              ]),
+            ),
+          );
+        else if (anchors?.[child.model])
           setModelAnchor(
             node.id,
             child.id,
@@ -257,14 +280,17 @@ export function WorldScene(props: Props) {
       items[0].model.group.traverse((object) => {
         const kind = object.userData.worldChildModel;
         const constituent = object.userData.constituent;
-        if (!kind && !constituent) return;
+        const exactId = object.userData.worldChildId;
+        if (!kind && !constituent && !exactId) return;
         const child = node.children
           .map((id) => WORLD_NODES[id])
           .find(
             (candidate) =>
-              (constituent
-                ? candidate.id.endsWith("/" + constituent)
-                : candidate.model === kind) &&
+              (exactId
+                ? candidate.id === exactId
+                : constituent
+                  ? candidate.id.endsWith("/" + constituent)
+                  : candidate.model === kind) &&
               (!object.userData.worldChildAtomicNumber ||
                 candidate.atomic?.atomicNumber ===
                   object.userData.worldChildAtomicNumber) &&
@@ -280,9 +306,11 @@ export function WorldScene(props: Props) {
           object.getMatrixAt(0, matrix);
           point.setFromMatrixPosition(matrix).applyMatrix4(object.matrixWorld);
         }
-        const anchor = items[0].model.group.userData.childAnchors?.[
-          child.model
-        ] as [number, number, number] | undefined;
+        const anchor = (items[0].model.group.userData.childNodeAnchors?.[
+          child.id
+        ] || items[0].model.group.userData.childAnchors?.[child.model]) as
+          | [number, number, number]
+          | undefined;
         setModelAnchor(
           node.id,
           child.id,
@@ -291,7 +319,7 @@ export function WorldScene(props: Props) {
         embodied.add(child.id);
       });
       node.children.forEach((id) => {
-        add(WORLD_NODES[id], true);
+        add(WORLD_NODES[id], true, node.id === "human" && embodied.has(id));
         if (embodied.has(id))
           items[items.length - 1].model.group.visible = false;
       });
@@ -439,6 +467,7 @@ export function WorldScene(props: Props) {
       return frame;
     }
     function language() {
+      anatomyHover.hidden = true;
       canvas.setAttribute(
         "aria-label",
         t("Interactive world. Select an object to explore its contents."),
@@ -501,8 +530,18 @@ export function WorldScene(props: Props) {
       camera.position.copy(fitPosition()).add(controls.target);
       controls.update();
     }
+    function retryAnatomy() {
+      const replacement = makeFrame(current);
+      active.dispose();
+      active = replacement;
+      ghosts.forEach((frame) => frame.dispose());
+      ghosts = [];
+      flight = null;
+      language();
+    }
     function navigate(id: string) {
       if (id === current || !WORLD_NODES[id]) return;
+      anatomyHover.hidden = true;
       if (pickedOrigin?.id === id && WORLD_NODES[id].parent === current)
         setSelectedAnchor(current, id, pickedOrigin.point);
       // A direct link can start inside a parent that has never been built.
@@ -576,26 +615,51 @@ export function WorldScene(props: Props) {
       let annotated = false;
       for (let part: T.Object3D | null = object; part; part = part.parent) {
         const data = part.userData;
-        if (!data.worldChildModel && !data.constituent) continue;
+        if (data.worldContext) return { annotated: true };
+        if (!data.worldChildModel && !data.constituent && !data.worldChildId)
+          continue;
         annotated = true;
         const match = active.items
           .slice(1)
           .find(
             ({ node }) =>
-              (data.constituent
-                ? node.id.endsWith("/" + data.constituent)
-                : node.model === data.worldChildModel) &&
+              (data.worldChildId
+                ? node.id === data.worldChildId
+                : data.constituent
+                  ? node.id.endsWith("/" + data.constituent)
+                  : node.model === data.worldChildModel) &&
               (data.worldChildAtomicNumber === undefined ||
                 node.atomic?.atomicNumber === data.worldChildAtomicNumber) &&
               (!data.worldQuarkFlavor ||
                 node.quarkFlavor === data.worldQuarkFlavor),
           );
-        if (match) return { id: match.node.id, annotated: true };
+        if (match) {
+          if (
+            current === "human" &&
+            !anatomyVisible(match.node.id, latest.current.anatomyMode)
+          )
+            return { annotated: true };
+          return { id: match.node.id, annotated: true };
+        }
         return { annotated: true };
       }
       return { annotated };
     }
     function hitCenter(hit: T.Intersection, owner?: T.Object3D): T.Vector3 {
+      if (!owner) {
+        for (
+          let part: T.Object3D | null = hit.object;
+          part;
+          part = part.parent
+        ) {
+          if (part.userData.worldAnatomySurface)
+            return active.group.worldToLocal(hit.point.clone());
+          if (part.userData.worldAnatomyAnchor)
+            return new T.Vector3(
+              ...(part.userData.worldAnatomyAnchor as [number, number, number]),
+            );
+        }
+      }
       const object = owner || hit.object;
       const point = object.getWorldPosition(new T.Vector3());
       if (
@@ -663,7 +727,15 @@ export function WorldScene(props: Props) {
         }
         // Never turn a click on an unsupported annotated structure into a
         // different nearby organelle through the screen-distance fallback.
-        if (target.annotated) return undefined;
+        if (target.annotated && !seeThrough) {
+          if (current === "human" && translucent)
+            return remember(
+              translucent.id,
+              translucent.point,
+              translucent.replica,
+            );
+          return undefined;
+        }
         if (seeThrough) continue;
         return undefined;
       }
@@ -672,6 +744,11 @@ export function WorldScene(props: Props) {
       let best: string | undefined,
         dist = 80;
       for (const item of active.items.slice(1)) {
+        if (
+          current === "human" &&
+          !anatomyVisible(item.node.id, latest.current.anatomyMode)
+        )
+          continue;
         item.model.group.getWorldPosition(vector).project(camera);
         const d = Math.hypot(
           (vector.x * 0.5 + 0.5) * width - (x - rect.left),
@@ -708,6 +785,26 @@ export function WorldScene(props: Props) {
             const instanceId =
               samples > 1 ? Math.floor((n * (count - 1)) / (samples - 1)) : 0;
             const point = object.getWorldPosition(new T.Vector3());
+            for (
+              let part: T.Object3D | null = object;
+              part;
+              part = part.parent
+            ) {
+              if (part.userData.worldAnatomyAnchor) {
+                point.copy(
+                  active.group.localToWorld(
+                    new T.Vector3(
+                      ...(part.userData.worldAnatomyAnchor as [
+                        number,
+                        number,
+                        number,
+                      ]),
+                    ),
+                  ),
+                );
+                break;
+              }
+            }
             if (object instanceof T.InstancedMesh) {
               const matrix = new T.Matrix4();
               object.getMatrixAt(instanceId, matrix);
@@ -825,11 +922,26 @@ export function WorldScene(props: Props) {
         ) > 5
       )
         dragging = true;
+      const hoverId = event.buttons
+        ? undefined
+        : pick(event.clientX, event.clientY);
       canvas.style.cursor = event.buttons
         ? "grabbing"
-        : pick(event.clientX, event.clientY)
+        : hoverId
           ? "pointer"
           : "grab";
+      active.items[0].model.group.userData.setAnatomyHover?.(hoverId);
+      anatomyHover.hidden = current !== "human" || !hoverId || Boolean(flight);
+      if (!anatomyHover.hidden && hoverId) {
+        anatomyHover.textContent =
+          WORLD_NODES[hoverId].name[latest.current.locale];
+        anatomyHover.style.left = `${Math.min(width - 210, event.clientX + 15)}px`;
+        anatomyHover.style.top = `${event.clientY - 35}px`;
+      }
+    };
+    const leave = () => {
+      anatomyHover.hidden = true;
+      active.items[0].model.group.userData.setAnatomyHover?.(undefined);
     };
     const up = (event: PointerEvent) => {
       const pressedHere = pressedPointers.delete(event.pointerId);
@@ -873,6 +985,7 @@ export function WorldScene(props: Props) {
     };
     canvas.addEventListener("pointerdown", down);
     canvas.addEventListener("pointermove", move);
+    canvas.addEventListener("pointerleave", leave);
     canvas.addEventListener("pointerup", up);
     canvas.addEventListener("pointercancel", cancelPointer);
     canvas.addEventListener("wheel", wheel, { passive: true });
@@ -890,7 +1003,7 @@ export function WorldScene(props: Props) {
     resize();
     reset();
     language();
-    api.current = { navigate, reset, language };
+    api.current = { navigate, reset, language, retryAnatomy };
     function animate(now: number) {
       if (disposed) return;
       raf = requestAnimationFrame(animate);
@@ -981,6 +1094,13 @@ export function WorldScene(props: Props) {
             : 1;
         for (let index = 0; index < frame.items.length; index++) {
           const item = frame.items[index];
+          if (item.revision !== item.model.group.userData.anatomyRevision) {
+            item.revision = item.model.group.userData.anatomyRevision;
+            item.base = materials(item.model.group);
+          }
+          item.model.group.userData.setAnatomyMode?.(
+            frame.id === "world" ? "surface" : latest.current.anatomyMode,
+          );
           // Restore opacities before applying model-specific cutaways each frame.
           item.base.forEach((opacity, material) => {
             material.opacity = opacity;
@@ -1012,6 +1132,16 @@ export function WorldScene(props: Props) {
             item.label.dataset.unresolved = String(pixelSize < 3);
             item.label.hidden =
               Boolean(flight) ||
+              (current === "human" &&
+                !anatomyVisible(item.node.id, latest.current.anatomyMode)) ||
+              (current === "human" &&
+                latest.current.anatomyMode === "organs" &&
+                ![
+                  "human/brain",
+                  "human/heart",
+                  "human/lungs",
+                  "human/vein",
+                ].includes(item.node.id)) ||
               vector.z > 1 ||
               vector.z < -1 ||
               x < 10 ||
@@ -1051,7 +1181,7 @@ export function WorldScene(props: Props) {
                 lx += lx < centerX ? -25 : 25;
               }
             }
-            placed.push({ x: lx, y: ly, w: lw, h: lh });
+            if (!item.label.hidden) placed.push({ x: lx, y: ly, w: lw, h: lh });
             item.label.style.left = `${lx}px`;
             item.label.style.top = `${ly}px`;
             item.label.style.setProperty("--label-lift", "0px");
@@ -1071,7 +1201,14 @@ export function WorldScene(props: Props) {
         const metersPerPixel =
           ((2 * distance * Math.tan((camera.fov * Math.PI) / 360)) / height) *
           frameMeters(WORLD_NODES[current]);
-        const visibleIds = active.items.map((i) => i.node.id);
+        const visibleIds = active.items
+          .filter(
+            (item) =>
+              current !== "human" ||
+              item.node.id === "human" ||
+              anatomyVisible(item.node.id, latest.current.anatomyMode),
+          )
+          .map((i) => i.node.id);
         canvas.dataset.selected = current;
         canvas.dataset.selectedAnchors = JSON.stringify(
           selectedAnchorEntries(),
@@ -1091,6 +1228,11 @@ export function WorldScene(props: Props) {
         canvas.dataset.replicaCount = String(
           active.items[0].model.group.userData.replicaCount || 0,
         );
+        canvas.dataset.anatomyStatus =
+          active.items[0].model.group.userData.anatomyStatus || "none";
+        canvas.dataset.anatomyMode = latest.current.anatomyMode;
+        canvas.dataset.modelSource =
+          active.items[0].model.group.userData.anatomySource || "procedural";
         canvas.dataset.childRatios = JSON.stringify(
           Object.fromEntries(
             active.items
@@ -1102,6 +1244,7 @@ export function WorldScene(props: Props) {
           metersPerPixel,
           transitioning: Boolean(flight),
           visibleIds,
+          anatomyStatus: active.items[0].model.group.userData.anatomyStatus,
         });
       }
     }
@@ -1114,6 +1257,7 @@ export function WorldScene(props: Props) {
       controls.dispose();
       canvas.removeEventListener("pointerdown", down);
       canvas.removeEventListener("pointermove", move);
+      canvas.removeEventListener("pointerleave", leave);
       canvas.removeEventListener("pointerup", up);
       canvas.removeEventListener("pointercancel", cancelPointer);
       canvas.removeEventListener("wheel", wheel);
@@ -1127,6 +1271,7 @@ export function WorldScene(props: Props) {
       renderer.forceContextLoss();
       canvas.remove();
       labels.remove();
+      anatomyHover.remove();
       api.current = undefined;
     };
   }, []);
@@ -1136,6 +1281,9 @@ export function WorldScene(props: Props) {
   useEffect(() => {
     api.current?.reset();
   }, [props.resetToken]);
+  useEffect(() => {
+    if (props.anatomyRetryToken) api.current?.retryAnatomy();
+  }, [props.anatomyRetryToken]);
   useEffect(() => {
     api.current?.language();
   }, [locale]);

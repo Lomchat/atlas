@@ -9,6 +9,8 @@ import {
   assertLocale,
 } from "./locale-fixture.mjs";
 import { assertWorldContent } from "./world-content.mjs";
+import { assertMineralModels } from "./mineral-models.mjs";
+assertMineralModels(locale);
 const {
   WORLD_NODES: nodes,
   WORLD_ROOTS: roots,
@@ -150,8 +152,15 @@ try {
       const data = await canvas.evaluate((c) => ({ ...c.dataset }));
       assert.deepEqual(
         JSON.parse(data.visibleIds).sort(),
-        [selected, ...nodes[selected].children].sort(),
-        "Only selected container and its direct contents remain",
+        [
+          selected,
+          ...nodes[selected].children.filter(
+            (id) =>
+              selected !== "human" ||
+              !["human/skin", "human/muscle", "human/femur"].includes(id),
+          ),
+        ].sort(),
+        "Only the selected container and direct contents of its active layer remain",
       );
       const ratios = JSON.parse(data.childRatios);
       for (const child of nodes[selected].children) {

@@ -45,6 +45,8 @@ import {
   WORLD_MECHANISMS,
 } from "./data";
 import type { WorldNode } from "./data";
+import { anatomyVisible } from "./anatomyModels";
+import type { AnatomyMode } from "./anatomyModels";
 import "./world.css";
 
 export interface WorldUIProps {
@@ -58,6 +60,7 @@ export interface WorldUIProps {
     metersPerPixel: number;
     transitioning: boolean;
     visibleIds: string[];
+    anatomyStatus?: "loading" | "ready" | "error";
   };
   rotating: boolean;
   onRotate: () => void;
@@ -66,6 +69,9 @@ export interface WorldUIProps {
   onOpenMatter: () => void;
   onResetView?: () => void;
   comparison?: ReactNode;
+  anatomyControls?: ReactNode;
+  anatomyMode: AnatomyMode;
+  onRetryAnatomy?: () => void;
   mechanismVisual?: ReactNode;
   onMechanismChange?: (
     id: string | null,
@@ -252,6 +258,9 @@ export function WorldUI({
   onOpenMatter,
   onResetView,
   comparison,
+  anatomyControls,
+  anatomyMode,
+  onRetryAnatomy,
   mechanismVisual,
   onMechanismChange,
 }: WorldUIProps) {
@@ -292,7 +301,10 @@ export function WorldUI({
       ? WORLD_NODES[trail.path[trailIndex + 1]]
       : undefined;
   const next =
-    trailNext ||
+    (trailNext &&
+    (node.id !== "human" || anatomyVisible(trailNext.id, anatomyMode))
+      ? trailNext
+      : undefined) ||
     WORLD_NODES[preferredChildId || node.defaultChild || node.children[0]];
   const quiz = WORLD_QUIZZES[quizIndex % Math.max(1, WORLD_QUIZZES.length)];
   const saved = journal.saved.includes(node.id);
@@ -707,6 +719,17 @@ export function WorldUI({
             {t("Six starting points. Countless questions.")}
             <ArrowDownRight size={16} />
           </button>
+          <a
+            className="world-anatomy-credit"
+            href="/models/bodyparts3d/README.md"
+            target="_blank"
+            rel="noreferrer"
+            title={t(
+              "BodyParts3D, © The Database Center for Life Science licensed under CC Attribution 4.0 International.",
+            )}
+          >
+            {t("BodyParts3D · source & licenses")}
+          </a>
         </section>
       )}
 
@@ -783,6 +806,25 @@ export function WorldUI({
                     <h1>{node.name[locale]}</h1>
                   </div>
                 </div>
+                {anatomyControls}
+                {!anatomyControls &&
+                  sceneInfo.anatomyStatus &&
+                  sceneInfo.anatomyStatus !== "ready" && (
+                    <div className="anatomy-load-status" role="status">
+                      <p>
+                        {sceneInfo.anatomyStatus === "loading"
+                          ? t("Loading anatomical surfaces…")
+                          : t(
+                              "The anatomical model could not load. Exploration links remain available.",
+                            )}
+                      </p>
+                      {sceneInfo.anatomyStatus === "error" && (
+                        <button type="button" onClick={onRetryAnatomy}>
+                          {t("Retry anatomical download")}
+                        </button>
+                      )}
+                    </div>
+                  )}
                 <p className="world-description">{node.description[locale]}</p>
                 <div className="world-science-size">
                   <Microscope size={16} />
@@ -795,7 +837,7 @@ export function WorldUI({
                     <span>{node.sizeNote[locale]}</span>
                   </div>
                 </div>
-                {children.length > 0 && (
+                {children.length > 0 && !anatomyControls && (
                   <section className="world-inside-section">
                     <h2>
                       {t("What's inside?")}

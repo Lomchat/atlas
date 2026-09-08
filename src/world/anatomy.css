@@ -1,0 +1,276 @@
+.anatomy-controls {
+  padding-bottom: 16px;
+  margin-bottom: 17px;
+  border-bottom: 1px solid var(--world-line, #dbe2eb1a);
+}
+.anatomy-controls .anatomy-heading {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 10px;
+  color: var(--world-muted, #aaaeb3);
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.4;
+  letter-spacing: 1.1px;
+  text-transform: uppercase;
+}
+.anatomy-heading > svg {
+  color: var(--world-accent, #a8d9ef);
+}
+.anatomy-layer-buttons {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+}
+.anatomy-layer-buttons > button {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  min-height: 39px;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--world-line, #dbe2eb1a);
+  border-radius: 9px;
+  background: #ccdbea04;
+  color: var(--world-muted, #aaaeb3);
+  font-size: 12px;
+  line-height: 1.3;
+  text-align: left;
+}
+.anatomy-layer-buttons > button > span {
+  flex: 1;
+  min-width: 0;
+}
+.anatomy-layer-buttons > button > i {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: transparent;
+  flex-shrink: 0;
+}
+.anatomy-layer-buttons > button[aria-pressed="true"] {
+  color: var(--world-accent, #a8d9ef);
+  border-color: #a8d9ef55;
+  background: #a8d9ef0d;
+}
+.anatomy-layer-buttons > button[aria-pressed="true"] > i {
+  background: currentColor;
+}
+.anatomy-controls .anatomy-mode-description {
+  margin: 10px 0 11px;
+  color: var(--world-muted, #aaaeb3);
+  font-size: 11px;
+  line-height: 1.75;
+}
+.anatomy-load-status:empty {
+  display: none;
+}
+.anatomy-load-status {
+  padding: 9px 11px;
+  margin-bottom: 11px;
+  border-radius: 9px;
+  border: 1px solid #cbdce923;
+  background: #d6e8f107;
+  color: #b6c9d9;
+}
+.anatomy-load-status > p {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  font-size: 11px;
+  line-height: 1.6;
+}
+.anatomy-load-status > p > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.anatomy-controls[data-anatomy-status="loading"] .anatomy-load-status svg {
+  animation: anatomy-loading-spin 1.4s linear infinite;
+}
+.anatomy-controls[data-anatomy-status="error"] .anatomy-load-status {
+  color: #e5b9a7;
+  border-color: #e5b9a728;
+  background: #e5b9a706;
+}
+.anatomy-load-status > button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 4px 0;
+  color: var(--world-accent, #a8d9ef);
+  font-size: 11px;
+}
+.anatomy-route-heading {
+  margin-bottom: 7px;
+  color: var(--world-faint, #828991);
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+.anatomy-routes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+}
+.anatomy-routes > button {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  min-height: 38px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid #cbdce915;
+  color: var(--world-ink, #f2f1e9);
+  font-size: 11px;
+  line-height: 1.45;
+  text-align: left;
+}
+.anatomy-route > i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.anatomy-route > span {
+  flex: 1;
+  min-width: 0;
+}
+.anatomy-route > svg {
+  color: var(--world-faint, #828991);
+  flex-shrink: 0;
+}
+.anatomy-other-routes {
+  margin-top: 7px;
+}
+.anatomy-other-routes > summary,
+.anatomy-attribution > summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 0;
+  color: var(--world-faint, #828991);
+  font-size: 10px;
+  line-height: 1.5;
+  cursor: pointer;
+  list-style: none;
+}
+.anatomy-other-routes > summary::-webkit-details-marker,
+.anatomy-attribution > summary::-webkit-details-marker {
+  display: none;
+}
+.anatomy-other-routes > summary > span,
+.anatomy-attribution > summary > span {
+  flex: 1;
+}
+.anatomy-other-routes > summary > small {
+  color: var(--world-muted, #aaaeb3);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.anatomy-other-routes[open] > summary > svg:last-child,
+.anatomy-attribution[open] > summary > svg:last-child {
+  transform: rotate(180deg);
+}
+.anatomy-other-routes > .anatomy-routes {
+  margin-top: 5px;
+}
+.anatomy-attribution {
+  margin-top: 10px;
+}
+.anatomy-attribution > summary {
+  color: #a3b6c7;
+  font-size: 9px;
+}
+.anatomy-attribution > p {
+  margin: 9px 0;
+  color: var(--world-muted, #aaaeb3);
+  font-size: 11px;
+  line-height: 1.75;
+}
+.anatomy-source-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 13px;
+}
+.anatomy-source-links > a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--world-accent, #a8d9ef);
+  font-size: 10px;
+  line-height: 1.8;
+  text-decoration: none;
+}
+.anatomy-source-links > a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.anatomy-attribution > .anatomy-credit {
+  font-size: 9px;
+  color: var(--world-faint, #828991);
+}
+@keyframes anatomy-loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (max-width: 700px), (max-height: 520px) and (orientation: landscape) {
+  .anatomy-controls {
+    padding-bottom: 13px;
+    margin-bottom: 14px;
+  }
+  .anatomy-controls .anatomy-heading {
+    margin-bottom: 8px;
+    font-size: 9px;
+  }
+  .anatomy-layer-buttons > button {
+    min-height: 39px;
+    padding: 8px 9px;
+    font-size: 11px;
+  }
+  .anatomy-controls .anatomy-mode-description {
+    margin: 8px 0 10px;
+  }
+  .anatomy-routes > button {
+    min-height: 33px;
+    padding: 7px 8px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .anatomy-controls[data-anatomy-status="loading"] .anatomy-load-status svg {
+    animation: none;
+  }
+}
+
+.world-anatomy-hover {
+  position: absolute;
+  z-index: 4;
+  pointer-events: none;
+  max-width: 200px;
+  padding: 8px 12px;
+  border: 1px solid #af907950;
+  border-radius: 9px;
+  background: #1c2636ee;
+  color: #fae0c8;
+  box-shadow: 0 6px 24px #0004;
+  font-size: 12px;
+}
+.world-anatomy-hover[hidden] {
+  display: none;
+}
+.world-anatomy-credit {
+  display: block;
+  width: fit-content;
+  margin-top: 8px;
+  color: #9baabd;
+  font-size: 11px;
+  text-underline-offset: 3px;
+  pointer-events: auto;
+}
+.world-comparison .world-anatomy-credit {
+  margin: 5px auto 0;
+  font-size: 9px;
+}

@@ -36,13 +36,6 @@ export function loadWorldContent() {
 }
 
 function modelKinds() {
-  const source = ts.createSourceFile(
-    modelsURL.pathname,
-    fs.readFileSync(modelsURL, "utf8"),
-    ts.ScriptTarget.Latest,
-    true,
-    ts.ScriptKind.TS,
-  );
   const kinds = new Set();
   function visit(node) {
     if (
@@ -58,7 +51,20 @@ function modelKinds() {
     }
     ts.forEachChild(node, visit);
   }
-  visit(source);
+  for (const path of [
+    modelsURL,
+    new URL("../src/world/anatomyModels.ts", import.meta.url),
+  ]) {
+    visit(
+      ts.createSourceFile(
+        path.pathname,
+        fs.readFileSync(path, "utf8"),
+        ts.ScriptTarget.Latest,
+        true,
+        ts.ScriptKind.TS,
+      ),
+    );
+  }
   assert.ok(
     kinds.size > 20,
     "The actual model dispatch must be found in models.ts",

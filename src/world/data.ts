@@ -1394,7 +1394,7 @@ add(
 add(
   "tree/wood/xylem/wall/microfibril",
   "tree/wood/xylem/wall",
-  "cellulose",
+  "celluloseMicrofibril",
   30e-9,
   "#d6ba7d",
   ["Cellulose microfibril segment", "Segment de microfibrille de cellulose"],
@@ -2103,7 +2103,7 @@ add(
   "rock/quartz/network",
   "rock/quartz",
   "crystalLattice",
-  2e-9,
+  1.7411510169506073e-9,
   "#c0b5dd",
   ["Quartz atomic network", "Réseau atomique du quartz"],
   [
@@ -2111,8 +2111,8 @@ add(
     "Chaque silicium est entouré de quatre oxygènes disposés en tétraèdre. Les oxygènes relient des centres de silicium voisins dans le réseau.",
   ],
   [
-    "A selected 2 nm lattice fragment; its edges cut a continuous crystal.",
-    "Fragment de réseau choisi de 2 nm ; ses bords coupent un cristal continu.",
+    "A ≈1.74 nm excerpt from measured α-quartz coordinates at 298 K. Atom markers are illustrative; boundary oxygens continue beyond this cut.",
+    "Extrait d’environ 1,74 nm issu des coordonnées mesurées du quartz α à 298 K. Les marqueurs atomiques sont illustratifs ; les oxygènes du bord se prolongent hors de cette coupe.",
   ],
   [
     "Tetrahedra share oxygen atoms; counting each shared atom once gives SiO₂ overall.",
@@ -2595,6 +2595,7 @@ atomicBranch(
   ATOMS.O,
 );
 atomicBranch("rock/quartz/network/silicon", "rock/quartz/network", ATOMS.Si);
+atomicBranch("rock/quartz/network/oxygen", "rock/quartz/network", ATOMS.O);
 atomicBranch(
   "mushroom/hypha/wall/chitin/carbon",
   "mushroom/hypha/wall/chitin",
@@ -2742,6 +2743,273 @@ WORLD_NODES["tree/leaf/cell/mitochondrion"].answer = b([
 ]);
 copyNode("tree/leaf/cell/ribosome", "tree/leaf/cell", WBC + "/ribosome");
 WORLD_NODES["tree/leaf/cell/ribosome"].category = "tree";
+
+WORLD_NODES["rock/quartz"].sources.push(
+  src(
+    "Handbook of Mineralogy · Quartz",
+    "https://www.handbookofmineralogy.org/pdfs/quartz.pdf",
+  ),
+);
+WORLD_NODES["rock/quartz/network"].sources.push(
+  src(
+    "IUCr · α-quartz structure at 298 K",
+    "https://journals.iucr.org/j/issues/2022/04/00/te5094/",
+  ),
+);
+
+// Keep existing blood-cell URLs while distinguishing the complete anatomical
+// vein from the short explanatory vessel-wall specimen.
+const VEIN_SAMPLE = "human/vein/segment";
+copyNode(VEIN_SAMPLE, "human/vein", "human/vein");
+WORLD_NODES[VEIN_SAMPLE].name = b([
+  "Vein wall segment",
+  "Segment de paroi veineuse",
+]);
+WORLD_NODES[VEIN_SAMPLE].relation = "sample";
+WORLD_NODES[VEIN_SAMPLE].sizeNote = b([
+  "A schematic 4 cm wall segment, about 3 mm across. The red interior represents blood as a volume; individual cells resolve at the next scale.",
+  "Segment schématique de paroi de 4 cm, large d’environ 3 mm. L’intérieur rouge représente un volume de sang ; les cellules individuelles apparaissent à l’échelle suivante.",
+]);
+WORLD_NODES[VEIN_SAMPLE].children = ["human/vein/blood"];
+WORLD_NODES[VEIN_SAMPLE].defaultChild = "human/vein/blood";
+WORLD_NODES["human/vein/blood"].parent = VEIN_SAMPLE;
+WORLD_NODES["human/vein"].children = [VEIN_SAMPLE];
+WORLD_NODES["human/vein"].defaultChild = VEIN_SAMPLE;
+
+const BP3D = src(
+  "BodyParts3D 4.0 · DBCLS · CC BY 4.0",
+  "https://dbarchive.biosciencedbc.jp/en/bodyparts3d/download.html",
+);
+add(
+  "human/liver",
+  "human",
+  "anatomyLiver",
+  0.25,
+  "#9a5058",
+  ["Liver", "Foie"],
+  [
+    "The liver processes nutrients arriving from the intestine, makes many blood proteins and produces bile. It lies mainly beneath the right side of the diaphragm.",
+    "Le foie transforme les nutriments arrivant de l’intestin, fabrique de nombreuses protéines sanguines et produit la bile. Il se situe surtout sous la partie droite du diaphragme.",
+  ],
+  [
+    "Largest extent of the selected BodyParts3D specimen; this is not a universal adult measurement.",
+    "Plus grande dimension du spécimen BodyParts3D choisi ; ce n’est pas une mesure adulte universelle.",
+  ],
+  [
+    "Bile helps disperse dietary fats. The gallbladder stores and concentrates bile; the liver produces it.",
+    "La bile aide à disperser les graisses alimentaires. La vésicule biliaire la stocke et la concentre ; le foie la produit.",
+  ],
+  [
+    "Does the gallbladder make bile?",
+    "La vésicule biliaire fabrique-t-elle la bile ?",
+  ],
+  [
+    "No. Liver cells produce bile, which can be stored in the gallbladder before reaching the intestine.",
+    "Non. Les cellules du foie produisent la bile, qui peut être stockée dans la vésicule avant de rejoindre l’intestin.",
+  ],
+  [
+    BP3D,
+    src(
+      "OpenStax · Liver and accessory digestive organs",
+      AP +
+        "23-6-accessory-organs-in-digestion-the-liver-pancreas-and-gallbladder",
+    ),
+  ],
+);
+add(
+  "human/kidneys",
+  "human",
+  "anatomyKidneys",
+  0.26,
+  "#b56265",
+  ["Kidneys", "Reins"],
+  [
+    "The kidneys filter blood plasma and adjust water, ions and waste excretion. They lie behind the abdominal lining, on either side of the spine.",
+    "Les reins filtrent le plasma sanguin et ajustent l’élimination d’eau, d’ions et de déchets. Ils se situent derrière le revêtement abdominal, de part et d’autre de la colonne.",
+  ],
+  [
+    "Extent of the positioned pair in this specimen, including the space between them; not the length of one kidney.",
+    "Dimension de la paire en place dans ce spécimen, espace intermédiaire compris ; pas la longueur d’un seul rein.",
+  ],
+  [
+    "Most filtered water and useful solutes return to the blood. Urine is the fluid remaining after filtration, reabsorption and secretion.",
+    "La plupart de l’eau filtrée et des solutés utiles retournent au sang. L’urine résulte de la filtration, de la réabsorption et de la sécrétion.",
+  ],
+  [
+    "Does everything filtered by the kidneys become urine?",
+    "Tout ce que filtrent les reins devient-il de l’urine ?",
+  ],
+  [
+    "No. Renal tubules reabsorb most filtered fluid and many useful substances.",
+    "Non. Les tubules rénaux réabsorbent la majorité du liquide filtré et de nombreuses substances utiles.",
+  ],
+  [
+    BP3D,
+    src("OpenStax · Kidney anatomy", AP + "25-3-gross-anatomy-of-the-kidney"),
+  ],
+);
+add(
+  "human/stomach",
+  "human",
+  "anatomyStomach",
+  0.22,
+  "#d99b8c",
+  ["Stomach", "Estomac"],
+  [
+    "This muscular chamber stores and mixes a meal with acidic secretions. It releases the resulting mixture gradually into the small intestine.",
+    "Cette poche musculaire stocke et mélange le repas avec des sécrétions acides. Elle libère progressivement le mélange obtenu vers l’intestin grêle.",
+  ],
+  [
+    "Extent of one modeled stomach. Its shape and volume change with filling and muscular activity.",
+    "Dimension d’un estomac modélisé. Sa forme et son volume changent avec le remplissage et l’activité musculaire.",
+  ],
+  [
+    "A mucus and bicarbonate barrier helps protect the lining from acid and digestive enzymes.",
+    "Une barrière de mucus et de bicarbonate aide à protéger la paroi contre l’acide et les enzymes digestives.",
+  ],
+  [
+    "Is the stomach where most nutrients enter the blood?",
+    "L’estomac est-il le principal lieu de passage des nutriments vers le sang ?",
+  ],
+  [
+    "No. Most nutrient absorption takes place in the small intestine.",
+    "Non. L’absorption de la plupart des nutriments se déroule dans l’intestin grêle.",
+  ],
+  [BP3D, src("OpenStax · Stomach", AP + "23-4-the-stomach")],
+);
+add(
+  "human/intestines",
+  "human",
+  "anatomyIntestines",
+  0.4,
+  "#c795ad",
+  ["Intestines", "Intestins"],
+  [
+    "The small intestine completes much digestion and absorbs nutrients. The large intestine recovers water and electrolytes and helps form feces.",
+    "L’intestin grêle réalise une grande partie de la digestion et absorbe les nutriments. Le gros intestin récupère de l’eau et des électrolytes et participe à la formation des selles.",
+  ],
+  [
+    "Extent of the folded organs in the abdomen, not their much greater length if unfolded.",
+    "Dimension des organes repliés dans l’abdomen, pas leur longueur bien supérieure s’ils étaient dépliés.",
+  ],
+  [
+    "The word small describes the intestine’s diameter relative to the large intestine, not its total length.",
+    "Le mot grêle désigne son diamètre inférieur à celui du gros intestin, pas sa longueur totale.",
+  ],
+  [
+    "Why does a long intestine fit inside the abdomen?",
+    "Pourquoi un intestin aussi long tient-il dans l’abdomen ?",
+  ],
+  [
+    "Its flexible tube forms many loops. The 3D model preserves their positions in this specimen.",
+    "Son tube souple forme de nombreuses anses. Le modèle 3D conserve leurs positions dans ce spécimen.",
+  ],
+  [
+    BP3D,
+    src(
+      "OpenStax · Small and large intestines",
+      AP + "23-5-the-small-and-large-intestines",
+    ),
+  ],
+);
+add(
+  "human/femur",
+  "human",
+  "anatomyFemur",
+  0.45,
+  "#e6d9be",
+  ["Left femur", "Fémur gauche"],
+  [
+    "The femur is the thigh bone. Its rounded head articulates with the pelvis, while its lower end participates in the knee joint.",
+    "Le fémur est l’os de la cuisse. Sa tête arrondie s’articule avec le bassin, tandis que son extrémité inférieure participe à l’articulation du genou.",
+  ],
+  [
+    "Largest extent of the left femur in this specimen. Bone dimensions vary between people.",
+    "Plus grande dimension du fémur gauche de ce spécimen. Les dimensions osseuses varient selon les personnes.",
+  ],
+  [
+    "Bone is living tissue containing cells, blood vessels and a mineralized collagen matrix.",
+    "L’os est un tissu vivant contenant des cellules, des vaisseaux sanguins et une matrice de collagène minéralisée.",
+  ],
+  [
+    "Is a bone just an inert mineral rod?",
+    "Un os est-il simplement une tige minérale inerte ?",
+  ],
+  [
+    "No. Bone tissue is continually maintained and remodeled by living cells.",
+    "Non. Le tissu osseux est entretenu et remodelé en permanence par des cellules vivantes.",
+  ],
+  [
+    BP3D,
+    src(
+      "OpenStax · Bones of the lower limb",
+      AP + "8-4-bones-of-the-lower-limb",
+    ),
+  ],
+);
+
+// Source geometry is kept in the same millimetre coordinate system before a
+// shared axis rotation and normalization. Values match the adapted GLB manifest.
+const ANATOMICAL_EXTENTS: Record<string, number> = {
+  "human/heart": 0.115552906,
+  "human/lungs": 0.255124382,
+  "human/brain": 0.1806502769,
+  "human/vein": 0.5523504166,
+  "human/muscle": 0.3453480056,
+  "human/liver": 0.2092812765,
+  "human/kidneys": 0.1779584044,
+  "human/stomach": 0.134475602,
+  "human/intestines": 0.3196657898,
+  "human/femur": 0.4661829912,
+};
+WORLD_NODES.human.sizeMeters = 1.7194712;
+WORLD_NODES.human.sizeNote = b([
+  "The source adult body frame is about 1.72 m high. Organs retain their original relative sizes and positions; individual anatomy varies.",
+  "Le repère du corps adulte source mesure environ 1,72 m de haut. Les organes gardent leurs proportions et positions d’origine ; l’anatomie varie selon les personnes.",
+]);
+WORLD_NODES.human.sources.push(BP3D);
+for (const [id, extent] of Object.entries(ANATOMICAL_EXTENTS)) {
+  WORLD_NODES[id].sizeMeters = extent;
+  WORLD_NODES[id].sizeNote = b([
+    "Largest extent of this BodyParts3D surface, measured in its common source frame. This reference specimen does not represent every adult.",
+    "Plus grande dimension de cette surface BodyParts3D, mesurée dans le repère commun de la source. Ce spécimen de référence ne représente pas tous les adultes.",
+  ]);
+  if (!WORLD_NODES[id].sources.some((source) => source.url === BP3D.url))
+    WORLD_NODES[id].sources.push(BP3D);
+}
+WORLD_NODES["human/lungs"].sizeNote = b([
+  "Extent of both positioned lungs in this BodyParts3D specimen, not the height of a single lung. Inflation and anatomy vary.",
+  "Dimension des deux poumons en place dans ce spécimen BodyParts3D, pas la hauteur d’un seul poumon. Le gonflement et l’anatomie varient.",
+]);
+WORLD_NODES["human/kidneys"].sizeNote = b([
+  "Extent of the positioned kidney pair, including the space between them; not the length of one kidney.",
+  "Dimension de la paire de reins en place, espace intermédiaire compris ; pas la longueur d’un seul rein.",
+]);
+WORLD_NODES["human/intestines"].sizeNote = b([
+  "Extent of the folded organs in the abdomen, not their much greater length if unfolded.",
+  "Dimension des organes repliés dans l’abdomen, pas leur longueur bien supérieure s’ils étaient dépliés.",
+]);
+WORLD_NODES["human/vein"].name = b([
+  "Left cephalic vein",
+  "Veine céphalique gauche",
+]);
+WORLD_NODES["human/vein"].description = b([
+  "This superficial vein follows the lateral side of the left upper limb. The anatomical surface shows its course; the next step samples a short wall segment before entering the blood.",
+  "Cette veine superficielle suit le côté latéral du membre supérieur gauche. La surface anatomique montre son trajet ; l’étape suivante prélève un court segment de paroi avant d’entrer dans le sang.",
+]);
+WORLD_NODES["human/muscle"].name = b([
+  "Left biceps brachii",
+  "Biceps brachial gauche",
+]);
+const BP3D_LUNGS = src(
+  "BodyParts3D 4.3 · Lung parenchyma · DBCLS · CC BY-SA 2.1 Japan",
+  "https://lifesciencedb.jp/bp3d/info_en/index.html",
+);
+WORLD_NODES.human.sources.push(BP3D_LUNGS);
+WORLD_NODES["human/lungs"].sources = WORLD_NODES["human/lungs"].sources.filter(
+  (source) => source.url !== BP3D.url,
+);
+WORLD_NODES["human/lungs"].sources.push(BP3D_LUNGS);
 
 // The default route serves the original question: body → vein → red cell → heme iron.
 WORLD_NODES.human.defaultChild = "human/vein";

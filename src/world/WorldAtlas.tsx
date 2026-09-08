@@ -7,6 +7,9 @@ import { WorldComparison } from "./WorldComparison";
 import { WorldScene } from "./WorldScene";
 import type { WorldSceneInfo } from "./WorldScene";
 import { t, useLocale } from "../i18n";
+import { AnatomyControls } from "./AnatomyControls";
+import { anatomyModeFor } from "./anatomyModels";
+import type { AnatomyMode } from "./anatomyModels";
 
 function initialNode() {
   const id = new URLSearchParams(location.search).get("world") || "world";
@@ -42,6 +45,13 @@ export default function WorldAtlas({
     [],
   );
   const [rotating, setRotating] = useState(false);
+  const [anatomyMode, setAnatomyMode] = useState<AnatomyMode>(() => {
+    const branch = pathTo(selectedId).find(
+      (id) => WORLD_NODES[id].parent === "human",
+    );
+    return anatomyModeFor(branch || "human/vein");
+  });
+  const [anatomyRetryToken, setAnatomyRetryToken] = useState(0);
   const [mechanism, setMechanism] = useState<{
     id: string | null;
     phase: number;
@@ -64,6 +74,10 @@ export default function WorldAtlas({
     if (selectedRef.current === id) return;
     selectedRef.current = id;
     const path = pathTo(id);
+    const anatomyBranch = path.find(
+      (part) => WORLD_NODES[part].parent === "human",
+    );
+    if (anatomyBranch) setAnatomyMode(anatomyModeFor(anatomyBranch));
     setPreferred((previous) => {
       const next = { ...previous };
       for (let i = 1; i < path.length; i++) next[path[i - 1]] = path[i];
@@ -79,6 +93,10 @@ export default function WorldAtlas({
       const id = initialNode();
       selectedRef.current = id;
       const path = pathTo(id);
+      const anatomyBranch = path.find(
+        (part) => WORLD_NODES[part].parent === "human",
+      );
+      if (anatomyBranch) setAnatomyMode(anatomyModeFor(anatomyBranch));
       setPreferred((previous) => {
         const next = { ...previous };
         for (let i = 1; i < path.length; i++) next[path[i - 1]] = path[i];
@@ -113,11 +131,38 @@ export default function WorldAtlas({
         rotating={rotating}
         focusMode={focusMode}
         resetToken={resetToken}
+        anatomyMode={anatomyMode}
+        anatomyRetryToken={anatomyRetryToken}
         onNavigate={navigate}
         onInfo={setSceneInfo}
       />
       {!focusMode && <WorldMechanismVisual {...mechanism} />}
       <WorldUI
+        anatomyMode={anatomyMode}
+        onRetryAnatomy={() => setAnatomyRetryToken((token) => token + 1)}
+        anatomyControls={
+          selectedId === "human" ? (
+            <AnatomyControls
+              selectedId={selectedId}
+              mode={anatomyMode}
+              status={sceneInfo.anatomyStatus || "loading"}
+              onModeChange={(mode) => {
+                setAnatomyMode(mode);
+                const target =
+                  mode === "skeleton"
+                    ? "human/femur"
+                    : mode === "muscles"
+                      ? "human/muscle"
+                      : mode === "surface"
+                        ? "human/skin"
+                        : "human/vein";
+                setPreferred((previous) => ({ ...previous, human: target }));
+              }}
+              onNavigate={navigate}
+              onRetry={() => setAnatomyRetryToken((token) => token + 1)}
+            />
+          ) : undefined
+        }
         preferredChildId={preferred[selectedId]}
         onNextTargetChange={onNextTargetChange}
         onMechanismChange={onMechanismChange}
