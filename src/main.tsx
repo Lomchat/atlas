@@ -1,10 +1,12 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
-import AtlasApplication from "./AtlasApplication";
-import "./style.css";
-import "./StudioLayout.css";
+import "@fontsource-variable/fredoka";
+import "@fontsource-variable/nunito";
+import App from "./App";
+import "./styles.css";
+
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <AtlasApplication />
+    <App />
   </React.StrictMode>,
 );
