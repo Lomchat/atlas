@@ -53,11 +53,11 @@ try {
     await assertLocale(page);
     const intro = page.getByRole("dialog", { name: text("From quarks to the cosmos") });
     await intro.waitFor();
-    const choice = intro.locator('[data-level="pond"]');
+    const choice = intro.locator('[data-level="c-atom"]');
     await choice.scrollIntoViewIfNeeded();
     await page.screenshot({ path: artifact(`layout-${viewport.name}-intro.png`) });
     await choice.click();
-    await settledOn(page, "pond");
+    await settledOn(page, "c-atom");
 
     // A deep level with every panel.
     await page.goto(`${base}/?lang=${locale}&at=cell&intro=0`);

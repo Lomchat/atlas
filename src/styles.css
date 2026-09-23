@@ -1102,9 +1102,83 @@ a {
   font-size: 17px;
 }
 
+.intro-featured {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  margin-bottom: 10px;
+  padding: 10px 18px 10px 10px;
+  border: 2px solid #ffd23f;
+  border-radius: 24px;
+  background: rgba(255, 210, 63, 0.1);
+  text-align: left;
+  box-shadow: 0 10px 28px rgba(255, 210, 63, 0.18);
+  transition: transform 0.25s var(--ease), background 0.2s;
+}
+
+.intro-featured:hover,
+.intro-featured:focus-visible {
+  transform: translateY(-3px);
+  background: rgba(255, 210, 63, 0.18);
+}
+
+.intro-featured-image {
+  flex: none;
+  width: 210px;
+  aspect-ratio: 1200 / 630;
+  border-radius: 16px;
+  background: #5ec2f7 url("/og.jpg") center / 128% auto no-repeat;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25);
+}
+
+.intro-featured-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  min-width: 0;
+}
+
+.intro-featured-text b {
+  font-family: var(--display);
+  font-size: 26px;
+  font-weight: 650;
+  line-height: 1.1;
+}
+
+.intro-featured-text small {
+  font-size: 14.5px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--ink-soft);
+}
+
+.intro-badge {
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: #ffd23f;
+  color: var(--dark);
+  font-family: var(--display);
+  font-size: 12.5px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+
+.intro-featured-arrow {
+  flex: none;
+  color: #ffd23f;
+  transition: transform 0.25s var(--ease);
+}
+
+.intro-featured:hover .intro-featured-arrow {
+  transform: translateX(4px);
+}
+
 .intro-choices {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 10px;
   margin-bottom: 18px;
 }
@@ -1133,6 +1207,9 @@ a {
 }
 .intro-choice[data-journey="cosmos"] {
   --c: #b58cff;
+}
+.intro-choice[data-journey="matter"] {
+  --c: #6fd2ff;
 }
 
 .intro-choice:hover,
@@ -1433,7 +1510,30 @@ a {
     border-radius: 26px;
   }
   .intro-choices {
-    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+  .intro-choice {
+    padding: 12px 4px 10px;
+  }
+  .intro-choice-icon {
+    width: 44px;
+    height: 44px;
+  }
+  .intro-choice b {
+    font-size: 15.5px;
+  }
+  .intro-featured {
+    gap: 12px;
+    padding: 8px 12px 8px 8px;
+  }
+  .intro-featured-image {
+    width: 118px;
+  }
+  .intro-featured-text b {
+    font-size: 21px;
+  }
+  .intro-featured-text small {
+    font-size: 13px;
   }
   .intro-lead {
     font-size: 15.5px;

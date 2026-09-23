@@ -1,14 +1,14 @@
-import { Mouse, Play } from "lucide-react";
+import { ArrowRight, Mouse, Play } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { t, useLocale } from "../i18n";
 import type { MessageKey } from "../i18n";
+import { HOME_ID } from "../levels";
 import type { Journey } from "../levels/types";
 import { JourneyIcon, LogoMark } from "./icons";
 
 const CHOICES: { id: string; journey: Journey; name: MessageKey; hint: MessageKey }[] = [
   { id: "person", journey: "body", name: "You", hint: "Down to your DNA" },
-  { id: "tree", journey: "tree", name: "A tree", hint: "Down to chlorophyll" },
-  { id: "pond", journey: "water", name: "A pond", hint: "Microbes, viruses, molecules" },
+  { id: "c-atom", journey: "matter", name: "An atom", hint: "Down to the quarks" },
   { id: "universe", journey: "cosmos", name: "The Universe", hint: "Out to the galaxies" },
 ];
 
@@ -39,11 +39,26 @@ export default function Intro({ onStart }: Props) {
           )}
         </p>
         <p className="intro-choose">{t("Where do you want to start?")}</p>
+        <button
+          ref={first}
+          type="button"
+          className="intro-featured"
+          data-journey="home"
+          data-level={HOME_ID}
+          onClick={() => onStart(HOME_ID, false)}
+        >
+          <span className="intro-featured-image" aria-hidden="true" />
+          <span className="intro-featured-text">
+            <span className="intro-badge">{t("Recommended")}</span>
+            <b>{t("The park")}</b>
+            <small>{t("Start here, halfway between atoms and galaxies")}</small>
+          </span>
+          <ArrowRight className="intro-featured-arrow" size={24} strokeWidth={2.6} aria-hidden="true" />
+        </button>
         <div className="intro-choices">
-          {CHOICES.map((choice, k) => (
+          {CHOICES.map((choice) => (
             <button
               key={choice.id}
-              ref={k === 0 ? first : undefined}
               type="button"
               className="intro-choice"
               data-journey={choice.journey}
