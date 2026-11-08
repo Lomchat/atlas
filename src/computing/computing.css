@@ -1032,3 +1032,105 @@ button.cs-station:focus-visible {
   text-align: center;
   line-height: 1.15;
 }
+
+/* ------------------------------------------------------------------ */
+/* Language models                                                      */
+/* ------------------------------------------------------------------ */
+
+.cs-token,
+.cs-word,
+.cs-bar-label {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-family: var(--display);
+  white-space: pre;
+  pointer-events: none;
+}
+
+.cs-token b {
+  font-size: 17px;
+  font-weight: 650;
+  color: var(--dark);
+}
+
+.cs-token small {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(26, 16, 64, 0.62);
+}
+
+.cs-word {
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--dark);
+  white-space: nowrap;
+}
+
+.cs-word small {
+  font-size: 11.5px;
+  font-weight: 650;
+  color: #c2185b;
+}
+
+.cs-word[data-pronoun] {
+  color: var(--dark);
+}
+
+.cs-word-dark {
+  color: var(--dark);
+  font-size: 16px;
+}
+
+.cs-bar-label {
+  transform: translate(-50%, -100%);
+  color: var(--ink);
+  text-shadow: 0 1px 4px rgba(10, 5, 40, 0.6);
+}
+
+.cs-bar-label b {
+  font-size: 14.5px;
+  font-weight: 650;
+}
+
+.cs-bar-label small {
+  font-size: 13px;
+  font-weight: 600;
+  color: #ffd23f;
+}
+
+.cs-field-wide {
+  flex: 1;
+  min-width: 180px;
+}
+
+.cs-field-wide input {
+  width: 100%;
+  font-size: 17px;
+  text-align: left;
+  padding: 0 10px;
+}
+
+.app[data-compact] .cs-token b,
+.app[data-compact] .cs-word {
+  font-size: 12px;
+}
+
+.app[data-compact] .cs-token small,
+.app[data-compact] .cs-word small {
+  font-size: 9.5px;
+}
+
+.app[data-compact] .cs-bar-label b {
+  font-size: 11.5px;
+}
+
+/* Only the most likely candidates are named on small screens. */
+.app[data-compact] .cs-bar-label[data-bar="4"],
+.app[data-compact] .cs-bar-label[data-bar="5"] {
+  display: none;
+}

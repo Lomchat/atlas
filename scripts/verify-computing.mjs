@@ -161,6 +161,23 @@ try {
   await page.getByLabel(text("Message")).fill("12");
   assert.equal(await page.locator('[data-readout="unlock"] b').textContent(), "12", "Bob gets the message back");
 
+  // Chapter 6: the toy tokenizer, attention and generation.
+  const llm = lessonById.get("llm");
+  await page.goto(`${base}/?lang=${locale}&section=computing&lesson=llm&step=tokens`);
+  await expectStep(llm, "tokens");
+  await page.getByLabel(text("Type a sentence")).fill("unbelievably");
+  await pinned(page, '[data-token="2"]');
+  assert.equal(await page.locator(".cs-token").count(), 3, "a rare word is cut into pieces");
+  await page.locator('[data-step-stop="attention"]').click();
+  await expectStep(llm, "attention");
+  await page.locator('[data-preset="small"]').click();
+  assert.ok((await page.locator('[data-weight="7"]').textContent()).startsWith("61"), "“it” now looks at the suitcase");
+  await page.locator('[data-step-stop="generate"]').click();
+  await expectStep(llm, "generate");
+  await page.getByRole("button", { name: text("Start again") }).click();
+  await page.locator('[data-action="next-token"]').click();
+  await pinned(page, '[data-generated="0"]');
+
   // Links: unknown and unfinished chapters fall back to the map.
   for (const lesson of ["nope", ...LESSONS.filter((l) => !isReady(l)).map((l) => l.id).slice(0, 1)]) {
     await page.goto(`${base}/?lang=${locale}&section=computing&lesson=${lesson}`);

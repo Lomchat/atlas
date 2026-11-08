@@ -133,6 +133,7 @@ async function checkLessons() {
     bits: (await import("../src/computing/logic/bits.ts")).BITS_STEPS,
     gates: (await import("../src/computing/logic/gates.ts")).GATES_STEPS,
     keys: (await import("../src/computing/logic/keys.ts")).KEYS_STEPS,
+    llm: (await import("../src/computing/logic/llm.ts")).LLM_STEPS,
   };
   const keysOf = (file) =>
     new Set(

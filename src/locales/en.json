@@ -65,6 +65,7 @@
   "Next chapter": "Next chapter",
   "Next fact": "Next fact",
   "Next step: {name}": "Next step: {name}",
+  "Next token": "Next token",
   "Number {n}": "Number {n}",
   "Open the chapter {name}": "Open the chapter {name}",
   "Orange": "Orange",
@@ -94,6 +95,7 @@
   "Steps of the chapter": "Steps of the chapter",
   "Sum": "Sum",
   "Take the guided tour": "Take the guided tour",
+  "Temperature": "Temperature",
   "The Computing section explains how computers work, one chapter at a time, with real worked examples. Its pictures are illustrations: real components do not look like this up close.": "The Computing section explains how computers work, one chapter at a time, with real worked examples. Its pictures are illustrations: real components do not look like this up close.",
   "The Universe": "The Universe",
   "The end… for now": "The end… for now",
@@ -102,6 +104,7 @@
   "Truth table": "Truth table",
   "Turn the gate on or off": "Turn the gate on or off",
   "Type a character": "Type a character",
+  "Type a sentence": "Type a sentence",
   "Universe": "Universe",
   "Use the arrows or the buttons to move between steps, and click the objects in the scene to try them.": "Use the arrows or the buttons to move between steps, and click the objects in the scene to try them.",
   "Violet": "Violet",
@@ -126,5 +129,6 @@
   "{n} light-years": "{n} light-years",
   "{n} million km": "{n} million km",
   "{n} million light-years": "{n} million light-years",
-  "{n} steps": "{n} steps"
+  "{n} steps": "{n} steps",
+  "{n}%": "{n}%"
 }

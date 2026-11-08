@@ -32,19 +32,4 @@ export const upcomingLessons: LessonData[] = [
     },
     steps: [],
   },
-  {
-    id: "llm",
-    number: 6,
-    status: "soon",
-    scene: "llm",
-    icon: "llm",
-    theme: { top: "#0d1240", bottom: "#2b3aa0", accent: "#8c5cff", dust: "#c9b3ff" },
-    title: { en: "Large language models", fr: "Les grands modèles de langage" },
-    short: { en: "LLMs", fr: "LLM" },
-    teaser: {
-      en: "How an AI picks the next word, with real examples.",
-      fr: "Comment une IA choisit le mot suivant, exemples à l’appui.",
-    },
-    steps: [],
-  },
 ];
