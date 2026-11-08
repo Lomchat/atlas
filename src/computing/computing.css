@@ -929,3 +929,106 @@ button.cs-station:focus-visible {
   font-size: 12.5px;
   padding: 2px 6px;
 }
+
+/* ------------------------------------------------------------------ */
+/* Public and private keys                                              */
+/* ------------------------------------------------------------------ */
+
+.cs-chip-readout {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 17px;
+}
+
+.cs-chip-readout[data-secret] {
+  transform: translate(-50%, -100%);
+  background: var(--accent);
+  color: var(--dark);
+}
+
+.cs-chip-readout[data-key] {
+  background: #ffd23f;
+  color: var(--dark);
+}
+
+.cs-eve-fail {
+  color: #ff7b88;
+}
+
+.cs-power sup {
+  font-size: 0.65em;
+  line-height: 0;
+}
+
+.cs-hour {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: translate(-50%, -50%);
+  font-family: var(--display);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink-faint);
+  transition: color 0.3s, transform 0.3s var(--ease);
+}
+
+.cs-hour[data-visited] {
+  color: #ffd23f;
+}
+
+.cs-hour[data-current] {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #ffd23f;
+  color: var(--dark);
+  transform: translate(-50%, -50%) scale(1.15);
+}
+
+.cs-sliders {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.cs-slider {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13.5px;
+  font-weight: 800;
+  color: var(--ink-soft);
+}
+
+.cs-slider b {
+  font-family: var(--display);
+  font-size: 16px;
+  color: var(--accent);
+}
+
+.cs-slider input {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.cs-action:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.app[data-compact] .cs-hour {
+  font-size: 11px;
+}
+
+.app[data-compact] .cs-chip-readout {
+  font-size: 14px;
+}
+
+.app[data-compact] .cs-chip-readout {
+  width: max-content;
+  max-width: 128px;
+  white-space: normal;
+  text-align: center;
+  line-height: 1.15;
+}

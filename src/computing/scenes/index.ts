@@ -7,4 +7,5 @@ export const STAGE_SCENES: Record<string, Loader> = {
   board: () => import("./board"),
   bits: () => import("./bits"),
   gates: () => import("./gates"),
+  keys: () => import("./keys"),
 };

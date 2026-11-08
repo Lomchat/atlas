@@ -18,21 +18,6 @@ export const upcomingLessons: LessonData[] = [
     steps: [],
   },
   {
-    id: "keys",
-    number: 4,
-    status: "soon",
-    scene: "keys",
-    icon: "key",
-    theme: { top: "#3a0d2e", bottom: "#8c2357", accent: "#ff6fb1", dust: "#ffb3d9" },
-    title: { en: "Public and private keys", fr: "Clés publiques et privées" },
-    short: { en: "Secret keys", fr: "Clés secrètes" },
-    teaser: {
-      en: "Agree on a secret in front of a spy, with a real calculation.",
-      fr: "Se mettre d’accord sur un secret sous les yeux d’un espion, avec un vrai calcul.",
-    },
-    steps: [],
-  },
-  {
     id: "neurons",
     number: 5,
     status: "soon",

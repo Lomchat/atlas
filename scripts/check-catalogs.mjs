@@ -132,6 +132,7 @@ async function checkLessons() {
   const ORDER = {
     bits: (await import("../src/computing/logic/bits.ts")).BITS_STEPS,
     gates: (await import("../src/computing/logic/gates.ts")).GATES_STEPS,
+    keys: (await import("../src/computing/logic/keys.ts")).KEYS_STEPS,
   };
   const keysOf = (file) =>
     new Set(

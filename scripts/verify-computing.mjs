@@ -142,6 +142,25 @@ try {
   await pinned(page, '[data-readout="value-sum"]');
   assert.equal((await page.locator('[data-readout="value-sum"]').textContent()).trim(), "= 30");
 
+  // Chapter 4: the clock, the exchange (same key on both sides) and RSA.
+  const keys = lessonById.get("keys");
+  await page.goto(`${base}/?lang=${locale}&section=computing&lesson=keys&step=clock`);
+  await expectStep(keys, "clock");
+  await page.getByRole("button", { name: text("Multiply by 5") }).click();
+  await pinned(page, '[data-readout="power"]');
+  assert.equal((await page.locator('[data-readout="power"]').textContent()).trim(), "57 → 17");
+  await page.locator('[data-step-stop="shared"]').click();
+  await expectStep(keys, "shared");
+  await pinned(page, '[data-readout="key-alice"]');
+  assert.equal((await page.locator('[data-readout="key-alice"]').textContent()).trim(), "196 → 2");
+  await page.getByLabel(text("Alice’s secret")).fill("9");
+  const [aliceKey, bobKey] = [await page.locator('[data-readout="key-alice"] b').textContent(), await page.locator('[data-readout="key-bob"] b').textContent()];
+  assert.equal(aliceKey, bobKey, "both sides find the same key");
+  await page.locator('[data-step-stop="padlock"]').click();
+  await expectStep(keys, "padlock");
+  await page.getByLabel(text("Message")).fill("12");
+  assert.equal(await page.locator('[data-readout="unlock"] b').textContent(), "12", "Bob gets the message back");
+
   // Links: unknown and unfinished chapters fall back to the map.
   for (const lesson of ["nope", ...LESSONS.filter((l) => !isReady(l)).map((l) => l.id).slice(0, 1)]) {
     await page.goto(`${base}/?lang=${locale}&section=computing&lesson=${lesson}`);

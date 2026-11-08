@@ -5,9 +5,10 @@
 import type { ComputingHome, LessonData, StepData } from "./types.ts";
 import { bitsLesson } from "./data/bits.ts";
 import { gatesLesson } from "./data/gates.ts";
+import { keysLesson } from "./data/keys.ts";
 import { upcomingLessons } from "./data/upcoming.ts";
 
-export const LESSONS: readonly LessonData[] = [bitsLesson, gatesLesson, ...upcomingLessons].sort(
+export const LESSONS: readonly LessonData[] = [bitsLesson, gatesLesson, keysLesson, ...upcomingLessons].sort(
   (a, b) => a.number - b.number,
 );
 
