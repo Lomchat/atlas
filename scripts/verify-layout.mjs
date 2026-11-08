@@ -66,6 +66,7 @@ try {
     await inside(".card", "level card");
     await inside(".controls-row", "zoom controls");
     await inside(".topbar-actions", "language, share and about");
+    await inside(".section-switch", "section switch");
     await inside(".ruler-marker", "scale ruler marker");
     const title = await inside(".card-title", "title");
     const hook = await inside(".card-hook", "explanation");

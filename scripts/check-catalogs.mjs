@@ -60,6 +60,18 @@ function checkSuites() {
 const HEX = /^#[0-9a-f]{6}$/i;
 const finite = (v) => Array.isArray(v) && v.length === 3 && v.every(Number.isFinite);
 
+/** A bilingual record: both languages, finished, without stray spaces. */
+function bilingual(id, field, value) {
+  assert.ok(value && typeof value === "object", `${id}: missing ${field}`);
+  for (const locale of ["en", "fr"]) {
+    assert.equal(typeof value[locale], "string", `${id}: ${field}.${locale} must be text`);
+    assert.ok(value[locale].trim(), `${id}: empty ${field}.${locale}`);
+    assert.doesNotMatch(value[locale], /\b(TODO|TBD|lorem|draft)\b|\[brouillon\]/i, `${id}: unfinished ${field}.${locale}`);
+    assert.doesNotMatch(value[locale], /\s{2,}|^\s|\s$/, `${id}: stray spaces in ${field}.${locale}`);
+  }
+  assert.ok(!(value.fr === value.en && value.en.length > 12), `${id}: ${field} looks untranslated`);
+}
+
 /** The level registry: structure, sizes, anchors and bilingual content. */
 async function checkLevels() {
   const { LEVELS, byId, childrenOf, homeZ, pathThrough, HOME_ID } = await import("../src/levels/index.ts");
@@ -72,16 +84,6 @@ async function checkLevels() {
   const roots = LEVELS.filter((level) => level.parent === null);
   assert.equal(roots.length, 1, "Exactly one root level");
   assert.ok(byId.has(HOME_ID), "The home level exists");
-  const bilingual = (id, field, value) => {
-    assert.ok(value && typeof value === "object", `${id}: missing ${field}`);
-    for (const locale of ["en", "fr"]) {
-      assert.equal(typeof value[locale], "string", `${id}: ${field}.${locale} must be text`);
-      assert.ok(value[locale].trim(), `${id}: empty ${field}.${locale}`);
-      assert.doesNotMatch(value[locale], /\b(TODO|TBD|lorem|draft)\b|\[brouillon\]/i, `${id}: unfinished ${field}.${locale}`);
-      assert.doesNotMatch(value[locale], /\s{2,}|^\s|\s$/, `${id}: stray spaces in ${field}.${locale}`);
-    }
-    assert.ok(!(value.fr === value.en && value.en.length > 12), `${id}: ${field} looks untranslated`);
-  };
   for (const level of LEVELS) {
     const id = level.id;
     assert.match(id, /^[a-z0-9-]+$/, `${id}: ids are lowercase and URL-safe`);
@@ -124,12 +126,65 @@ async function checkLevels() {
   return LEVELS.length;
 }
 
+/** The computing lessons: chapters, steps, scenes, interactive layers and bilingual content. */
+async function checkLessons() {
+  const { LESSONS, lessonById, COMPUTING_HOME, isReady } = await import("../src/computing/index.ts");
+  const { BITS_STEPS } = await import("../src/computing/logic/bits.ts");
+  const keysOf = (file) =>
+    new Set(
+      [...fs.readFileSync(new URL(file, import.meta.url), "utf8").matchAll(/^\s*(\w+):\s*(?:\(\)\s*=>\s*import\(|\w+Ui\b)/gm)].map(
+        (match) => match[1],
+      ),
+    );
+  const scenes = keysOf("../src/computing/scenes/index.ts");
+  const interactive = keysOf("../src/computing/ui/lessons/index.ts");
+  assert.equal(lessonById.size, LESSONS.length, "Lesson ids must be unique");
+  assert.ok(scenes.has(COMPUTING_HOME.scene), "the chapter map has a scene");
+  for (const key of ["top", "bottom", "accent", "dust"]) assert.match(COMPUTING_HOME.theme[key], HEX, `chapter map theme.${key}`);
+  LESSONS.forEach((lesson, k) => {
+    const id = lesson.id;
+    assert.match(id, /^[a-z0-9-]+$/, `${id}: ids are lowercase and URL-safe`);
+    assert.equal(lesson.number, k + 1, `${id}: chapters are numbered 1, 2, 3… in order`);
+    for (const key of ["top", "bottom", "accent", "dust"]) assert.match(lesson.theme[key], HEX, `${id}: theme.${key}`);
+    for (const field of ["title", "short", "teaser"]) bilingual(id, field, lesson[field]);
+    if (lesson.status === "soon") return;
+    assert.equal(lesson.status, "ready", `${id}: status is ready or soon`);
+    assert.ok(isReady(lesson), `${id}: a ready chapter has steps`);
+    assert.ok(scenes.has(lesson.scene), `${id}: unknown scene "${lesson.scene}"`);
+    assert.ok(interactive.has(id), `${id}: register its interactive layer in ui/lessons/index.ts`);
+    assert.match(lesson.source?.url ?? "", /^https:\/\//, `${id}: source must be an https link`);
+    const stepIds = new Set();
+    for (const step of lesson.steps) {
+      const where = `${id}/${step.id}`;
+      assert.match(step.id, /^[a-z0-9-]+$/, `${where}: step ids are lowercase and URL-safe`);
+      assert.ok(!stepIds.has(step.id), `${where}: duplicate step`);
+      stepIds.add(step.id);
+      for (const field of ["title", "text", "example"]) bilingual(where, field, step[field]);
+      if (step.try) bilingual(where, "try", step.try);
+      assert.ok(step.facts.length >= 1, `${where}: at least one fact`);
+      step.facts.forEach((fact, f) => bilingual(where, `facts[${f}]`, fact));
+      for (const label of step.labels ?? []) {
+        assert.match(label.anchor, /^[a-z0-9-]+$/, `${where}: label anchor`);
+        bilingual(where, `label ${label.anchor}`, label.text);
+      }
+      if (step.source) assert.match(step.source.url, /^https:\/\//, `${where}: source must be an https link`);
+      if (step.theme) for (const key of ["top", "bottom", "accent", "dust"]) assert.match(step.theme[key], HEX, `${where}: theme.${key}`);
+    }
+  });
+  // The bits scene lays its steps out in this order.
+  assert.deepEqual(lessonById.get("bits").steps.map((step) => step.id), [...BITS_STEPS], "bits: steps match BITS_STEPS");
+  return LESSONS.length;
+}
+
 export async function checkCatalogs() {
   const en = checkMessages();
   checkSources(en);
   checkSuites();
   const count = await checkLevels();
-  console.log(`PASS catalogs and registry: ${Object.keys(en).length} messages and ${count} levels in English and French`);
+  const lessons = await checkLessons();
+  console.log(
+    `PASS catalogs and registry: ${Object.keys(en).length} messages, ${count} levels and ${lessons} chapters in English and French`,
+  );
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) await checkCatalogs();

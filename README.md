@@ -6,6 +6,8 @@ Atlas is a bilingual (English/French) journey through every power of ten, from q
 
 You start in a small park. Scroll, pinch or press **Dive** to go into a person, a tree or a pond; zoom out to see the landscape, the Earth, the Solar System and the galaxies. Every inward journey ends inside an atom, its nucleus, a proton and finally a quark.
 
+A second section, **Computing** (switch at the top left), explains how computers work in the same illustrated style: step-by-step animated chapters with real worked examples, starting from the bit.
+
 ## What you can do
 
 - **Zoom continuously** with the mouse wheel, a trackpad or a pinch. When you stop, the view settles on the nearest place in the direction you were going. Drag to look around.
@@ -30,6 +32,15 @@ You start in a small park. Scroll, pinch or press **Dive** to go into a person, 
 
 Sizes are real. Shapes are simplified and colours chosen for legibility; electrons, quarks and gluons are drawn symbolically. Where a view enlarges something to make it visible (planets in the Solar System), the place says so.
 
+### Computing
+
+The chapter map is a floating circuit board with one station per chapter. Each chapter is a short sequence of steps: a 3D scene that morphs from one step to the next, a card with the idea, a worked example with real numbers, things to try in the scene, "Did you know?" facts and a source. Arrows (or ←/→) move between steps, ▶ (or Space) reads them in turn, the rail on the right jumps to any step.
+
+| Chapter | Status |
+| --- | --- |
+| 1. The bit — a switch and its lamp, where bits live (voltage, magnet, light), why each bit doubles the choices, counting in binary, a letter as bytes and pixels (A = 65, é = 2 bytes in UTF-8), a colour as three bytes | ready |
+| 2. Logic gates · 3. Inside a computer · 4. Public and private keys · 5. Neural networks · 6. Large language models | coming soon |
+
 ## Languages
 
 Use the two flag buttons. Switching keeps the place, the zoom and the 3D view. A valid `?lang=en` or `?lang=fr` wins over the saved choice, then the browser language; English is the fallback. UI messages live in `src/locales/{en,fr}.json`; scientific texts live with each level as `{ en, fr }` pairs in `src/levels/data/`.
@@ -47,7 +58,7 @@ npm run build        # static site in dist/ (use -- --outDir .next-dist before p
 node scripts/shoot.mjs --at cell --offset -0.5 --lang fr   # screenshots of any level or transition
 ```
 
-Useful URL parameters: `at=<level id>`, `lang=en|fr`, `intro=0|1`, and for screenshots `freeze=<seconds>` (stops animation time), `offset=<decades>` (partway into the next level) and `ui=0`.
+Useful URL parameters: `at=<level id>`, `lang=en|fr`, `intro=0|1`, `section=computing` with `lesson=<id>` and `step=<id>`, and for screenshots `freeze=<seconds>` (stops animation time and transitions), `offset=<decades>` (partway into the next level) and `ui=0`. `node scripts/shoot.mjs --lesson bits --step count,letter` shoots computing steps (`--lesson map` for the chapter map).
 
 ### Tests
 
@@ -59,6 +70,7 @@ npm run test:journey   # intro, diving to the quark, branches, labels, ruler, wh
 npm run test:language  # switching both ways, persistence, ?lang precedence, storage failures
 npm run test:layout    # desktop, laptop, phone and landscape layouts, dialogs, hotspots
 npm run test:scenes    # every level builds its own scene without errors, plus one dive frame each
+npm run test:computing # section switch, chapter map, every step and its controls, keys, links, phone
 npm run check          # catalogs and level registry only (no browser)
 ```
 
@@ -68,7 +80,9 @@ npm run check          # catalogs and level registry only (no browser)
 - `src/levels/scenes/` — one lazily loaded builder per scene, drawn with the illustrated style kit. A scene that fails falls back to a placeholder; navigation never breaks.
 - `src/engine/Atlas.ts` — the infinite-zoom engine. The position is `z = log10(view size in metres)`; levels are drawn in the frame of the current level (a floating origin), stacked from largest to smallest and cross-faded. The camera tilts smoothly between each level's home view.
 - `src/engine/kit.ts` — toon, halo, glow, point and line materials, organic blobs, tubes and canvas textures, all released together with their scene.
-- `src/App.tsx`, `src/ui/` — card, controls, ruler, floating labels, intro, about dialog, language flags.
+- `src/App.tsx`, `src/ui/` — card, controls, ruler, floating labels, intro, about dialog, language flags, section switch.
+- `src/engine/renderer.ts` — the single WebGL renderer, shared by both sections; only the section on screen renders.
+- `src/computing/` — the Computing section, loaded on demand: pure lesson data (`data/`, `index.ts`), the `Stage` engine (one scene per lesson, a camera gliding between step shots, anchors projected for HTML labels), scenes (`scenes/`), shared lesson logic (`logic/`) and its interface (`Computing.tsx`, `ui/`).
 
 There is no backend, account or tracking. Fonts are bundled.
 

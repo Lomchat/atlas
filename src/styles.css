@@ -83,6 +83,7 @@ a {
 .controls-row,
 .topbar-actions,
 .brand,
+.section-switch,
 .branches,
 .toast {
   background: var(--panel);
@@ -144,6 +145,52 @@ a {
   font-size: 12px;
   font-weight: 700;
   color: var(--ink-soft);
+}
+
+.topbar-start {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+/* The two sections, side by side next to the brand. */
+.section-switch {
+  display: flex;
+  gap: 3px;
+  padding: 4px;
+  border-radius: 999px;
+}
+
+.section-switch button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 40px;
+  padding: 0 15px 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--ink-soft);
+  transition: background 0.2s, color 0.2s, transform 0.2s var(--ease);
+}
+
+.section-switch button:hover {
+  background: rgba(255, 255, 255, 0.13);
+  color: var(--ink);
+}
+
+.section-switch button[aria-pressed="true"] {
+  background: #fff;
+  color: var(--dark);
+  box-shadow: 0 4px 12px rgba(10, 5, 40, 0.25);
+}
+
+.section-switch button[aria-pressed="true"] svg {
+  color: color-mix(in srgb, var(--accent) 65%, var(--dark));
 }
 
 .logo-mark {
@@ -1426,6 +1473,34 @@ a {
 .app[data-compact] .language-picker button {
   width: 34px;
   height: 30px;
+}
+
+.app[data-compact] .topbar-start {
+  gap: 6px;
+}
+
+.app[data-compact] .section-switch {
+  padding: 3px;
+}
+
+.app[data-compact] .section-switch button {
+  width: 36px;
+  height: 34px;
+  padding: 0;
+  justify-content: center;
+}
+
+.app[data-compact] .section-switch-text {
+  display: none;
+}
+
+@media (max-width: 480px) {
+  .app[data-compact] .brand {
+    padding: 4px;
+  }
+  .app[data-compact] .brand-text {
+    display: none;
+  }
 }
 
 .app[data-compact] .dock {

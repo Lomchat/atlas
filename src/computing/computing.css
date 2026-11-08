@@ -1,0 +1,844 @@
+/* Computing section: chapter map, step card, step rail and pinned controls.
+   Panels reuse the Atlas classes (card, controls-row, control…) from styles.css. */
+
+/* ------------------------------------------------------------------ */
+/* Chapter map                                                          */
+/* ------------------------------------------------------------------ */
+
+.cs-dock[data-view="map"] {
+  width: min(430px, calc(100vw - 150px));
+}
+
+.cs-dock[data-view="map"] .card {
+  max-height: calc(100vh - 186px);
+}
+
+.cs-map .card-body {
+  padding: 20px 18px 14px;
+}
+
+.cs-kicker {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.cs-map-title {
+  margin: 2px 0 8px;
+  font-family: var(--display);
+  font-size: 34px;
+  font-weight: 650;
+  line-height: 1.05;
+}
+
+.cs-lead {
+  margin: 0 0 14px;
+  font-size: 15.5px;
+  line-height: 1.45;
+  color: var(--ink-soft);
+}
+
+.cs-chapters {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cs-chapter {
+  --c: #ffd23f;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 7px 12px 7px 8px;
+  border: 0;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.07);
+  text-align: left;
+  transition: transform 0.25s var(--ease), background 0.2s;
+}
+
+.cs-chapter:hover:not(:disabled),
+.cs-chapter:focus-visible {
+  transform: translateX(3px);
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.cs-chapter:disabled {
+  cursor: default;
+}
+
+.cs-chapter-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  background: var(--c);
+  color: var(--dark);
+  box-shadow: 0 6px 14px color-mix(in srgb, var(--c) 35%, transparent);
+}
+
+.cs-chapter:disabled .cs-chapter-icon {
+  background: color-mix(in srgb, var(--c) 30%, rgba(255, 255, 255, 0.08));
+  color: var(--ink);
+  box-shadow: none;
+}
+
+.cs-chapter-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  gap: 1px;
+}
+
+.cs-chapter-text b {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  font-family: var(--display);
+  font-size: 16.5px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.cs-chapter-number {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--c);
+}
+
+.cs-chapter-text small {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--ink-faint);
+}
+
+.cs-chapter:not(:disabled) .cs-chapter-text small {
+  color: var(--ink-soft);
+}
+
+.cs-chapter-badge {
+  flex: none;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  font-family: var(--display);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--ink-soft);
+}
+
+.cs-chapter:not(:disabled) .cs-chapter-badge {
+  background: var(--c);
+  color: var(--dark);
+}
+
+.cs-start-row {
+  grid-template-columns: 1fr;
+}
+
+.cs-start {
+  justify-content: space-between;
+}
+
+/* Labels above the stations of the board */
+
+.cs-station {
+  --c: #ffd23f;
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: translate(-50%, -100%);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px 7px 7px;
+  border: 0;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--dark);
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 14.5px;
+  white-space: nowrap;
+  box-shadow: 0 8px 20px rgba(10, 5, 40, 0.3);
+  pointer-events: auto;
+  transition: transform 0.25s var(--ease), background 0.2s;
+}
+
+.cs-station::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -5px;
+  width: 10px;
+  height: 10px;
+  background: inherit;
+  transform: translateX(-50%) rotate(45deg);
+  border-radius: 2px;
+}
+
+button.cs-station:hover,
+button.cs-station:focus-visible {
+  transform: translate(-50%, -100%) scale(1.08);
+  background: var(--c);
+}
+
+.cs-station-number {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--c);
+  font-size: 13px;
+}
+
+.cs-station[data-soon] {
+  padding: 5px 10px 5px 9px;
+  background: rgba(22, 14, 54, 0.78);
+  color: var(--ink);
+  font-size: 13px;
+  box-shadow: 0 6px 14px rgba(10, 5, 40, 0.3);
+  pointer-events: none;
+}
+
+.cs-station[data-soon] svg {
+  color: var(--c);
+}
+
+.cs-station[data-soon] small {
+  font-family: var(--body);
+  font-size: 11.5px;
+  font-weight: 800;
+  color: var(--ink-faint);
+}
+
+/* ------------------------------------------------------------------ */
+/* Step card                                                            */
+/* ------------------------------------------------------------------ */
+
+.cs-step-count {
+  margin-left: auto;
+}
+
+.cs-example {
+  margin-top: 12px;
+  padding: 10px 14px;
+  border-radius: 16px;
+  border-left: 4px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.cs-example-title {
+  margin: 0;
+  font-family: var(--display);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.cs-example-text {
+  margin: 2px 0 0;
+  font-size: 15.5px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.cs-try {
+  margin-top: 12px;
+}
+
+.cs-try-text {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin: 0;
+  font-size: 14.5px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--ink-soft);
+}
+
+.cs-try-text svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--accent);
+}
+
+.cs-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.cs-action,
+.cs-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 38px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 15px;
+  transition: background 0.2s, transform 0.2s var(--ease);
+}
+
+.cs-action:hover,
+.cs-chip:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.cs-action:active,
+.cs-chip:active {
+  transform: scale(0.95);
+}
+
+.cs-action:first-child {
+  background: var(--accent);
+  color: var(--dark);
+}
+
+.cs-chip {
+  justify-content: center;
+  min-width: 42px;
+  padding: 0 10px;
+  font-size: 18px;
+}
+
+.cs-chip[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--dark);
+}
+
+.cs-presets {
+  display: flex;
+  gap: 6px;
+}
+
+.cs-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12.5px;
+  font-weight: 800;
+  color: var(--ink-faint);
+}
+
+.cs-field input {
+  width: 74px;
+  height: 42px;
+  border: 2px solid color-mix(in srgb, var(--accent) 70%, transparent);
+  border-radius: 14px;
+  background: rgba(10, 5, 40, 0.35);
+  color: var(--ink);
+  font-family: var(--display);
+  font-size: 24px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.cs-field input:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.cs-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.cs-swatch {
+  width: 36px;
+  height: 36px;
+  border: 3px solid rgba(255, 255, 255, 0.25);
+  border-radius: 12px;
+  background: var(--swatch);
+  box-shadow: 0 4px 10px rgba(10, 5, 40, 0.3);
+  transition: transform 0.2s var(--ease), border-color 0.2s;
+}
+
+.cs-swatch:hover {
+  transform: scale(1.1);
+}
+
+.cs-swatch[aria-pressed="true"] {
+  border-color: #fff;
+  transform: scale(1.1);
+}
+
+/* ------------------------------------------------------------------ */
+/* Step rail                                                            */
+/* ------------------------------------------------------------------ */
+
+.cs-rail {
+  position: absolute;
+  top: 50%;
+  right: max(18px, env(safe-area-inset-right));
+  z-index: 3;
+  transform: translateY(-50%);
+}
+
+.cs-rail ol {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cs-rail ol::before {
+  content: "";
+  position: absolute;
+  top: 14px;
+  bottom: 14px;
+  right: 14px;
+  width: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.cs-rail-stop {
+  position: relative;
+  display: flex;
+  flex-direction: row-reverse;
+  align-items: center;
+  gap: 10px;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+.cs-rail-number {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(255, 255, 255, 0.55);
+  border-radius: 50%;
+  background: var(--dark);
+  font-family: var(--display);
+  font-weight: 650;
+  font-size: 14px;
+  transition: transform 0.25s var(--ease), background 0.3s, border-color 0.3s;
+}
+
+.cs-rail-stop[data-seen] .cs-rail-number {
+  border-color: var(--accent);
+}
+
+.cs-rail-stop[data-current] .cs-rail-number {
+  background: var(--accent);
+  border-color: #fff;
+  color: var(--dark);
+  transform: scale(1.18);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.cs-rail-name {
+  padding: 4px 10px;
+  border-radius: 12px;
+  background: rgba(22, 14, 54, 0.7);
+  font-family: var(--display);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateX(6px);
+  transition: opacity 0.2s, transform 0.25s var(--ease);
+  pointer-events: none;
+}
+
+.cs-rail-stop:hover .cs-rail-name,
+.cs-rail-stop:focus-visible .cs-rail-name {
+  opacity: 1;
+  transform: none;
+}
+
+.cs-rail-stop[data-current] .cs-rail-name {
+  background: #fff;
+  color: var(--dark);
+}
+
+/* ------------------------------------------------------------------ */
+/* Words and controls pinned on the scene                               */
+/* ------------------------------------------------------------------ */
+
+.cs-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+}
+
+.cs-anchor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.35s, visibility 0s linear 0.35s;
+}
+
+.cs-anchor[data-visible="1"] {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.35s;
+}
+
+.cs-label {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: translate(-50%, -100%);
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--dark);
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 14.5px;
+  white-space: nowrap;
+  box-shadow: 0 8px 20px rgba(10, 5, 40, 0.3);
+}
+
+.cs-label[data-place="below"] {
+  transform: translate(-50%, 0);
+}
+
+/* An invisible button over a 3D object, sized like it. */
+.cs-hit {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: max(36px, calc(var(--px) * 1));
+  height: max(36px, calc(var(--px) * 1));
+  padding: 0;
+  border: 0;
+  border-radius: 28%;
+  background: transparent;
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.cs-hit:hover {
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.55);
+}
+
+.cs-hit:focus-visible {
+  outline-offset: 2px;
+}
+
+.cs-switch {
+  width: max(64px, calc(var(--px) * 1.9));
+  height: max(90px, calc(var(--px) * 3.2));
+  border-radius: 22%;
+}
+
+.cs-switch::before {
+  content: "";
+  position: absolute;
+  inset: -7px;
+  border: 2.5px dashed rgba(255, 255, 255, 0.7);
+  border-radius: 26%;
+  animation: cs-breathe 2.4s ease-in-out infinite;
+}
+
+@keyframes cs-breathe {
+  50% {
+    opacity: 0.35;
+    transform: scale(1.04);
+  }
+}
+
+.cs-readout {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: translate(-50%, -50%);
+  padding: 6px 14px;
+  border-radius: 14px;
+  background: rgba(22, 14, 54, 0.82);
+  font-family: var(--display);
+  font-size: 19px;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 8px 20px rgba(10, 5, 40, 0.3);
+}
+
+.cs-readout-big {
+  display: grid;
+  place-items: center;
+  min-width: 56px;
+  height: 56px;
+  padding: 0;
+  border-radius: 18px;
+  font-size: 36px;
+  transform: translate(-50%, -100%);
+}
+
+.cs-readout-big[data-on] {
+  background: var(--accent);
+  color: var(--dark);
+}
+
+.cs-binary {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+}
+
+.cs-place {
+  position: absolute;
+  left: 0;
+  top: calc(var(--px) * -0.62);
+  transform: translate(-50%, -100%);
+  font-family: var(--display);
+  font-size: clamp(12px, calc(var(--px) * 0.3), 18px);
+  font-weight: 650;
+  color: var(--ink-soft);
+  text-shadow: 0 1px 4px rgba(10, 5, 40, 0.6);
+  pointer-events: none;
+}
+
+.cs-code {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px 6px 6px;
+  transform: translate(-50%, -100%);
+}
+
+.cs-char {
+  display: grid;
+  place-items: center;
+  min-width: 44px;
+  height: 44px;
+  padding: 0 6px;
+  border-radius: 12px;
+  background: var(--accent);
+  color: var(--dark);
+  font-size: 28px;
+}
+
+.cs-code-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+
+.cs-code-text b {
+  font-weight: 600;
+  font-size: 18px;
+}
+
+.cs-code-text small {
+  font-family: var(--body);
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--ink-soft);
+}
+
+.cs-byte {
+  position: absolute;
+  left: calc(var(--px) * 0.75);
+  top: 0;
+  transform: translateY(-50%);
+  padding: 3px 9px;
+  border-radius: 10px;
+  background: rgba(22, 14, 54, 0.75);
+  font-family: var(--display);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  color: var(--accent);
+}
+
+.cs-channel {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 64px;
+  padding: 4px 10px;
+  transform: translate(0, -50%);
+  line-height: 1.05;
+}
+
+.cs-channel small {
+  font-family: var(--body);
+  font-size: 11.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.cs-channel[data-channel="0"] small {
+  color: #ff7b88;
+}
+
+.cs-channel[data-channel="1"] small {
+  color: #6cf097;
+}
+
+.cs-channel[data-channel="2"] small {
+  color: #7fa6ff;
+}
+
+/* ------------------------------------------------------------------ */
+/* Compact layout                                                       */
+/* ------------------------------------------------------------------ */
+
+.app[data-compact] .cs-dock[data-view="map"] {
+  width: auto;
+}
+
+.app[data-compact] .cs-map .card-body {
+  padding: 14px 12px 12px;
+}
+
+.app[data-compact] .cs-map-title {
+  font-size: 25px;
+  margin-bottom: 8px;
+}
+
+.app[data-compact] .cs-chapter {
+  padding: 6px 10px 6px 6px;
+  gap: 10px;
+}
+
+.app[data-compact] .cs-chapter-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+}
+
+.app[data-compact] .cs-chapter-text small {
+  display: none;
+}
+
+.app[data-compact] .cs-example {
+  margin-top: 8px;
+  padding: 8px 12px;
+}
+
+.app[data-compact] .cs-example-text {
+  font-size: 14.5px;
+}
+
+.app[data-compact] .cs-station {
+  padding: 5px 9px 5px 5px;
+  font-size: 12.5px;
+}
+
+.app[data-compact] .cs-station[data-soon] {
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+.app[data-compact] .cs-station[data-soon] small {
+  display: none;
+}
+
+.app[data-compact] .cs-station-number {
+  width: 19px;
+  height: 19px;
+  font-size: 12px;
+}
+
+.app[data-compact] .cs-readout {
+  font-size: 15px;
+  padding: 4px 10px;
+}
+
+.app[data-compact] .cs-readout-big {
+  min-width: 44px;
+  height: 44px;
+  font-size: 28px;
+}
+
+.app[data-compact] .cs-byte {
+  font-size: 12px;
+  padding: 2px 6px;
+}
+
+.app[data-compact] .cs-code {
+  gap: 6px;
+  padding: 4px 10px 4px 4px;
+}
+
+.app[data-compact] .cs-char {
+  min-width: 34px;
+  height: 34px;
+  font-size: 21px;
+}
+
+.app[data-compact] .cs-code-text b {
+  font-size: 14px;
+}
+
+.app[data-compact] .cs-label {
+  font-size: 12.5px;
+  padding: 4px 9px;
+}
+
+/* Captions side by side wrap instead of overlapping. */
+.app[data-compact] .cs-label[data-place="below"] {
+  max-width: 108px;
+  border-radius: 12px;
+  line-height: 1.2;
+  text-align: center;
+  white-space: normal;
+  width: max-content;
+}
+
+.app[data-compact] .cs-channel {
+  min-width: 0;
+  padding: 2px 7px;
+}
+
+.app[data-compact] .cs-channel small {
+  display: none;
+}
+
+.app[data-compact] .cs-channel[data-channel="0"] b {
+  color: #ff7b88;
+}
+
+.app[data-compact] .cs-channel[data-channel="1"] b {
+  color: #6cf097;
+}
+
+.app[data-compact] .cs-channel[data-channel="2"] b {
+  color: #7fa6ff;
+}

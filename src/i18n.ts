@@ -38,15 +38,21 @@ export function t(
 /** Select the active language of a structured scientific record. */
 export const tr = (text: Bilingual) => text[locale];
 
+/** Document title and description of the section on screen. */
+let documentText: { title: MessageKey; description: MessageKey } = {
+  title: "Atlas — From quarks to the cosmos",
+  description: "Zoom through every power of ten, from quarks to the observable Universe, in playful 3D.",
+};
+
 function syncDocument() {
   document.documentElement.lang = locale;
-  document.title = t("Atlas — From quarks to the cosmos");
-  document
-    .querySelector('meta[name="description"]')
-    ?.setAttribute(
-      "content",
-      t("Zoom through every power of ten, from quarks to the observable Universe, in playful 3D."),
-    );
+  document.title = t(documentText.title);
+  document.querySelector('meta[name="description"]')?.setAttribute("content", t(documentText.description));
+}
+
+export function setDocumentText(title: MessageKey, description: MessageKey) {
+  documentText = { title, description };
+  syncDocument();
 }
 
 export function setLocale(next: Locale) {

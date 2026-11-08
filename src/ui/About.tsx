@@ -42,6 +42,13 @@ export default function About({ onClose }: { onClose(): void }) {
           {t("When a view enlarges something to make it visible, such as the planets, its card says so.")}{" "}
           {t("Each place cites a source at the bottom of its card.")}
         </p>
+        <h3>{t("Computing section")}</h3>
+        <p>
+          {t(
+            "The Computing section explains how computers work, one chapter at a time, with real worked examples. Its pictures are illustrations: real components do not look like this up close.",
+          )}{" "}
+          {t("Use the arrows or the buttons to move between steps, and click the objects in the scene to try them.")}
+        </p>
         <h3>{t("Credits")}</h3>
         <p>
           {t(

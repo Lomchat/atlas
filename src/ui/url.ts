@@ -1,6 +1,15 @@
 import { HOME_ID, byId } from "../levels";
 import { getLocale } from "../i18n";
 
+/** The two halves of the app: the scale journey and the computing lessons. */
+export type Section = "atlas" | "computing";
+
+/** Where the visitor is in the computing section (null lesson: the chapter map). */
+export interface ComputingPlace {
+  lesson: string | null;
+  step: string | null;
+}
+
 /** Links from the previous version of the atlas keep opening a sensible place. */
 function legacyTarget(url: URL): string | null {
   if (url.pathname.startsWith("/lab")) return "water-molecules";
@@ -16,7 +25,11 @@ function legacyTarget(url: URL): string | null {
 }
 
 export interface StartOptions {
+  section: Section;
   at: string;
+  /** Computing lesson and step ids (validated by the computing section). */
+  lesson: string | null;
+  step: string | null;
   /** Show the welcome screen. */
   intro: boolean;
   /** Freeze animation time (screenshots and tests). */
@@ -30,6 +43,7 @@ export interface StartOptions {
 export function readStart(): StartOptions {
   const url = new URL(location.href);
   const params = url.searchParams;
+  const section: Section = params.get("section") === "computing" ? "computing" : "atlas";
   const requested = params.get("at");
   const at =
     requested && byId.has(requested) ? requested : legacyTarget(url) ?? HOME_ID;
@@ -43,33 +57,59 @@ export function readStart(): StartOptions {
   const freeze = params.get("freeze");
   const offset = params.get("offset");
   return {
+    section,
     at,
-    intro: introParam === "1" || (introParam !== "0" && !seen && !requested && at === HOME_ID),
+    lesson: params.get("lesson"),
+    step: params.get("step"),
+    intro:
+      section === "atlas" &&
+      (introParam === "1" || (introParam !== "0" && !seen && !requested && at === HOME_ID)),
     freeze: freeze !== null && Number.isFinite(Number(freeze)) ? Number(freeze) : undefined,
     offset: offset !== null && Number.isFinite(Number(offset)) ? Number(offset) : undefined,
     bare: params.get("ui") === "0",
   };
 }
 
-/** Keep the address bar in sync with the level being viewed. */
-export function writeLevel(id: string) {
+/** Screenshot and test parameters survive navigation. */
+const KEEP = ["freeze", "ui", "offset"];
+
+function replace(entries: [string, string][]) {
   const url = new URL(location.href);
-  if (url.searchParams.get("at") === id && url.searchParams.get("lang") === getLocale())
-    return;
-  const keep = ["freeze", "ui", "offset"];
   const next = new URL(url.origin + (url.pathname.startsWith("/lab") ? "/" : url.pathname));
   next.searchParams.set("lang", getLocale());
-  next.searchParams.set("at", id);
-  for (const key of keep) {
+  for (const [key, value] of entries) next.searchParams.set(key, value);
+  for (const key of KEEP) {
     const value = url.searchParams.get(key);
     if (value !== null) next.searchParams.set(key, value);
   }
-  history.replaceState(history.state, "", next);
+  if (next.search !== url.search) history.replaceState(history.state, "", next);
+}
+
+/** Keep the address bar in sync with the level being viewed. */
+export function writeLevel(id: string) {
+  replace([["at", id]]);
+}
+
+/** Keep the address bar in sync with the computing lesson and step. */
+export function writeLesson(lesson: string | null, step: string | null) {
+  const entries: [string, string][] = [["section", "computing"]];
+  if (lesson) entries.push(["lesson", lesson]);
+  if (lesson && step) entries.push(["step", step]);
+  replace(entries);
 }
 
 export function shareUrl(id: string) {
   const url = new URL(location.origin + "/");
   url.searchParams.set("lang", getLocale());
   url.searchParams.set("at", id);
+  return url.toString();
+}
+
+export function shareLessonUrl(lesson: string | null, step: string | null) {
+  const url = new URL(location.origin + "/");
+  url.searchParams.set("lang", getLocale());
+  url.searchParams.set("section", "computing");
+  if (lesson) url.searchParams.set("lesson", lesson);
+  if (lesson && step) url.searchParams.set("step", step);
   return url.toString();
 }

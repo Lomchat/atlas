@@ -1,7 +1,9 @@
-import { Check, House, Info, Share2 } from "lucide-react";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Check, House, Info, LayoutGrid, Share2 } from "lucide-react";
+import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import type * as THREE from "three";
 import { Atlas } from "./engine/Atlas";
-import { t, tr, useLocale } from "./i18n";
+import { createRenderer } from "./engine/renderer";
+import { setDocumentText, t, tr, useLocale } from "./i18n";
 import { HOME_ID, level as levelById, pathThrough } from "./levels";
 import type { LevelData } from "./levels/types";
 import About from "./ui/About";
@@ -10,11 +12,16 @@ import Intro from "./ui/Intro";
 import LanguagePicker from "./ui/LanguagePicker";
 import LevelCard from "./ui/LevelCard";
 import ScaleRuler from "./ui/ScaleRuler";
+import SectionSwitch from "./ui/SectionSwitch";
 import Targets from "./ui/Targets";
 import { LevelTip } from "./ui/LevelTip";
 import { LogoMark } from "./ui/icons";
-import { readStart, shareUrl, writeLevel } from "./ui/url";
+import { readStart, shareLessonUrl, shareUrl, writeLevel } from "./ui/url";
+import type { ComputingPlace, Section } from "./ui/url";
 import { markVisited, useVisited } from "./ui/visited";
+
+/** The computing section is loaded the first time it is opened. */
+const Computing = lazy(() => import("./computing/Computing"));
 
 const COMPACT = "(max-width: 760px), (max-height: 520px)";
 
@@ -36,6 +43,11 @@ export default function App() {
   const start = useMemo(readStart, []);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
+  const [section, setSection] = useState<Section>(start.section);
+  const [computingOpened, setComputingOpened] = useState(start.section === "computing");
+  const [place, setPlace] = useState<ComputingPlace>({ lesson: start.lesson, step: start.step });
+  const [computingTitle, setComputingTitle] = useState("");
+  const [renderer, setRenderer] = useState<THREE.WebGLRenderer | null>(null);
   const [atlas, setAtlas] = useState<Atlas | null>(null);
   const [nearest, setNearest] = useState<LevelData>(() => levelById(start.at));
   const [path, setPath] = useState<readonly LevelData[]>(() => pathThrough(start.at));
@@ -49,12 +61,16 @@ export default function App() {
   const reducedMotion = useMedia("(prefers-reduced-motion: reduce)");
   const tour = useRef(0);
 
-  /* Engine lifecycle: one renderer for the whole visit. */
+  /* Engine lifecycle: one renderer for the whole visit, shared by both sections. */
   useEffect(() => {
     const canvas = canvasRef.current!;
+    let shared: THREE.WebGLRenderer;
     let engine: Atlas;
     try {
+      shared = createRenderer(canvas, { preserveDrawingBuffer: start.freeze !== undefined });
       engine = new Atlas(canvas, {
+        renderer: shared,
+        active: start.section === "atlas",
         startAt: start.at,
         reducedMotion: matchMedia("(prefers-reduced-motion: reduce)").matches,
         freezeTime: start.freeze,
@@ -65,6 +81,7 @@ export default function App() {
       setFailed(true);
       return;
     }
+    setRenderer(shared);
     setAtlas(engine);
     const offChange = engine.onChange((state) => {
       setNearest(state.nearestLevel);
@@ -78,14 +95,42 @@ export default function App() {
       offChange();
       offInterrupt();
       engine.dispose();
+      shared.dispose();
       setAtlas(null);
+      setRenderer(null);
     };
   }, [start]);
 
   useEffect(() => atlas?.setReducedMotion(reducedMotion), [atlas, reducedMotion]);
+  useEffect(() => atlas?.setActive(section === "atlas"), [atlas, section]);
+  useEffect(() => {
+    if (section === "computing")
+      setDocumentText(
+        "Atlas — From bits to AI",
+        "Step-by-step animated lessons on how computers work: bits, logic gates, secret keys, neural networks and language models.",
+      );
+    else
+      setDocumentText(
+        "Atlas — From quarks to the cosmos",
+        "Zoom through every power of ten, from quarks to the observable Universe, in playful 3D.",
+      );
+  }, [section]);
+
+  const switchSection = useCallback(
+    (next: Section) => {
+      if (next === section) return;
+      tour.current++;
+      setTouring(false);
+      setIntro(false);
+      if (next === "computing") setComputingOpened(true);
+      setSection(next);
+    },
+    [section],
+  );
 
   /* Address bar, discoveries and theme follow the level being viewed. */
   useEffect(() => {
+    if (section !== "atlas") return;
     writeLevel(nearest.id);
     markVisited(nearest.id);
     const root = document.documentElement.style;
@@ -93,11 +138,11 @@ export default function App() {
     root.setProperty("--theme-top", nearest.theme.top);
     root.setProperty("--theme-bottom", nearest.theme.bottom);
     document.querySelector('meta[name="theme-color"]')?.setAttribute("content", nearest.theme.top);
-  }, [nearest, locale]);
+  }, [nearest, locale, section]);
 
   /* Keep the subject clear of the panels. */
   useLayoutEffect(() => {
-    if (!atlas) return;
+    if (!atlas || section !== "atlas") return;
     const update = () => {
       const card = cardRef.current?.getBoundingClientRect();
       const width = window.innerWidth;
@@ -129,7 +174,7 @@ export default function App() {
       observer.disconnect();
       window.removeEventListener("resize", update);
     };
-  }, [atlas, compact, start.bare]);
+  }, [atlas, compact, start.bare, section]);
 
   const stopTour = useCallback(() => {
     tour.current++;
@@ -185,7 +230,7 @@ export default function App() {
         else stopTour();
         return;
       }
-      if (about || intro || !atlas) return;
+      if (about || intro || !atlas || section !== "atlas") return;
       if (["ArrowDown", "+", "=", "PageDown"].includes(event.key)) {
         event.preventDefault();
         stopTour();
@@ -204,13 +249,14 @@ export default function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [atlas, about, intro, stopTour, toggleTour, fly]);
+  }, [atlas, about, intro, stopTour, toggleTour, fly, section]);
 
   const share = async () => {
-    const url = shareUrl(nearest.id);
+    const url = section === "atlas" ? shareUrl(nearest.id) : shareLessonUrl(place.lesson, place.step);
+    const title = section === "atlas" ? tr(nearest.title) : computingTitle;
     try {
       if (navigator.share && compact) {
-        await navigator.share({ title: tr(nearest.title), url });
+        await navigator.share({ title, url });
         return;
       }
       await navigator.clipboard.writeText(url);
@@ -240,14 +286,17 @@ export default function App() {
     } else void atlas.flyTo(target);
   };
 
+  const inAtlas = section === "atlas";
+  const sceneTitle = inAtlas ? tr(nearest.title) : computingTitle || t("From bits to AI");
   return (
-    <div className="app" data-compact={compact || undefined} data-bare={start.bare || undefined}>
+    <div className="app" data-compact={compact || undefined} data-bare={start.bare || undefined} data-section={section}>
       <canvas
         ref={canvasRef}
         className="scene"
         data-atlas-scene=""
+        data-section={section}
         role="img"
-        aria-label={t("Interactive 3D view: {title}", { title: tr(nearest.title) })}
+        aria-label={t("Interactive 3D view: {title}", { title: sceneTitle })}
       />
       {failed && (
         <div className="fallback" role="alert">
@@ -255,32 +304,65 @@ export default function App() {
           <p>{t("Your browser cannot display 3D graphics, which this atlas needs.")}</p>
         </div>
       )}
+      {computingOpened && !failed && (
+        <Suspense fallback={null}>
+          <Computing
+            active={!inAtlas}
+            renderer={renderer}
+            canvas={canvasRef.current}
+            freeze={start.freeze}
+            bare={start.bare}
+            compact={compact}
+            reducedMotion={reducedMotion}
+            blocked={about}
+            place={place}
+            onNavigate={setPlace}
+            onTitle={setComputingTitle}
+          />
+        </Suspense>
+      )}
       {!start.bare && (
         <>
-          <Targets atlas={atlas} level={nearest} onFly={fly} />
+          {inAtlas && <Targets atlas={atlas} level={nearest} onFly={fly} />}
           <header className="topbar">
-            <button
-              type="button"
-              className="brand"
-              data-action="intro"
-              onClick={() => {
-                stopTour();
-                setIntro(true);
-              }}
-              aria-label={t("Show the introduction")}
-              title={t("Show the introduction")}
-            >
-              <LogoMark size={compact ? 28 : 34} />
-              <span className="brand-text">
-                <b>Atlas</b>
-                {!compact && <small>{t("From quarks to the cosmos")}</small>}
-              </span>
-            </button>
+            <div className="topbar-start">
+              <button
+                type="button"
+                className="brand"
+                data-action="intro"
+                onClick={() => {
+                  stopTour();
+                  if (inAtlas) setIntro(true);
+                  else setPlace({ lesson: null, step: null });
+                }}
+                aria-label={inAtlas ? t("Show the introduction") : t("Back to the chapters")}
+                title={inAtlas ? t("Show the introduction") : t("Back to the chapters")}
+              >
+                <LogoMark size={compact ? 28 : 34} />
+                <span className="brand-text">
+                  <b>Atlas</b>
+                  {!compact && <small>{inAtlas ? t("From quarks to the cosmos") : t("From bits to AI")}</small>}
+                </span>
+              </button>
+              <SectionSwitch section={section} onChange={switchSection} />
+            </div>
             <div className="topbar-actions">
               <LanguagePicker />
-              {nearest.id !== HOME_ID && (
+              {inAtlas && nearest.id !== HOME_ID && (
                 <button type="button" className="icon-button" data-action="go-home" onClick={() => fly(HOME_ID)} aria-label={t("Back to the park")} title={t("Back to the park")}>
                   <House size={18} aria-hidden="true" />
+                </button>
+              )}
+              {!inAtlas && place.lesson && (
+                <button
+                  type="button"
+                  className="icon-button"
+                  data-action="go-chapters"
+                  onClick={() => setPlace({ lesson: null, step: null })}
+                  aria-label={t("Back to the chapters")}
+                  title={t("Back to the chapters")}
+                >
+                  <LayoutGrid size={18} aria-hidden="true" />
                 </button>
               )}
               <button type="button" className="icon-button" data-action="share" onClick={share} aria-label={t("Share this view")} title={t("Share this view")}>
@@ -291,19 +373,23 @@ export default function App() {
               </button>
             </div>
           </header>
-          <ScaleRuler atlas={atlas} path={path} nearest={nearest} visited={visited} onSelect={fly} />
-          <LevelTip nearest={nearest} />
-          <div className="dock" ref={cardRef}>
-            <LevelCard level={nearest} compact={compact} />
-            <Controls path={path} nearest={nearest} touring={touring} onFly={fly} onTour={toggleTour} />
-          </div>
+          {inAtlas && (
+            <>
+              <ScaleRuler atlas={atlas} path={path} nearest={nearest} visited={visited} onSelect={fly} />
+              <LevelTip nearest={nearest} />
+              <div className="dock" ref={cardRef}>
+                <LevelCard level={nearest} compact={compact} />
+                <Controls path={path} nearest={nearest} touring={touring} onFly={fly} onTour={toggleTour} />
+              </div>
+            </>
+          )}
           {toast && (
             <div className="toast" role="status">
               <Check size={16} aria-hidden="true" />
               {toast}
             </div>
           )}
-          {intro && <Intro onStart={startFromIntro} />}
+          {intro && inAtlas && <Intro onStart={startFromIntro} />}
           {about && <About onClose={() => setAbout(false)} />}
         </>
       )}

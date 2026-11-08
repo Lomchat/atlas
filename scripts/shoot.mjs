@@ -5,12 +5,15 @@
  *   node scripts/shoot.mjs --at cell,nucleus --lang fr --out /tmp/shots
  *   node scripts/shoot.mjs --at cell --offset -0.6      # partway into the child
  *   node scripts/shoot.mjs --at park --ui 1 --size 390x844
+ *   node scripts/shoot.mjs --lesson map --ui 1              # computing: chapter map
+ *   node scripts/shoot.mjs --lesson bits --step switch,count # computing: lesson steps
  *
  * Options: --at (comma-separated level ids), --offset (decades from the home
  * view, negative = deeper; comma-separated values are combined with every id),
  * --lang (en|fr, default en), --size (WxH, default 1280x800), --ui (0|1,
  * default 0), --freeze (animation time, default 1.5), --wait (ms after ready,
- * default 400), --out (directory, default /tmp/atlas-shots), --url.
+ * default 400), --out (directory, default /tmp/atlas-shots), --url,
+ * --lesson (computing lesson id, or "map") with --step (comma-separated ids).
  * Prints the file paths and any console errors.
  */
 import { chromium } from "playwright";
@@ -23,7 +26,8 @@ const args = Object.fromEntries(
   }, []),
 );
 const base = (args.url || process.env.ATLAS_URL || "http://127.0.0.1:3017").replace(/\/$/, "");
-const ids = (args.at || "park").split(",");
+const lesson = args.lesson;
+const ids = lesson ? (args.step ?? "").split(",") : (args.at || "park").split(",");
 const offsets = (args.offset ?? "0").split(",").map(Number);
 const lang = args.lang || "en";
 const [width, height] = (args.size || "1280x800").split("x").map(Number);
@@ -53,7 +57,9 @@ try {
   page.on("pageerror", (error) => errors.push(`pageerror: ${error.message}`));
   for (const id of ids) {
     for (const offset of offsets) {
-      const url = `${base}/?lang=${lang}&at=${id}&intro=0&ui=${ui}&freeze=${freeze}&offset=${offset}`;
+      const place =
+        lesson === "map" ? "section=computing" : lesson ? `section=computing&lesson=${lesson}&step=${id}` : `at=${id}`;
+      const url = `${base}/?lang=${lang}&${place}&intro=0&ui=${ui}&freeze=${freeze}&offset=${offset}`;
       await page.goto(url, { waitUntil: "load" });
       await page
         .waitForFunction(() => document.querySelector("canvas[data-atlas-scene]")?.dataset.ready === "1", null, {
@@ -61,7 +67,8 @@ try {
         })
         .catch(() => errors.push(`timeout waiting for ${id} to be ready`));
       await page.waitForTimeout(wait);
-      const file = `${out}/${id}${offset ? `_${offset}` : ""}${ui === "1" ? "_ui" : ""}_${lang}_${width}x${height}.png`;
+      const name = lesson ? `${lesson}${id ? `-${id}` : ""}` : id;
+      const file = `${out}/${name}${offset ? `_${offset}` : ""}${ui === "1" ? "_ui" : ""}_${lang}_${width}x${height}.png`;
       await page.screenshot({ path: file });
       console.log(file);
     }
