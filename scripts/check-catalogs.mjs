@@ -132,6 +132,7 @@ async function checkLessons() {
   const ORDER = {
     bits: (await import("../src/computing/logic/bits.ts")).BITS_STEPS,
     gates: (await import("../src/computing/logic/gates.ts")).GATES_STEPS,
+    inside: (await import("../src/computing/logic/inside.ts")).INSIDE_STEPS,
     keys: (await import("../src/computing/logic/keys.ts")).KEYS_STEPS,
     llm: (await import("../src/computing/logic/llm.ts")).LLM_STEPS,
     neurons: (await import("../src/computing/logic/neurons.ts")).NEURONS_STEPS,

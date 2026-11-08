@@ -36,10 +36,16 @@ Sizes are real. Shapes are simplified and colours chosen for legibility; electro
 
 The chapter map is a floating circuit board with one station per chapter. Each chapter is a short sequence of steps: a 3D scene that morphs from one step to the next, a card with the idea, a worked example with real numbers, things to try in the scene, "Did you know?" facts and a source. Arrows (or ←/→) move between steps, ▶ (or Space) reads them in turn, the rail on the right jumps to any step.
 
-| Chapter | Status |
+| Chapter | What it shows |
 | --- | --- |
-| 1. The bit — a switch and its lamp, where bits live (voltage, magnet, light), why each bit doubles the choices, counting in binary, a letter as bytes and pixels (A = 65, é = 2 bytes in UTF-8), a colour as three bytes | ready |
-| 2. Logic gates · 3. Inside a computer · 4. Public and private keys · 5. Neural networks · 6. Large language models | coming soon |
+| 1. The bit | a switch and its lamp; a bit as a voltage, a magnet, a flash of light; each bit doubles the choices; counting in binary; a letter as bytes and pixels (A = 65, é = 2 bytes in UTF-8); a colour as three bytes |
+| 2. Logic gates | a transistor; NOT, AND, OR, XOR with truth tables; a half adder (1 + 1 = 10); a 4-bit adder (0101 + 0011 = 1000) |
+| 3. Inside a computer | a dive from a laptop to silicon atoms, with a true scale bar (10 cm → 500 pm) |
+| 4. Public and private keys | a 23-hour clock; a Diffie–Hellman exchange giving both sides the key 2; RSA on a 55-hour clock (7 → 13 → 7) and its signature; the stages of https |
+| 5. Neural networks | a neuron deciding to take an umbrella (0.98); weights; one learning step (0.044); a digit reader; training on MNIST; 101,770 weights vs 175 billion |
+| 6. Large language models | a toy tokenizer; word vectors (king − man + woman ≈ queen); next-token probabilities and temperature; attention; generation; training |
+
+Moving on to a new chapter shows a short title card. Illustrative numbers (probabilities, attention weights, scores) are labelled as such; the arithmetic is exact.
 
 ## Languages
 

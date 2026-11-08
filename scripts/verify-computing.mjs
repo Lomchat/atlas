@@ -146,6 +146,17 @@ try {
   await pinned(page, '[data-readout="value-sum"]');
   assert.equal((await page.locator('[data-readout="value-sum"]').textContent()).trim(), "= 30");
 
+  // Chapter 3: one long dive from the laptop to silicon atoms, with a true scale bar.
+  const inside = lessonById.get("inside");
+  await page.goto(`${base}/?lang=${locale}&section=computing&lesson=inside&step=laptop`);
+  await expectStep(inside, "laptop");
+  await pinned(page, '[data-readout="scale"]');
+  assert.equal((await page.locator('[data-readout="scale"]').textContent()).trim(), "10 cm");
+  await page.locator('[data-step-stop="atoms"]').click();
+  await expectStep(inside, "atoms");
+  await pinned(page, '[data-readout="scale"]');
+  assert.equal((await page.locator('[data-readout="scale"]').textContent()).trim(), "500 pm");
+
   // Chapter 4: the clock, the exchange (same key on both sides) and RSA.
   const keys = lessonById.get("keys");
   await page.goto(`${base}/?lang=${locale}&section=computing&lesson=keys&step=clock`);
