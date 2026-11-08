@@ -14,11 +14,16 @@ export interface ControlsProps {
   store: Store<object>;
 }
 
+/** Values for the `{name}` placeholders of a step's example. */
+export type Vars = Record<string, string | number> | null;
+
 /** The interactive part of a lesson, next to its scene builder. */
 export interface LessonUi {
   createStore(): Store<object>;
   /** Controls and readouts pinned on the scene's anchors. */
   Overlay: ComponentType<OverlayProps>;
-  /** Controls inside the step card ("Try it"), or null. */
+  /** Controls of the "Your turn!" panel, or null. */
   Controls: ComponentType<ControlsProps>;
+  /** Values for the `{name}` placeholders of a step's example, from the lesson state. */
+  vars?(step: string, state: object, locale: string): Vars;
 }

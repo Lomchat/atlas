@@ -1,11 +1,11 @@
 import { Plus, RotateCcw } from "lucide-react";
 import { useId } from "react";
 import { getLocale, t, tr, useLocale } from "../../../i18n";
-import { CANDIDATES, EXAMPLE_SENTENCE, GENERATED, GENERATE_PROMPT, LLM_START, PRONOUN, PROMPT, SENTENCE, SMALL, attention, tokenize, withTemperature } from "../../logic/llm";
+import { CANDIDATES, EXAMPLE_SENTENCE, GENERATED, GENERATE_PROMPT, LLM_START, PRONOUN, PROMPT, SENTENCE, SMALL, THE_SUITCASE, THE_TROPHY, attention, tokenize, withTemperature } from "../../logic/llm";
 import type { LlmState } from "../../logic/llm";
 import { Store, useStore } from "../../store";
 import { useAnchors } from "../anchors";
-import type { ControlsProps, LessonUi, OverlayProps } from "./types";
+import type { ControlsProps, LessonUi, OverlayProps, Vars } from "./types";
 
 const useLlm = (store: Store<object>) => {
   const typed = store as Store<LlmState>;
@@ -157,8 +157,27 @@ function Controls({ step, store }: ControlsProps) {
   return null;
 }
 
+/** Live values of the worked examples. */
+function vars(step: string, state: object, locale: string): Vars {
+  const s = state as LlmState;
+  if (step === "tokens") {
+    const sentence = s.text ?? tr(EXAMPLE_SENTENCE);
+    const tokens = tokenize(sentence);
+    return { sentence, count: tokens.length, tokens: tokens.map((token) => token.text.trim() || "␣").join(" · ") };
+  }
+  if (step === "next") {
+    const p = withTemperature(s.temperature);
+    return { temperature: s.temperature.toLocaleString(locale, { minimumFractionDigits: 1 }), p1: Math.round(p[0] * 100), p2: Math.round(p[1] * 100), p3: Math.round(p[2] * 100) };
+  }
+  if (step === "attention") return { adjective: tr(s.big ? SENTENCE[SENTENCE.length - 1] : SMALL), who: tr(s.big ? THE_TROPHY : THE_SUITCASE) };
+  if (step === "generate")
+    return { sentence: [tr(GENERATE_PROMPT), ...GENERATED.slice(0, s.generated).map((token) => tr(token.word))].join(" ") };
+  return null;
+}
+
 export const llmUi: LessonUi = {
   createStore: () => new Store<LlmState>({ ...LLM_START }),
   Overlay,
   Controls,
+  vars,
 };

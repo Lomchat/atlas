@@ -29,8 +29,8 @@ export const gatesLesson: LessonData = {
         fr: "Un transistor est un interrupteur sans bouton : c’est l’électricité qui l’allume. Quand sa grille reçoit du courant (1), le courant passe ; sinon (0), il est bloqué. Un bit peut donc en allumer un autre.",
       },
       example: {
-        en: "Your phone holds billions of transistors, all on a chip about the size of a fingernail.",
-        fr: "Ton téléphone contient des milliards de transistors, tous sur une puce à peu près grande comme un ongle.",
+        en: "Right now the gate gets {gate}, so the current {flows}. Your phone holds billions of these switches, on a chip about the size of a fingernail.",
+        fr: "En ce moment, la grille reçoit {gate}, donc le courant {flows}. Ton téléphone contient des milliards de ces interrupteurs, sur une puce grande comme un ongle.",
       },
       try: { en: "Turn the gate on and off.", fr: "Allume et éteins la grille." },
       facts: [
@@ -54,8 +54,8 @@ export const gatesLesson: LessonData = {
         fr: "Une porte logique est un petit groupe de transistors : des bits entrent, un bit sort. La plus simple, NON, fait le contraire : 1 devient 0, et 0 devient 1.",
       },
       example: {
-        en: "A fridge light works like NOT: door closed, light off; door open, light on.",
-        fr: "La lampe du frigo marche comme NON : porte fermée, lampe éteinte ; porte ouverte, lampe allumée.",
+        en: "Input {a}, so NOT gives {out}. Like a fridge light: door closed, light off; door open, light on.",
+        fr: "L’entrée vaut {a}, donc NON donne {out}. Comme la lampe du frigo : porte fermée, lampe éteinte ; porte ouverte, lampe allumée.",
       },
       try: { en: "Change the input and follow the table.", fr: "Change l’entrée et suis le tableau." },
       facts: [
@@ -77,8 +77,8 @@ export const gatesLesson: LessonData = {
         fr: "ET donne 1 seulement si les deux entrées valent 1. Dans tous les autres cas, il donne 0.",
       },
       example: {
-        en: "Some dangerous machines only start if you press two buttons at once, one with each hand: that way, no hand is near the machine.",
-        fr: "Certaines machines dangereuses ne démarrent que si on appuie sur deux boutons à la fois, un avec chaque main : comme ça, aucune main ne traîne près de la machine.",
+        en: "A = {a} and B = {b}, so AND gives {out}. Like a machine that only starts when you press two buttons at once, one with each hand.",
+        fr: "A = {a} et B = {b}, donc ET donne {out}. Comme une machine qui ne démarre que si on appuie sur deux boutons à la fois, un avec chaque main.",
       },
       try: { en: "Switch inputs A and B.", fr: "Bascule les entrées A et B." },
       facts: [
@@ -96,8 +96,8 @@ export const gatesLesson: LessonData = {
         fr: "OU donne 1 dès qu’au moins une entrée vaut 1. Il ne donne 0 que si les deux valent 0.",
       },
       example: {
-        en: "A car’s ceiling light comes on if the driver’s door OR the passenger’s door is open, or both.",
-        fr: "Le plafonnier d’une voiture s’allume si la portière du conducteur OU celle du passager est ouverte, ou les deux.",
+        en: "A = {a} or B = {b}, so OR gives {out}. Like a car’s ceiling light: one open door is enough to turn it on.",
+        fr: "A = {a} ou B = {b}, donc OU donne {out}. Comme le plafonnier d’une voiture : une seule portière ouverte suffit à l’allumer.",
       },
       try: { en: "Switch inputs A and B.", fr: "Bascule les entrées A et B." },
       facts: [
@@ -115,8 +115,8 @@ export const gatesLesson: LessonData = {
         fr: "Le OU exclusif (XOR) donne 1 quand ses deux entrées sont différentes, et 0 quand elles sont pareilles.",
       },
       example: {
-        en: "A staircase light with one switch at the top and one at the bottom: flipping either one changes the light.",
-        fr: "Une lampe d’escalier avec un interrupteur en haut et un en bas : basculer l’un ou l’autre change la lampe.",
+        en: "A = {a} and B = {b}: the inputs are {same}, so XOR gives {out}. Like a staircase light with a switch at each end: flipping either one changes the light.",
+        fr: "A = {a} et B = {b} : les entrées sont {same}, donc XOR donne {out}. Comme une lampe d’escalier avec un interrupteur à chaque bout : basculer l’un ou l’autre change la lampe.",
       },
       try: { en: "Switch inputs A and B.", fr: "Bascule les entrées A et B." },
       facts: [
@@ -134,8 +134,8 @@ export const gatesLesson: LessonData = {
         fr: "Deux portes suffisent pour additionner deux bits ! XOR donne le chiffre du résultat, ET donne la retenue.",
       },
       example: {
-        en: "1 + 1 in binary: write 0 and carry 1, which gives 10. And 10 in binary is 2!",
-        fr: "1 + 1 en binaire : on pose 0 et on retient 1, ce qui donne 10. Et 10 en binaire, c’est bien 2 !",
+        en: "{a} + {b}: XOR writes {sum} and AND carries {carry}. Result: {result} in binary, which is {value}.",
+        fr: "{a} + {b} : XOR pose {sum} et ET retient {carry}. Résultat : {result} en binaire, c’est-à-dire {value}.",
       },
       try: { en: "Switch A and B: the circuit adds them.", fr: "Bascule A et B : le circuit les additionne." },
       facts: [
@@ -159,8 +159,8 @@ export const gatesLesson: LessonData = {
         fr: "En mettant quatre additionneurs côte à côte, la retenue passe d’une colonne à l’autre, comme quand tu poses une addition. Le circuit additionne alors des nombres jusqu’à 15.",
       },
       example: {
-        en: "5 + 3 in binary: 0101 + 0011 = 1000, which is 8. Watch the carry jump from column to column!",
-        fr: "5 + 3 en binaire : 0101 + 0011 = 1000, c’est-à-dire 8. Regarde la retenue sauter de colonne en colonne !",
+        en: "{x} + {y} in binary: {xb} + {yb} = {sb}, which is {s}. Watch the carry jump from column to column!",
+        fr: "{x} + {y} en binaire : {xb} + {yb} = {sb}, c’est-à-dire {s}. Regarde la retenue sauter de colonne en colonne !",
       },
       try: { en: "Change the bits of both numbers.", fr: "Change les bits des deux nombres." },
       facts: [

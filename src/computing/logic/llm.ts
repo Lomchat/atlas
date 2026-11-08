@@ -137,6 +137,8 @@ export const SENTENCE: Bilingual[] = [
   { en: "big", fr: "grand" },
 ];
 export const SMALL: Bilingual = { en: "small", fr: "petit" };
+export const THE_TROPHY: Bilingual = { en: "the trophy", fr: "le trophée" };
+export const THE_SUITCASE: Bilingual = { en: "the suitcase", fr: "la valise" };
 export const PRONOUN = 9;
 export const TROPHY = 1;
 export const SUITCASE = 7;

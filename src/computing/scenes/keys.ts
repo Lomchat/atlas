@@ -1,37 +1,41 @@
 /**
- * Chapter 4, public and private keys. Alice and Bob talk over a wire that
- * Eve watches with her magnifying glass; a 23-hour clock shows powers of 5;
- * numbers travel as glowing tokens; a padlocked box (RSA) and a sealed box
- * (signature) cross the wire; finally a browser and a server run the three
- * stages of https on three lanes. Numbers are drawn by the interface at the
- * anchors, so they follow the visitor's choices.
+ * Chapter 4, public and private keys, told with a real message. Alice and
+ * Bob talk over a wire that Eve watches with her magnifying glass and copies
+ * into her notebook. Letter tiles show the message and its scrambled
+ * version; an 11-hour clock shows powers of 2; public keys travel as glowing
+ * tokens; the shared key lights up a golden key on each side; finally a
+ * browser and a server run the same three stages. Letters and numbers are
+ * drawn by the interface at the anchors.
  */
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import { rng } from "../../engine/kit";
 import type { Kit } from "../../engine/kit";
-import { DH, KEYS_START, KEYS_STEPS, clockTrail, powMod } from "../logic/keys";
+import { tr } from "../../i18n";
+import { CLOCK, EXAMPLE_MESSAGE, KEYS_START, KEYS_STEPS, MAX_LETTERS, START, clockTrail, onClock } from "../logic/keys";
 import type { KeysState, KeysStep } from "../logic/keys";
 import type { Store } from "../store";
 import { Pop, approach } from "./fx";
 import type { Shot, StageBuilder } from "./types";
 
-const PEOPLE: Shot = { target: [0, -0.35, 0], width: 11.2, height: 5.8, pitch: 5 };
+const PEOPLE: Shot = { target: [0, -0.1, 0], width: 11.6, height: 6.4, pitch: 5 };
 const SHOTS: Record<KeysStep, Shot> = {
   problem: PEOPLE,
-  clock: { target: [0, 0.1, 0], width: 7.6, height: 7.2, pitch: 3 },
+  shift: { target: [-0.6, 0.2, 0], width: 10.2, height: 4.6, pitch: 4 },
+  clock: { target: [0, 0.1, 0], width: 7.4, height: 7, pitch: 3 },
   exchange: PEOPLE,
   shared: PEOPLE,
-  padlock: { ...PEOPLE, height: 5.2 },
-  signature: { ...PEOPLE, height: 5.2 },
+  message: PEOPLE,
   https: { target: [0, 0.1, 0], width: 11.6, height: 4.8, pitch: 4 },
 };
 
 const ALICE_X = -4.3;
 const BOB_X = 4.3;
-const FEET = -1.55;
-const WIRE_Y = -0.15;
-const CLOCK_R = 2.25;
+const FEET = -1.75;
+const WIRE_Y = -0.35;
+const CLOCK_R = 2.2;
+const TILE = 0.62;
+const GAP = 0.72;
 
 /** A friendly character: a pebble body, a round head, two eyes. */
 function person(kit: Kit, color: string, scale = 1) {
@@ -55,9 +59,9 @@ function person(kit: Kit, color: string, scale = 1) {
   return group;
 }
 
-function keyMesh(kit: Kit, color = "#ffd23f") {
+function keyMesh(kit: Kit) {
   const group = new THREE.Group();
-  const gold = kit.toon(color, { gloss: 0.55, rim: 0.4 });
+  const gold = kit.toon("#ffd23f", { gloss: 0.55, rim: 0.4 });
   const bow = new THREE.Mesh(kit.geometry(new THREE.TorusGeometry(0.2, 0.07, 10, 28)), gold);
   bow.position.y = 0.36;
   const shaft = new THREE.Mesh(kit.geometry(new THREE.BoxGeometry(0.09, 0.62, 0.09)), gold);
@@ -84,24 +88,28 @@ const keys: StageBuilder = ({ kit, store }) => {
     parent.add(object);
     return object;
   };
-  const rounded = (w: number, h: number, d: number, r: number, s = 4) => kit.geometry(new RoundedBoxGeometry(w, h, d, s, r));
+  const rounded = (w: number, h: number, d: number, r: number, s = 3) => kit.geometry(new RoundedBoxGeometry(w, h, d, s, r));
+  const m = new THREE.Matrix4();
+  const q = new THREE.Quaternion();
+  const v = new THREE.Vector3();
+  const sc = new THREE.Vector3();
+  const show = (names: string[], visible: boolean) => names.forEach((name) => (anchors[name].visible = visible));
 
-  /* ---------------- Alice, Bob, Eve and the wire ---------------- */
-  const cast = new THREE.Group();
-  root.add(cast);
+  /* ---------------- Alice, Bob, Eve, the wire and Eve's notebook ---------------- */
   const alice = person(kit, "#ff6fb1");
   alice.position.set(ALICE_X, FEET, 0);
   const bob = person(kit, "#3fd0ff");
   bob.position.set(BOB_X, FEET, 0);
-  cast.add(alice, bob);
+  root.add(alice, bob);
   const alicePop = new Pop(alice);
   const bobPop = new Pop(bob);
   anchor("alice", root, ALICE_X, FEET - 0.05, 0.6);
   anchor("bob", root, BOB_X, FEET - 0.05, 0.6);
-  anchor("secret-alice", root, ALICE_X, FEET + 2.45, 0.3);
-  anchor("secret-bob", root, BOB_X, FEET + 2.45, 0.3);
-  anchor("key-alice", root, ALICE_X + 1.25, FEET + 1.45, 0.4);
-  anchor("key-bob", root, BOB_X - 1.25, FEET + 1.45, 0.4);
+  // Thought bubbles: what each one knows (secret, message, key).
+  anchor("know-alice", root, ALICE_X, FEET + 2.55, 0.3);
+  anchor("know-bob", root, BOB_X, FEET + 2.55, 0.3);
+  anchor("calc-alice", root, ALICE_X + 1.55, FEET + 1.55, 0.5);
+  anchor("calc-bob", root, BOB_X - 1.55, FEET + 1.55, 0.5);
 
   const wire = new THREE.Group();
   root.add(wire);
@@ -118,8 +126,8 @@ const keys: StageBuilder = ({ kit, store }) => {
     }
   }
 
-  const eve = person(kit, "#3ff2b5", 0.78);
-  eve.position.set(0, FEET - 0.55, -0.6);
+  const eve = person(kit, "#3ff2b5", 0.74);
+  eve.position.set(-0.9, FEET - 0.45, -0.7);
   const glass = new THREE.Group();
   glass.position.set(0.55, 1.65, 0.25);
   glass.rotation.z = 0.5;
@@ -133,29 +141,48 @@ const keys: StageBuilder = ({ kit, store }) => {
   eve.add(glass);
   root.add(eve);
   const evePop = new Pop(eve);
-  anchor("eve", root, 0, FEET - 0.62, 0.4);
-  anchor("eve-notes", root, 1.35, FEET + 0.5, 0.4);
+  // Eve's notebook: everything that went by, copied down.
+  const notebook = new THREE.Group();
+  notebook.position.set(1.15, FEET + 0.55, 0.2);
+  notebook.rotation.set(-0.15, -0.25, 0.05);
+  notebook.add(new THREE.Mesh(rounded(1.9, 1.3, 0.12, 0.08, 2), kit.toon("#fff4d6", { rim: 0.3 })));
+  const spine = new THREE.Mesh(rounded(0.16, 1.34, 0.18, 0.06, 2), kit.toon("#3ff2b5", { rim: 0.3 }));
+  spine.position.x = -0.98;
+  notebook.add(spine);
+  root.add(notebook);
+  const notebookPop = new Pop(notebook);
+  anchor("eve", root, -0.9, FEET - 0.5, 0.4);
+  anchor("eve-notes", notebook, 0.08, 0.05, 0.12);
 
-  // Envelopes on the wire (the problem), number tokens (the exchange).
-  const envelopes = new THREE.Group();
-  root.add(envelopes);
-  const envelopePop = new Pop(envelopes);
-  const letters = [0, 1, 2].map(() => {
-    const letter = new THREE.Group();
-    const paper = new THREE.Mesh(rounded(0.78, 0.52, 0.08, 0.04, 2), kit.toon("#fff4d6", { rim: 0.3 }));
-    const flap = new THREE.Mesh(kit.geometry(new THREE.CircleGeometry(0.42, 3)), kit.toon("#ffd9a8", { flat: 0.3, side: THREE.DoubleSide }));
-    flap.rotation.z = -Math.PI / 2;
-    flap.scale.set(0.58, 1, 1);
-    flap.position.set(0, 0.07, 0.05);
-    letter.add(paper, flap);
-    envelopes.add(letter);
-    return letter;
-  });
+  /* ---------------- Letter tiles: the message and its scrambled version ---------------- */
+  const tileCount = MAX_LETTERS * 2;
+  const tiles = new THREE.InstancedMesh(rounded(TILE, TILE, 0.22, 0.12), kit.toon("#ffffff", { rim: 0.35, gloss: 0.3 }), tileCount);
+  tiles.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  tiles.frustumCulled = false;
+  root.add(tiles);
+  const tileState = Array.from({ length: tileCount }, () => ({ x: 0, y: 0, s: 0, c: new THREE.Color("#fff4d6") }));
+  for (let i = 0; i < tileCount; i++) {
+    anchor(`tile-${i}`, root, 0, 0, 0.2);
+    tiles.setColorAt(i, tileState[i].c);
+  }
+  const PLAIN = new THREE.Color("#fff4d6");
+  const CIPHER = new THREE.Color("#ff9ccc");
+  // Arrows from each letter to its scrambled letter (step "shift").
+  const arrows = new THREE.InstancedMesh(kit.geometry(new THREE.ConeGeometry(0.13, 0.32, 16)), kit.toon("#ffd23f", { gloss: 0.4 }), MAX_LETTERS);
+  const shafts = new THREE.InstancedMesh(kit.geometry(new THREE.CylinderGeometry(0.035, 0.035, 0.7, 8)), kit.toon("#ffd23f"), MAX_LETTERS);
+  for (const mesh of [arrows, shafts]) {
+    mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    mesh.frustumCulled = false;
+    root.add(mesh);
+  }
+  anchor("row-plain", root, -3.75, 1.25, 0.2);
+  anchor("row-cipher", root, -3.75, -0.85, 0.2);
+  anchor("shift-key", root, 2.75, 0.2, 0.3);
 
-  const tokenMaterial = (color: string) => kit.toon(color, { gloss: 0.5, rim: 0.5 });
+  /* ---------------- Public keys travelling, shared keys appearing ---------------- */
   const makeToken = (color: string) => {
     const token = new THREE.Group();
-    token.add(new THREE.Mesh(kit.geometry(new THREE.SphereGeometry(0.36, 28, 20)), tokenMaterial(color)));
+    token.add(new THREE.Mesh(kit.geometry(new THREE.SphereGeometry(0.36, 28, 20)), kit.toon(color, { gloss: 0.5, rim: 0.5 })));
     token.add(kit.glow(color, 1.6, { opacity: 0.55 }));
     root.add(token);
     return { group: token, pop: new Pop(token) };
@@ -164,8 +191,16 @@ const keys: StageBuilder = ({ kit, store }) => {
   const tokenB = makeToken("#8fe3ff");
   anchors["token-a"] = tokenA.group;
   anchors["token-b"] = tokenB.group;
+  const keyAlice = keyMesh(kit);
+  keyAlice.position.set(ALICE_X + 1.0, FEET + 1.0, 0.4);
+  keyAlice.rotation.z = -0.5;
+  const keyBob = keyMesh(kit);
+  keyBob.position.set(BOB_X - 1.0, FEET + 1.0, 0.4);
+  keyBob.rotation.z = 0.5;
+  root.add(keyAlice, keyBob);
+  const keyPops = [new Pop(keyAlice), new Pop(keyBob)];
 
-  /* ---------------- The 23-hour clock ---------------- */
+  /* ---------------- The 11-hour clock ---------------- */
   const clock = new THREE.Group();
   clock.position.set(0, 0.1, 0);
   root.add(clock);
@@ -178,22 +213,18 @@ const keys: StageBuilder = ({ kit, store }) => {
     clock.add(face, ring);
   }
   const at = (hour: number, radius = CLOCK_R) => {
-    const angle = Math.PI / 2 - (hour / DH.p) * Math.PI * 2;
+    const angle = Math.PI / 2 - (hour / CLOCK) * Math.PI * 2;
     return new THREE.Vector3(Math.cos(angle) * radius, Math.sin(angle) * radius, 0);
   };
-  const ticks = new THREE.InstancedMesh(kit.geometry(new THREE.SphereGeometry(0.13, 16, 12)), kit.toon("#ffffff", { rim: 0.3, gloss: 0.4 }), DH.p);
-  {
-    const m = new THREE.Matrix4();
-    for (let h = 0; h < DH.p; h++) {
-      ticks.setMatrixAt(h, m.makeTranslation(at(h)));
-      ticks.setColorAt(h, new THREE.Color("#7c6bd6"));
-      const label = at(h, CLOCK_R + 0.92);
-      anchor(`tick-${h}`, clock, label.x, label.y, 0.2);
-    }
+  const ticks = new THREE.InstancedMesh(kit.geometry(new THREE.SphereGeometry(0.17, 16, 12)), kit.toon("#ffffff", { rim: 0.3, gloss: 0.4 }), CLOCK);
+  for (let h = 0; h < CLOCK; h++) {
+    ticks.setMatrixAt(h, m.makeTranslation(at(h)));
+    ticks.setColorAt(h, new THREE.Color("#7c6bd6"));
+    const label = at(h, CLOCK_R + 0.9);
+    anchor(`tick-${h}`, clock, label.x, label.y, 0.2);
   }
   clock.add(ticks);
-  // The chords 1 → 5 → 5² → 5³…: always the same path round the clock.
-  const trailPoints = [1, ...clockTrail(22)];
+  const trailPoints = clockTrail(CLOCK - 1);
   const chords = trailPoints.slice(1).map((hour, k) => {
     const line = kit.line([at(trailPoints[k], CLOCK_R - 0.05), at(hour, CLOCK_R - 0.05)], { color: "#ffd23f", width: 3, opacity: 0.85 });
     line.visible = false;
@@ -210,32 +241,9 @@ const keys: StageBuilder = ({ kit, store }) => {
   clock.add(hand, cap);
   anchor("power", clock, 0, -0.95, 0.4);
   let handAngle = 0;
-
-  /* ---------------- The box: padlock (RSA) or seal (signature) ---------------- */
-  const box = new THREE.Group();
-  root.add(box);
-  const boxPop = new Pop(box);
-  const crate = new THREE.Mesh(rounded(0.95, 0.72, 0.6, 0.12), kit.toon("#fff4d6", { rim: 0.35, gloss: 0.2 }));
-  box.add(crate);
-  const lockGroup = new THREE.Group();
-  lockGroup.position.set(0, 0.05, 0.36);
-  const lockBody = new THREE.Mesh(rounded(0.46, 0.38, 0.2, 0.08), kit.toon("#ff6fb1", { gloss: 0.4, rim: 0.4 }));
-  const shackle = new THREE.Mesh(kit.geometry(new THREE.TorusGeometry(0.15, 0.045, 10, 24, Math.PI)), kit.toon("#e8e2ff", { gloss: 0.6 }));
-  lockGroup.add(lockBody, shackle);
-  const seal = new THREE.Mesh(kit.geometry(new THREE.CylinderGeometry(0.24, 0.24, 0.08, 24)), kit.toon("#ff5e6c", { gloss: 0.4, rim: 0.4 }));
-  seal.rotation.x = Math.PI / 2;
-  seal.position.set(0, 0, 0.34);
-  box.add(lockGroup, seal);
-  anchor("cipher", box, 0, 0.78, 0.2);
-  const privateKey = keyMesh(kit);
-  privateKey.position.set(BOB_X + 1.05, FEET + 1.4, 0.3);
-  privateKey.rotation.z = -0.4;
-  root.add(privateKey);
-  const keyPop = new Pop(privateKey);
-  anchor("key-private", root, BOB_X - 0.5, FEET + 2.45, 0.3);
-  anchor("key-public", root, ALICE_X + 0.5, FEET + 2.45, 0.3);
-  anchor("plain-left", root, ALICE_X + 1.35, FEET + 1.0, 0.5);
-  anchor("plain-right", root, BOB_X - 1.35, FEET + 1.0, 0.5);
+  let lastPower = -1;
+  const visited = new THREE.Color("#ffd23f");
+  const unvisited = new THREE.Color("#7c6bd6");
 
   /* ---------------- https: browser, server and three lanes ---------------- */
   const web = new THREE.Group();
@@ -244,7 +252,7 @@ const keys: StageBuilder = ({ kit, store }) => {
   {
     const browser = new THREE.Group();
     browser.position.set(-4.3, 0, 0);
-    browser.add(new THREE.Mesh(rounded(2.5, 2.1, 0.3, 0.2), kit.toon("#f4f0ff", { shadow: "#b9a8f0", rim: 0.4 })));
+    browser.add(new THREE.Mesh(rounded(2.5, 2.1, 0.3, 0.2, 4), kit.toon("#f4f0ff", { shadow: "#b9a8f0", rim: 0.4 })));
     const bar = new THREE.Mesh(rounded(2.5, 0.42, 0.34, 0.15), kit.toon("#2b1f6b", { rim: 0.3 }));
     bar.position.y = 0.84;
     browser.add(bar);
@@ -287,14 +295,16 @@ const keys: StageBuilder = ({ kit, store }) => {
   anchor("lane-signature", web, 0, 0.3, 0.3);
   anchor("lane-cipher", web, 0, -0.7, 0.3);
   const laneTokens = [makeToken("#ff9ccc"), makeToken("#8fe3ff")];
-  for (const t of laneTokens) {
-    t.group.removeFromParent();
-    t.group.scale.setScalar(0);
-    web.add(t.group);
+  for (const token of laneTokens) {
+    token.group.removeFromParent();
+    web.add(token.group);
   }
-  const webSeal = new THREE.Mesh(kit.geometry(new THREE.CylinderGeometry(0.26, 0.26, 0.09, 24)), kit.toon("#ff5e6c", { gloss: 0.4, rim: 0.4 }));
-  webSeal.rotation.x = Math.PI / 2;
-  web.add(webSeal);
+  const laneKeys = [keyMesh(kit), keyMesh(kit)];
+  laneKeys.forEach((key, k) => {
+    key.scale.setScalar(0.7);
+    key.position.set(k ? 2.6 : -2.6, 0, 0.2);
+    web.add(key);
+  });
   const streamCount = kit.count(40, 22);
   const streamColors: number[] = [];
   const palette = ["#ff6fb1", "#3fd0ff", "#ffd23f", "#3ff2b5", "#b58cff"].map((c) => new THREE.Color(c));
@@ -309,9 +319,6 @@ const keys: StageBuilder = ({ kit, store }) => {
 
   /* ---------------- Motion ---------------- */
   const wirePoint = (u: number) => new THREE.Vector3(ALICE_X + 0.8 + u * (BOB_X - ALICE_X - 1.6), WIRE_Y, 0.15);
-  const visited = new THREE.Color("#ffd23f");
-  const unvisited = new THREE.Color("#7c6bd6");
-  let lastPower = -1;
 
   return {
     root,
@@ -322,98 +329,125 @@ const keys: StageBuilder = ({ kit, store }) => {
       const s = state();
       const { time } = frame;
       const calm = frame.reducedMotion;
-      const people = step !== "clock" && step !== "https";
-      const watched = step === "problem" || step === "exchange" || step === "shared";
+      const message = s.message ?? tr(EXAMPLE_MESSAGE);
+      const people = step === "problem" || step === "exchange" || step === "shared" || step === "message";
       alicePop.update(people, frame);
       bobPop.update(people, frame);
       wirePop.update(people, frame);
-      evePop.update(watched, frame);
-      const bob2 = calm ? 0 : Math.sin(time * 2) * 0.04;
-      alice.position.y = FEET + bob2;
-      bob.position.y = FEET - bob2;
-      for (const name of ["alice", "bob", "secret-alice", "secret-bob"]) anchors[name].visible = people && alicePop.value > 0.8;
-      anchors.eve.visible = anchors["eve-notes"].visible = watched && evePop.value > 0.8;
-      anchors["key-alice"].visible = anchors["key-bob"].visible = step === "shared" && alicePop.value > 0.8;
-
-      // Eve's glass follows whatever crosses the wire.
-      const loop = calm ? 0.45 : (time / 4.5) % 1;
+      evePop.update(people, frame);
+      notebookPop.update(people, frame);
+      const sway = calm ? 0 : Math.sin(time * 2) * 0.04;
+      alice.position.y = FEET + sway;
+      bob.position.y = FEET - sway;
       glass.rotation.z = 0.5 + (calm ? 0 : Math.sin(time * 1.3) * 0.15);
+      const ready = people && alicePop.value > 0.8;
+      show(["alice", "bob", "eve", "eve-notes", "know-alice", "know-bob"], ready);
+      show(["calc-alice", "calc-bob"], ready && step === "shared");
 
-      // Envelopes in the open.
-      envelopePop.update(step === "problem", frame);
-      letters.forEach((letter, k) => {
-        const u = (loop + k / letters.length) % 1;
-        letter.position.copy(wirePoint(u)).add(new THREE.Vector3(0, 0.42, 0));
-        letter.rotation.z = calm ? 0 : Math.sin(time * 3 + k) * 0.08;
-      });
+      // Letter tiles: a train on the wire, or two rows (message and scrambled).
+      const letters = Math.max(1, message.length);
+      const train = step === "problem" || step === "message";
+      const rows = step === "shift";
+      const loop = calm ? 0.5 : (time / 6) % 1;
+      for (let i = 0; i < tileCount; i++) {
+        const t = tileState[i];
+        const cipherRow = i >= MAX_LETTERS;
+        const k = cipherRow ? i - MAX_LETTERS : i;
+        let target = 0;
+        let x = t.x;
+        let y = t.y;
+        if (k < letters && rows) {
+          target = 1;
+          x = -0.6 + (k - (letters - 1) / 2) * GAP;
+          y = cipherRow ? -0.85 : 1.25;
+        } else if (k < letters && train && !cipherRow) {
+          // The train runs from Alice to Bob; letters outside the wire shrink away.
+          // The last letter leads, so the train reads left to right.
+          const u = loop * 1.5 - 0.25 - ((letters - 1 - k) * GAP) / (BOB_X - ALICE_X - 1.6);
+          const inside = u > 0.02 && u < 0.98;
+          target = inside ? 1 : 0;
+          const p = wirePoint(Math.min(1, Math.max(0, u)));
+          x = p.x;
+          y = WIRE_Y + 0.6;
+        }
+        t.x = frame.snap || t.s < 0.05 ? x : approach(t.x, x, 7, frame);
+        t.y = frame.snap || t.s < 0.05 ? y : approach(t.y, y, 7, frame);
+        t.s = approach(t.s, target, 10, frame);
+        t.c.copy(cipherRow || step === "message" ? CIPHER : PLAIN);
+        m.compose(v.set(t.x, t.y, 0.2), q, sc.setScalar(Math.max(1e-4, t.s)));
+        tiles.setMatrixAt(i, m);
+        tiles.setColorAt(i, t.c);
+        anchors[`tile-${i}`].position.set(t.x, t.y, 0.35);
+        anchors[`tile-${i}`].visible = t.s > 0.7;
+      }
+      tiles.instanceMatrix.needsUpdate = true;
+      if (tiles.instanceColor) tiles.instanceColor.needsUpdate = true;
+      for (let k = 0; k < MAX_LETTERS; k++) {
+        const on = rows && k < letters ? Math.min(tileState[k].s, tileState[k + MAX_LETTERS].s) : 0;
+        const x = tileState[k].x;
+        m.compose(v.set(x, -0.05, 0.2), q.set(1, 0, 0, 0), sc.setScalar(on));
+        arrows.setMatrixAt(k, m);
+        m.compose(v.set(x, 0.3, 0.2), q.identity(), sc.setScalar(on));
+        shafts.setMatrixAt(k, m);
+      }
+      q.identity();
+      arrows.instanceMatrix.needsUpdate = shafts.instanceMatrix.needsUpdate = true;
+      show(["row-plain", "row-cipher", "shift-key"], rows && tileState[0].s > 0.7);
 
-      // Number tokens: sent in the exchange, held once received.
+      // Public keys: sent in the exchange, held once received.
       const exchanging = step === "exchange";
       const holding = step === "shared";
       tokenA.pop.update(exchanging || holding, frame);
       tokenB.pop.update(exchanging || holding, frame);
-      const travel = exchanging ? Math.min(1, ((calm ? 0.5 : time / 3.2) % 1.25)) : 1;
-      tokenA.group.position.copy(wirePoint(holding ? 1 : travel)).add(new THREE.Vector3(holding ? 0.1 : 0, 0.55, 0));
-      tokenB.group.position.copy(wirePoint(holding ? 0 : 1 - travel)).add(new THREE.Vector3(holding ? -0.1 : 0, -0.55, 0));
+      const travel = exchanging ? Math.min(1, (calm ? 0.5 : time / 3.2) % 1.25) : 1;
+      tokenA.group.position.copy(wirePoint(holding ? 1 : travel)).add(v.set(holding ? 0.15 : 0, 0.6, 0));
+      tokenB.group.position.copy(wirePoint(holding ? 0 : 1 - travel)).add(v.set(holding ? -0.15 : 0, -0.6, 0));
       anchors["token-a"].visible = tokenA.group.visible && tokenA.pop.value > 0.8;
       anchors["token-b"].visible = tokenB.group.visible && tokenB.pop.value > 0.8;
 
-      // The clock: the hand walks round to 5^power.
+      // The shared key: a golden key appears on both sides.
+      const keyed = step === "shared" || step === "message";
+      keyPops.forEach((pop) => pop.update(keyed, frame));
+      keyAlice.rotation.y = keyBob.rotation.y = calm ? 0.3 : time * 0.9;
+
+      // The clock: the hand walks round to 2^power.
       clockPop.update(step === "clock", frame);
-      const hour = powMod(DH.g, s.power, DH.p);
-      const targetAngle = -(hour / DH.p) * Math.PI * 2;
+      const hour = onClock(START, s.power);
       if (s.power !== lastPower) {
         lastPower = s.power;
-        const trail = new Set([1, ...clockTrail(s.power)]);
-        for (let h = 0; h < DH.p; h++) ticks.setColorAt(h, trail.has(h) ? visited : unvisited);
+        const trail = new Set(clockTrail(s.power));
+        for (let h = 0; h < CLOCK; h++) ticks.setColorAt(h, trail.has(h) ? visited : unvisited);
         if (ticks.instanceColor) ticks.instanceColor.needsUpdate = true;
         chords.forEach((line, k) => (line.visible = k < s.power));
       }
-      // Always turn clockwise, like a real hand.
+      const targetAngle = -(hour / CLOCK) * Math.PI * 2;
       let delta = targetAngle - handAngle;
       while (delta > 0.001) delta -= Math.PI * 2;
       handAngle = frame.snap ? targetAngle : handAngle + delta * (1 - Math.exp(-frame.dt * (calm ? 14 : 5)));
       hand.rotation.z = handAngle;
-      for (let h = 0; h < DH.p; h++) anchors[`tick-${h}`].visible = clock.visible && clockPop.value > 0.8;
-      anchors.power.visible = clock.visible && clockPop.value > 0.8;
+      const clockReady = clock.visible && clockPop.value > 0.8;
+      for (let h = 0; h < CLOCK; h++) anchors[`tick-${h}`].visible = clockReady;
+      anchors.power.visible = clockReady;
 
-      // The box crosses the wire: padlocked towards Bob, sealed towards Alice.
-      const boxed = step === "padlock" || step === "signature";
-      boxPop.update(boxed, frame);
-      keyPop.update(boxed, frame);
-      privateKey.rotation.y = calm ? 0.3 : time * 0.9;
-      const phase = calm ? 0.5 : (time / 5) % 1;
-      const along = THREE.MathUtils.smoothstep(phase, 0.2, 0.75);
-      const towardsBob = step !== "signature";
-      box.position.copy(wirePoint(towardsBob ? along : 1 - along)).add(new THREE.Vector3(0, 0.62, 0));
-      lockGroup.visible = towardsBob;
-      seal.visible = !towardsBob;
-      const closed = phase > 0.12 && phase < 0.85 ? 1 : 0;
-      shackle.position.y = approach(shackle.position.y, closed ? 0.19 : 0.36, 10, frame);
-      for (const name of ["cipher", "key-private", "key-public", "plain-left", "plain-right"])
-        anchors[name].visible = boxed && boxPop.value > 0.8;
-
-      // https: tokens cross on lane 1, a seal comes from the server on lane 2,
-      // scrambled bits flow both ways on lane 3.
+      // https: public keys cross on lane 1, keys appear on lane 2, scrambled letters flow on lane 3.
       webPop.update(step === "https", frame);
       if (web.visible) {
         const u = calm ? 0.5 : (time / 3) % 1;
-        laneTokens[0].pop.update(true, frame);
-        laneTokens[1].pop.update(true, frame);
-        laneTokens[0].group.scale.multiplyScalar(0.55);
-        laneTokens[1].group.scale.multiplyScalar(0.55);
-        laneTokens[0].group.position.set(-2.6 + u * 5.2, 1, 0.1);
-        laneTokens[1].group.position.set(2.6 - u * 5.2, 1, 0.1);
-        webSeal.position.set(2.6 - ((calm ? 0.5 : (time / 3.6) % 1) * 5.2), 0, 0.12);
+        laneTokens.forEach((token, k) => {
+          token.pop.update(true, frame);
+          token.group.scale.multiplyScalar(0.55);
+          token.group.position.set(k ? 2.6 - u * 5.2 : -2.6 + u * 5.2, 1, 0.1);
+        });
+        laneKeys.forEach((key) => (key.rotation.y = calm ? 0.3 : time * 0.9));
         const positions = stream.geometry.getAttribute("position") as THREE.BufferAttribute;
         for (let i = 0; i < streamCount; i++) {
           const dir = i % 2 ? 1 : -1;
-          const v = ((streamPhase[i] + (calm ? 0 : time * 0.22 * dir)) % 1 + 1) % 1;
-          positions.setXYZ(i, -2.6 + v * 5.2, -1 + (streamPhase[i] - 0.5) * 0.35, 0.1);
+          const w = ((streamPhase[i] + (calm ? 0 : time * 0.22 * dir)) % 1 + 1) % 1;
+          positions.setXYZ(i, -2.6 + w * 5.2, -1 + (streamPhase[i] - 0.5) * 0.35, 0.1);
         }
         positions.needsUpdate = true;
       }
-      for (const name of ["lane-exchange", "lane-signature", "lane-cipher"]) anchors[name].visible = web.visible && webPop.value > 0.8;
+      show(["lane-exchange", "lane-signature", "lane-cipher"], web.visible && webPop.value > 0.8);
     },
   };
 };

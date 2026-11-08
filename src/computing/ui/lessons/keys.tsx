@@ -1,105 +1,122 @@
-import { Eye, LockKeyhole, RotateCcw, X } from "lucide-react";
+import { Eye, KeyRound, LockKeyhole, RotateCcw, X } from "lucide-react";
 import { useId } from "react";
 import type { ReactNode } from "react";
-import { t, useLocale } from "../../../i18n";
-import { DH, KEYS_START, RSA, exchange, lock, powMod, sign } from "../../logic/keys";
+import { t, tr, useLocale } from "../../../i18n";
+import { CLOCK, EXAMPLE_MESSAGE, KEYS_START, MAX_LETTERS, START, cleanMessage, clockTrail, exchange, onClock, plainPower, shiftText } from "../../logic/keys";
 import type { KeysState } from "../../logic/keys";
 import { Store, useStore } from "../../store";
 import { useAnchors } from "../anchors";
-import type { ControlsProps, LessonUi, OverlayProps } from "./types";
+import type { ControlsProps, LessonUi, OverlayProps, Vars } from "./types";
+
+const SUP: Record<string, string> = { "0": "⁰", "1": "¹", "2": "²", "3": "³", "4": "⁴", "5": "⁵", "6": "⁶", "7": "⁷", "8": "⁸", "9": "⁹" };
+/** "2³" */
+const pow = (base: number, exponent: number) => `${base}${String(exponent).replace(/\d/g, (d) => SUP[d])}`;
+/** "2⁴ = 16 → 5" on the 11-hour clock (the plain power is left out when it gets big). */
+const calc = (base: number, exponent: number) => {
+  const plain = plainPower(base, exponent);
+  const result = onClock(base, exponent);
+  return plain === null ? `${pow(base, exponent)} → ${result}` : plain === result ? `${pow(base, exponent)} = ${result}` : `${pow(base, exponent)} = ${plain} → ${result}`;
+};
 
 const useKeys = (store: Store<object>) => {
   const typed = store as Store<KeysState>;
   return [useStore(typed), (patch: Partial<KeysState>) => typed.set(patch)] as const;
 };
+const messageOf = (s: KeysState) => s.message ?? tr(EXAMPLE_MESSAGE);
+const sharedKey = (s: KeysState) => exchange(s.alice, s.bob).aliceKey;
 
-/** base^exponent → result, written with a superscript. */
-function Power({ base, exponent, result }: { base: number; exponent: number; result: number }) {
-  return (
-    <span className="cs-power">
-      {base}
-      <sup>{exponent}</sup> → <b>{result}</b>
-    </span>
-  );
-}
-
-/** Numbers pinned on the people, the tokens, the clock and the box. */
+/** Letters, numbers and notes pinned on the scene. */
 function Overlay({ stage, step, store }: OverlayProps) {
   useLocale();
   const [s] = useKeys(store);
   const pin = useAnchors(stage);
-  const chip = (key: string, anchor: string, content: ReactNode, extra: Record<string, string> = {}) => (
+  const chip = (key: string, content: ReactNode, extra: Record<string, string> = {}, anchor = key) => (
     <div key={key} ref={pin(key, anchor)} className="cs-anchor" data-visible="0">
       <span className="cs-readout cs-chip-readout" {...extra}>
         {content}
       </span>
     </div>
   );
-  const secret = (who: "alice" | "bob", value: number) =>
-    chip(`secret-${who}`, `secret-${who}`, (
+  const tile = (index: number, letter: string) => (
+    <div key={`tile-${index}`} ref={pin(`tile-${index}`, `tile-${index}`)} className="cs-anchor" data-visible="0">
+      <span className="cs-letter" data-tile={index}>
+        {letter}
+      </span>
+    </div>
+  );
+  const notes = (seen: string, unreadable = false) =>
+    chip("eve-notes", (
       <>
-        <LockKeyhole size={15} strokeWidth={2.6} aria-hidden="true" />
-        {value}
+        <Eye size={14} strokeWidth={2.6} aria-hidden="true" />
+        <b>{seen}</b>
+        {unreadable && <X size={15} strokeWidth={2.8} aria-hidden="true" className="cs-eve-fail" />}
       </>
-    ), { "data-readout": `secret-${who}`, "data-secret": "" });
+    ), { "data-readout": "eve", "data-notes": "" });
+  const message = messageOf(s);
 
-  if (step === "clock") {
-    const hour = powMod(DH.g, s.power, DH.p);
-    const visited = new Set([1, ...Array.from({ length: s.power }, (_, k) => powMod(DH.g, k + 1, DH.p))]);
+  if (step === "problem")
     return (
       <>
-        {Array.from({ length: DH.p }, (_, h) => (
+        {chip("know-alice", message, { "data-readout": "alice-message", "data-know": "" })}
+        {[...message].map((letter, k) => tile(k, letter))}
+        {notes(message)}
+      </>
+    );
+
+  if (step === "shift") {
+    const cipher = shiftText(message, s.shift);
+    return (
+      <>
+        {[...message].map((letter, k) => tile(k, letter))}
+        {[...cipher].map((letter, k) => tile(k + MAX_LETTERS, letter))}
+        {chip("shift-key", <><KeyRound size={15} strokeWidth={2.6} aria-hidden="true" />+{s.shift}</>, { "data-readout": "shift", "data-key": "" })}
+      </>
+    );
+  }
+
+  if (step === "clock") {
+    const trail = new Set(clockTrail(s.power));
+    const hour = onClock(START, s.power);
+    return (
+      <>
+        {Array.from({ length: CLOCK }, (_, h) => (
           <div key={h} ref={pin(`tick-${h}`, `tick-${h}`)} className="cs-anchor" data-visible="0">
-            <span className="cs-hour" data-visited={visited.has(h) || undefined} data-current={h === hour || undefined}>
+            <span className="cs-hour" data-visited={trail.has(h) || undefined} data-current={h === hour || undefined}>
               {h}
             </span>
           </div>
         ))}
-        {chip("power", "power", <Power base={DH.g} exponent={s.power} result={hour} />, { "data-readout": "power" })}
+        {chip("power", calc(START, s.power), { "data-readout": "power" })}
       </>
     );
   }
 
   if (step === "exchange" || step === "shared") {
     const x = exchange(s.alice, s.bob);
+    const secret = (who: "alice" | "bob", value: number) =>
+      chip(`know-${who}`, <><LockKeyhole size={15} strokeWidth={2.6} aria-hidden="true" />{value}</>, { "data-readout": `secret-${who}`, "data-know": "" });
     return (
       <>
         {secret("alice", s.alice)}
         {secret("bob", s.bob)}
-        {chip("token-a", "token-a", x.fromAlice, { "data-readout": "token-a" })}
-        {chip("token-b", "token-b", x.fromBob, { "data-readout": "token-b" })}
-        {chip("eve-notes", "eve-notes", (
-          <>
-            <Eye size={15} strokeWidth={2.6} aria-hidden="true" />
-            {[DH.p, DH.g, x.fromAlice, x.fromBob].join(" · ")}
-            {step === "shared" && <X size={15} strokeWidth={2.8} aria-hidden="true" className="cs-eve-fail" />}
-          </>
-        ), { "data-readout": "eve" })}
-        {step === "shared" && chip("key-alice", "key-alice", <Power base={x.fromBob} exponent={s.alice} result={x.aliceKey} />, { "data-readout": "key-alice", "data-key": "" })}
-        {step === "shared" && chip("key-bob", "key-bob", <Power base={x.fromAlice} exponent={s.bob} result={x.bobKey} />, { "data-readout": "key-bob", "data-key": "" })}
+        {chip("token-a", x.fromAlice, { "data-readout": "token-a" })}
+        {chip("token-b", x.fromBob, { "data-readout": "token-b" })}
+        {notes([CLOCK, START, x.fromAlice, x.fromBob].join(" · "), step === "shared")}
+        {step === "shared" && chip("calc-alice", <><KeyRound size={15} strokeWidth={2.6} aria-hidden="true" />{calc(x.fromBob, s.alice)}</>, { "data-readout": "key-alice", "data-key": "" })}
+        {step === "shared" && chip("calc-bob", <><KeyRound size={15} strokeWidth={2.6} aria-hidden="true" />{calc(x.fromAlice, s.bob)}</>, { "data-readout": "key-bob", "data-key": "" })}
       </>
     );
   }
 
-  if (step === "padlock" || step === "signature") {
-    const locking = step === "padlock";
-    const sealed = locking ? lock(s.message) : sign(s.message);
+  if (step === "message") {
+    const key = sharedKey(s);
+    const cipher = shiftText(message, key);
     return (
       <>
-        {chip("key-public", "key-public", t("Bob’s public key: {k}", { k: RSA.e }), { "data-readout": "key-public" })}
-        {chip("key-private", "key-private", t("Bob’s private key: {k}", { k: RSA.d }), { "data-readout": "key-private" })}
-        {chip("cipher", "cipher", <b>{sealed}</b>, { "data-readout": "cipher" })}
-        {locking ? (
-          <>
-            {chip("plain-left", "plain-left", <Power base={s.message} exponent={RSA.e} result={sealed} />, { "data-readout": "lock" })}
-            {chip("plain-right", "plain-right", <Power base={sealed} exponent={RSA.d} result={s.message} />, { "data-readout": "unlock" })}
-          </>
-        ) : (
-          <>
-            {chip("plain-right", "plain-right", <Power base={s.message} exponent={RSA.d} result={sealed} />, { "data-readout": "sign" })}
-            {chip("plain-left", "plain-left", <Power base={sealed} exponent={RSA.e} result={s.message} />, { "data-readout": "verify" })}
-          </>
-        )}
+        {chip("know-alice", <>{message} <KeyRound size={14} strokeWidth={2.6} aria-hidden="true" />{key}</>, { "data-readout": "alice-message", "data-know": "" })}
+        {chip("know-bob", <>{shiftText(cipher, -key)} <KeyRound size={14} strokeWidth={2.6} aria-hidden="true" />{key}</>, { "data-readout": "bob-message", "data-know": "" })}
+        {[...cipher].map((letter, k) => tile(k, letter))}
+        {notes(cipher, true)}
       </>
     );
   }
@@ -118,16 +135,50 @@ function Slider({ label, value, min, max, name, onChange }: { label: string; val
   );
 }
 
-/** Buttons and sliders inside the step card. */
+function MessageField({ s, set }: { s: KeysState; set(patch: Partial<KeysState>): void }) {
+  const id = useId();
+  return (
+    <label className="cs-field cs-field-wide" htmlFor={id}>
+      <span>{t("Alice’s message")}</span>
+      <input
+        id={id}
+        data-input="message"
+        value={messageOf(s)}
+        maxLength={MAX_LETTERS}
+        autoComplete="off"
+        autoCapitalize="characters"
+        spellCheck={false}
+        onChange={(event) => set({ message: cleanMessage(event.target.value) || null })}
+      />
+    </label>
+  );
+}
+
+/** Controls of the "Your turn!" panel. */
 function Controls({ step, store }: ControlsProps) {
   useLocale();
   const [s, set] = useKeys(store);
 
+  if (step === "problem" || step === "message")
+    return (
+      <div className="cs-actions">
+        <MessageField s={s} set={set} />
+      </div>
+    );
+
+  if (step === "shift")
+    return (
+      <div className="cs-sliders">
+        <MessageField s={s} set={set} />
+        <Slider label={t("Key")} name="shift" value={s.shift} min={1} max={25} onChange={(shift) => set({ shift })} />
+      </div>
+    );
+
   if (step === "clock")
     return (
       <div className="cs-actions">
-        <button type="button" className="cs-action" data-action="times-five" disabled={s.power >= DH.p - 1} onClick={() => set({ power: s.power + 1 })}>
-          {t("Multiply by 5")}
+        <button type="button" className="cs-action" data-action="times-two" disabled={s.power >= CLOCK - 1} onClick={() => set({ power: s.power + 1 })}>
+          {t("Multiply by 2")}
         </button>
         <button type="button" className="cs-action" data-action="restart" onClick={() => set({ power: 1 })}>
           <RotateCcw size={15} strokeWidth={2.6} aria-hidden="true" />
@@ -139,18 +190,31 @@ function Controls({ step, store }: ControlsProps) {
   if (step === "exchange" || step === "shared")
     return (
       <div className="cs-sliders">
-        <Slider label={t("Alice’s secret")} name="alice" value={s.alice} min={1} max={DH.p - 1} onChange={(alice) => set({ alice })} />
-        <Slider label={t("Bob’s secret")} name="bob" value={s.bob} min={1} max={DH.p - 1} onChange={(bob) => set({ bob })} />
+        <Slider label={t("Alice’s secret")} name="alice" value={s.alice} min={1} max={9} onChange={(alice) => set({ alice })} />
+        <Slider label={t("Bob’s secret")} name="bob" value={s.bob} min={1} max={9} onChange={(bob) => set({ bob })} />
       </div>
     );
 
-  if (step === "padlock" || step === "signature")
-    return (
-      <div className="cs-sliders">
-        <Slider label={t("Message")} name="message" value={s.message} min={2} max={RSA.n - 1} onChange={(message) => set({ message })} />
-      </div>
-    );
+  return null;
+}
 
+/** Live values of the worked examples. */
+function vars(step: string, state: object): Vars {
+  const s = state as KeysState;
+  const message = messageOf(s);
+  if (step === "problem") return { message };
+  if (step === "shift") return { key: s.shift, message, cipher: shiftText(message, s.shift) };
+  if (step === "clock") return { calc: calc(START, s.power) };
+  if (step === "exchange" || step === "shared") {
+    const x = exchange(s.alice, s.bob);
+    return step === "exchange"
+      ? { a: s.alice, b: s.bob, A: x.fromAlice, B: x.fromBob, aliceCalc: calc(START, s.alice), bobCalc: calc(START, s.bob) }
+      : { A: x.fromAlice, B: x.fromBob, key: x.aliceKey, aliceCalc: calc(x.fromBob, s.alice), bobCalc: calc(x.fromAlice, s.bob) };
+  }
+  if (step === "message") {
+    const key = sharedKey(s);
+    return { key, message, cipher: shiftText(message, key) };
+  }
   return null;
 }
 
@@ -158,4 +222,5 @@ export const keysUi: LessonUi = {
   createStore: () => new Store<KeysState>({ ...KEYS_START }),
   Overlay,
   Controls,
+  vars,
 };

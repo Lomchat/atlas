@@ -14,6 +14,7 @@ import { Stage } from "./Stage";
 import type { Store } from "./store";
 import ChapterBanner from "./ui/ChapterBanner";
 import MapPanel from "./ui/MapPanel";
+import PlayPanel from "./ui/PlayPanel";
 import { StationLabels, StepLabels } from "./ui/SceneLabels";
 import StepPanel from "./ui/StepPanel";
 import StepRail from "./ui/StepRail";
@@ -65,6 +66,7 @@ export default function Computing({
   const [banner, setBanner] = useState<{ lesson: LessonData; previous: LessonData | null } | null>(null);
   const shownLesson = useRef<string | null | undefined>(undefined);
   const dockRef = useRef<HTMLDivElement>(null);
+  const [play, setPlay] = useState<HTMLElement | null>(null);
   const stores = useRef(new Map<string, Store<object>>());
 
   const lesson = useMemo(() => {
@@ -152,6 +154,8 @@ export default function Computing({
     if (!stage || !active) return;
     const update = () => {
       const dock = dockRef.current?.getBoundingClientRect();
+      // The "Your turn!" panel sits above the scene: keep the subject below it.
+      const playBottom = play?.isConnected ? play.getBoundingClientRect().bottom : 0;
       const width = window.innerWidth;
       if (bare || !dock) stage.setSafeArea({ left: 0, right: 0, top: 0, bottom: 0 });
       else if (compact) {
@@ -160,14 +164,14 @@ export default function Computing({
         const landscape = window.innerWidth > window.innerHeight && window.innerHeight <= 520;
         stage.setSafeArea(
           landscape
-            ? { left: dock.right + 8, right: 12, top: 56, bottom: 8 }
-            : { left: 8, right: 8, top: 64, bottom: height + 8 },
+            ? { left: dock.right + 8, right: 12, top: Math.max(56, playBottom + 6), bottom: 8 }
+            : { left: 8, right: 8, top: Math.max(64, playBottom + 6), bottom: height + 8 },
         );
       } else {
         stage.setSafeArea({
           left: Math.min(dock.right + 16, width * 0.42),
           right: lesson ? 72 : 24,
-          top: 80,
+          top: Math.max(80, playBottom + 14),
           bottom: 28,
         });
       }
@@ -175,12 +179,13 @@ export default function Computing({
     update();
     const observer = new ResizeObserver(update);
     if (dockRef.current) observer.observe(dockRef.current);
+    if (play) observer.observe(play);
     window.addEventListener("resize", update);
     return () => {
       observer.disconnect();
       window.removeEventListener("resize", update);
     };
-  }, [stage, active, compact, bare, lesson]);
+  }, [stage, active, compact, bare, lesson, play]);
 
   /* Navigation. */
   const stopTour = useCallback(() => setTouring(false), []);
@@ -260,6 +265,7 @@ export default function Computing({
             </div>
           )}
           {!compact && <StepRail lesson={lesson} index={index} seen={seen} onStep={goStep} />}
+          <PlayPanel step={step} ui={ui} store={store} panelRef={setPlay} />
         </>
       ) : (
         <StationLabels stage={stage} onOpen={openLesson} />

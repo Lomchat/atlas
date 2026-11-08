@@ -78,7 +78,7 @@ try {
 
   // Each kind of control of chapter 1 changes the scene's state.
   await pinned(page, '[data-action="flip"]');
-  await page.getByRole("button", { name: text("Flip the switch") }).click();
+  await page.locator('.cs-play [data-action="flip-panel"]').click();
   assert.equal((await page.locator('[data-readout="bit"]').textContent()).trim(), "0");
   await page.locator('[data-action="next"]').click();
   await expectStep(bits, "where");
@@ -157,24 +157,24 @@ try {
   await pinned(page, '[data-readout="scale"]');
   assert.equal((await page.locator('[data-readout="scale"]').textContent()).trim(), "500 pm");
 
-  // Chapter 4: the clock, the exchange (same key on both sides) and RSA.
+  // Chapter 4: a real message, scrambled with a key agreed on an 11-hour clock.
   const keys = lessonById.get("keys");
-  await page.goto(`${base}/?lang=${locale}&section=computing&lesson=keys&step=clock`);
-  await expectStep(keys, "clock");
-  await page.getByRole("button", { name: text("Multiply by 5") }).click();
-  await pinned(page, '[data-readout="power"]');
-  assert.equal((await page.locator('[data-readout="power"]').textContent()).trim(), "57 → 17");
+  await page.goto(`${base}/?lang=${locale}&section=computing&lesson=keys&step=shift`);
+  await expectStep(keys, "shift");
+  await page.getByLabel(text("Alice’s message")).fill("chat");
+  await page.locator('[data-input="shift"]').fill("1");
+  assert.ok((await page.locator(".cs-example-text").textContent()).includes("DIBU"), "CHAT moved by 1 is DIBU");
   await page.locator('[data-step-stop="shared"]').click();
   await expectStep(keys, "shared");
+  await page.getByLabel(text("Alice’s secret")).fill("4");
   await pinned(page, '[data-readout="key-alice"]');
-  assert.equal((await page.locator('[data-readout="key-alice"]').textContent()).trim(), "196 → 2");
-  await page.getByLabel(text("Alice’s secret")).fill("9");
-  const [aliceKey, bobKey] = [await page.locator('[data-readout="key-alice"] b').textContent(), await page.locator('[data-readout="key-bob"] b').textContent()];
-  assert.equal(aliceKey, bobKey, "both sides find the same key");
-  await page.locator('[data-step-stop="padlock"]').click();
-  await expectStep(keys, "padlock");
-  await page.getByLabel(text("Message")).fill("12");
-  assert.equal(await page.locator('[data-readout="unlock"] b').textContent(), "12", "Bob gets the message back");
+  assert.equal((await page.locator('[data-readout="key-alice"]').textContent()).trim(), "4⁴ = 256 → 3");
+  assert.equal((await page.locator('[data-readout="key-bob"]').textContent()).trim(), "5² = 25 → 3");
+  await page.locator('[data-step-stop="message"]').click();
+  await expectStep(keys, "message");
+  await pinned(page, '[data-readout="bob-message"]');
+  assert.ok((await page.locator('[data-readout="bob-message"]').textContent()).includes("CHAT"), "Bob reads the message");
+  assert.ok((await page.locator('[data-readout="eve"]').textContent()).includes("FKDW"), "Eve only sees CHAT moved by 3");
 
   // Chapter 5: one neuron counts points, then learns from its mistake.
   const neuronsLesson = lessonById.get("neurons");
@@ -222,6 +222,7 @@ try {
     for (const s of lesson.steps) {
       await page.goto(`${base}/?lang=${locale}&section=computing&lesson=${lesson.id}&step=${s.id}&freeze=2`);
       await expectStep(lesson, s.id);
+      assert.doesNotMatch(await page.locator(".cs-example-text").innerText(), /\{\w+\}/, `${lesson.id}/${s.id}: every value of the example is filled`);
       await page.screenshot({ path: artifact(`computing-${lesson.id}-${s.id}.png`) });
     }
   assert.deepEqual(problems, [], "no errors");

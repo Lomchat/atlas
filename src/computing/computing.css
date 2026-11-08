@@ -461,6 +461,10 @@ button.cs-station:focus-visible {
 }
 
 .cs-rail-name {
+  position: absolute;
+  right: calc(100% + 10px);
+  top: 50%;
+  margin-top: -13px;
   padding: 4px 10px;
   border-radius: 12px;
   background: rgba(22, 14, 54, 0.7);
@@ -1372,4 +1376,237 @@ button.cs-station:focus-visible {
   font-family: var(--display);
   font-size: 15px;
   font-weight: 650;
+}
+
+/* ------------------------------------------------------------------ */
+/* "Your turn!" panel and live variables                                */
+/* ------------------------------------------------------------------ */
+
+:root {
+  /* Everything the visitor can change wears this colour, in the panel and in the text. */
+  --var: #5ef5c2;
+}
+
+.cs-play {
+  position: absolute;
+  top: 84px;
+  right: 92px;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: max-content;
+  max-width: min(600px, calc(100vw - 540px));
+  padding: 12px 16px 14px;
+  border: 2px solid var(--var);
+  border-radius: 22px;
+  background: var(--panel-strong);
+  box-shadow: var(--shadow), 0 0 0 5px color-mix(in srgb, var(--var) 16%, transparent), 0 0 36px color-mix(in srgb, var(--var) 28%, transparent);
+  animation: cs-play-in 0.6s cubic-bezier(0.34, 1.5, 0.64, 1) both;
+}
+
+@keyframes cs-play-in {
+  from {
+    opacity: 0;
+    transform: translateY(-12px) scale(0.94);
+  }
+}
+
+.cs-play-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  font-family: var(--display);
+  font-size: 17px;
+  font-weight: 650;
+  color: var(--var);
+}
+
+.cs-play-title svg {
+  animation: cs-wiggle 2.6s ease-in-out 0.6s infinite;
+}
+
+@keyframes cs-wiggle {
+  0%,
+  70%,
+  100% {
+    transform: rotate(0);
+  }
+  78% {
+    transform: rotate(-14deg);
+  }
+  86% {
+    transform: rotate(12deg);
+  }
+  94% {
+    transform: rotate(-6deg);
+  }
+}
+
+.cs-play-text {
+  margin: 0;
+  font-size: 14.5px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--ink-soft);
+}
+
+.cs-play-controls > * {
+  margin-top: 4px;
+}
+
+.cs-play .cs-sliders {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  margin-top: 4px;
+}
+
+.cs-play .cs-slider {
+  min-width: 170px;
+  flex: 1;
+}
+
+.cs-play .cs-action:first-child {
+  background: var(--var);
+  color: var(--dark);
+}
+
+.cs-play .cs-chip[aria-pressed="true"] {
+  background: var(--var);
+}
+
+.cs-slider b,
+.cs-field span b {
+  display: inline-block;
+  min-width: 26px;
+  padding: 0 7px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--var) 22%, transparent);
+  color: var(--var);
+  text-align: center;
+}
+
+.cs-slider input {
+  accent-color: var(--var);
+}
+
+.cs-field input {
+  border-color: var(--var);
+}
+
+/* A value the visitor can change, inside the explanation. */
+.cs-var {
+  display: inline-block;
+  padding: 0 6px;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--var) 20%, transparent);
+  color: var(--var);
+  font-weight: 800;
+  animation: cs-var-pop 0.45s cubic-bezier(0.34, 1.6, 0.64, 1);
+}
+
+@keyframes cs-var-pop {
+  from {
+    transform: scale(1.35);
+    background: color-mix(in srgb, var(--var) 55%, transparent);
+  }
+}
+
+.app[data-compact] .cs-play {
+  top: calc(max(10px, env(safe-area-inset-top)) + 50px);
+  left: 8px;
+  right: 8px;
+  width: auto;
+  max-width: none;
+  padding: 8px 12px 10px;
+  border-radius: 18px;
+}
+
+.app[data-compact] .cs-play-title {
+  font-size: 15px;
+}
+
+.app[data-compact] .cs-play-text {
+  font-size: 13px;
+}
+
+@media (max-height: 520px) and (min-width: 600px) {
+  .app[data-compact] .cs-play {
+    left: auto;
+    width: min(380px, 48vw);
+  }
+}
+
+.cs-gate-play {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 18px;
+}
+
+.cs-gate-play .cs-table {
+  margin-top: 0;
+}
+
+.cs-play .cs-chip[aria-pressed="true"] .cs-var,
+.cs-play .cs-action:first-child .cs-var {
+  background: rgba(26, 16, 64, 0.18);
+  color: var(--dark);
+}
+
+.cs-action .cs-var,
+.cs-chip .cs-var {
+  margin-left: 4px;
+  animation: none;
+}
+
+/* Letters on the tiles of the keys chapter, and what each person knows. */
+.cs-letter {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: translate(-50%, -50%);
+  font-family: var(--display);
+  font-size: calc(clamp(13px, var(--px) * 0.42, 26px));
+  font-weight: 700;
+  color: var(--dark);
+  pointer-events: none;
+}
+
+.cs-chip-readout[data-know] {
+  transform: translate(-50%, -100%);
+  background: #fff;
+  color: var(--dark);
+  letter-spacing: 0.04em;
+}
+
+.cs-chip-readout[data-notes] {
+  background: transparent;
+  box-shadow: none;
+  color: var(--dark);
+  font-size: 14px;
+}
+
+.cs-chip-readout[data-notes] svg:first-child {
+  color: #0d8a64;
+}
+
+/* On phones the explanation is folded to three lines: the live example and the scene come first. */
+.cs-step .card-hook[data-clamped] {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+
+.cs-more {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 13.5px;
+  color: var(--accent);
 }

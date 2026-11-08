@@ -7,7 +7,7 @@ import { BITS_START, PLACES, SWATCHES, binary, bitsOf, lastCharacter, utf8 } fro
 import type { BitsState } from "../../logic/bits";
 import { Store, useStore } from "../../store";
 import { useAnchors } from "../anchors";
-import type { ControlsProps, LessonUi, OverlayProps } from "./types";
+import type { ControlsProps, LessonUi, OverlayProps, Vars } from "./types";
 
 const CHANNELS: { name: MessageKey; anchor: string }[] = [
   { name: "Red", anchor: "red" },
@@ -146,11 +146,21 @@ function Overlay({ stage, step, store }: OverlayProps) {
   return null;
 }
 
-/** Extra controls inside the step card. */
+/** Controls of the "Your turn!" panel. */
 function Controls({ step, store }: ControlsProps) {
   useLocale();
   const [s, set] = useBits(store);
   const input = useId();
+
+  if (step === "switch")
+    return (
+      <div className="cs-actions">
+        <button type="button" className="cs-action" data-action="flip-panel" aria-pressed={s.single} onClick={() => set({ single: !s.single })}>
+          {t("Flip the switch")}
+          <b className="cs-var">{s.single ? 1 : 0}</b>
+        </button>
+      </div>
+    );
 
   if (step === "count")
     return (
@@ -218,8 +228,28 @@ function Controls({ step, store }: ControlsProps) {
   return null;
 }
 
+/** Live values of the worked examples. */
+function vars(step: string, state: object, locale: string): Vars {
+  const s = state as BitsState;
+  if (step === "switch") return { bit: s.single ? 1 : 0, answer: s.single ? t("yes") : t("no") };
+  if (step === "count") {
+    const on = PLACES.filter((place) => s.value & place);
+    return {
+      places: on.length ? new Intl.ListFormat(locale).format(on.map(String)) : t("none"),
+      sum: on.length ? `${on.join(" + ")} = ${s.value}` : "0",
+      binary: s.value.toString(2),
+      value: s.value,
+    };
+  }
+  if (step === "letter")
+    return { char: s.char, number: (s.char.codePointAt(0) ?? 0).toLocaleString(locale), bits: utf8(s.char).map(binary).join(" ") };
+  if (step === "color") return { red: s.rgb[0], green: s.rgb[1], blue: s.rgb[2] };
+  return null;
+}
+
 export const bitsUi: LessonUi = {
   createStore: () => new Store<BitsState>({ ...BITS_START, rgb: [...BITS_START.rgb] }),
   Overlay,
   Controls,
+  vars,
 };

@@ -167,6 +167,7 @@ async function checkLessons() {
       assert.ok(!stepIds.has(step.id), `${where}: duplicate step`);
       stepIds.add(step.id);
       for (const field of ["title", "text", "example"]) bilingual(where, field, step[field]);
+      assert.deepEqual(placeholders(step.example.fr), placeholders(step.example.en), `${where}: the example has the same {values} in both languages`);
       if (step.try) bilingual(where, "try", step.try);
       assert.ok(step.facts.length >= 1, `${where}: at least one fact`);
       step.facts.forEach((fact, f) => bilingual(where, `facts[${f}]`, fact));

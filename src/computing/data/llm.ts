@@ -31,8 +31,8 @@ export const llmLesson: LessonData = {
         fr: "Une IA qui écrit, comme un chatbot, ne lit pas les lettres une par une. Elle découpe le texte en petits morceaux appelés tokens, et donne un numéro à chacun.",
       },
       example: {
-        en: "“The cat sleeps.” gives 4 tokens: The, cat, sleeps and the full stop. A very long word like “unbelievably” is cut into several pieces.",
-        fr: "« Le chat dort. » donne 4 tokens : Le, chat, dort et le point. Un mot très long, comme « anticonstitutionnellement », est coupé en plusieurs morceaux.",
+        en: "“{sentence}” is cut into {count} pieces: {tokens}. A very long word like “unbelievably” is cut into several pieces.",
+        fr: "« {sentence} » est coupée en {count} morceaux : {tokens}. Un mot très long, comme « anticonstitutionnellement », est coupé en plusieurs morceaux.",
       },
       try: { en: "Type a sentence and watch it being cut.", fr: "Tape une phrase et regarde-la se découper." },
       facts: [
@@ -81,8 +81,8 @@ export const llmLesson: LessonData = {
         fr: "Pour écrire, l’IA devine le mot qui vient ensuite. Elle donne une chance à chaque mot possible, puis en choisit un, souvent parmi les plus probables.",
       },
       example: {
-        en: "“The cat is sleeping on the…”: sofa has 46 chances out of 100, bed 27, mat 13… (example numbers).",
-        fr: "« Le chat dort sur le… » : canapé a 46 chances sur 100, lit 27, tapis 13… (chiffres d’exemple).",
+        en: "“The cat is sleeping on the…”: at temperature {temperature}, sofa has {p1} chances out of 100, bed {p2}, mat {p3}… (example numbers).",
+        fr: "« Le chat dort sur le… » : à la température {temperature}, canapé a {p1} chances sur 100, lit {p2}, tapis {p3}… (chiffres d’exemple).",
       },
       try: {
         en: "Change the temperature: low, the AI almost always picks the most likely word; high, it tries more surprising ones.",
@@ -103,8 +103,8 @@ export const llmLesson: LessonData = {
         fr: "Pour comprendre une phrase, l’IA regarde comment les mots sont liés entre eux : on appelle ça l’attention. Par exemple, elle cherche qui est « il ».",
       },
       example: {
-        en: "“The trophy does not fit in the suitcase because it is too big”: “it” is the trophy. Change “big” to “small”, and “it” becomes the suitcase!",
-        fr: "« Le trophée ne rentre pas dans la valise car il est trop grand » : « il », c’est le trophée. Remplace « grand » par « petit », et « il » devient la valise !",
+        en: "“The trophy does not fit in the suitcase because it is too {adjective}”: here “it” is {who}. Change the last word, and “it” changes too!",
+        fr: "« Le trophée ne rentre pas dans la valise car il est trop {adjective} » : ici, « il », c’est {who}. Change le dernier mot, et « il » change aussi !",
       },
       try: { en: "Switch between big and small.", fr: "Passe de grand à petit." },
       facts: [
@@ -127,8 +127,8 @@ export const llmLesson: LessonData = {
         fr: "L’IA écrit un mot, l’ajoute au texte, puis devine le suivant, et ainsi de suite. Une longue réponse, c’est cette petite boucle répétée des centaines de fois.",
       },
       example: {
-        en: "“The cat is sleeping on the” → sofa → near → the → fire. Each time, the AI picked the most likely word.",
-        fr: "« Le chat dort sur le » → canapé → près → du → feu. À chaque tour, l’IA a choisi le mot le plus probable.",
+        en: "Text so far: “{sentence}”. Each turn, the AI adds the most likely next word.",
+        fr: "Texte pour l’instant : « {sentence} ». À chaque tour, l’IA ajoute le mot suivant le plus probable.",
       },
       try: { en: "Add the next word, or start again.", fr: "Ajoute le mot suivant, ou recommence." },
       facts: [

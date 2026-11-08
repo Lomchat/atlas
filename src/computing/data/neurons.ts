@@ -31,8 +31,8 @@ export const neuronsLesson: LessonData = {
         fr: "Un neurone artificiel est une toute petite machine à décider. Il donne des points à des indices, les additionne, et répond oui si le total dépasse un seuil.",
       },
       example: {
-        en: "Take an umbrella? Each cloud counts 1 point, a rain forecast counts 5. Sky 8 out of 10 cloudy and rain forecast: 8 × 1 + 1 × 5 = 13 points. More than 10: take the umbrella!",
-        fr: "Prendre son parapluie ? Chaque nuage vaut 1 point, la pluie annoncée vaut 5 points. Ciel couvert à 8 sur 10 et pluie annoncée : 8 × 1 + 1 × 5 = 13 points. C’est plus que 10 : on prend le parapluie !",
+        en: "Take an umbrella? Each cloud counts 1 point, a rain forecast counts 5. Clouds {clouds} out of 10, rain forecast {forecast}: {clouds} × 1 + {forecast} × 5 = {total} points. {decision}",
+        fr: "Prendre son parapluie ? Chaque nuage vaut 1 point, la pluie annoncée vaut 5 points. Nuages {clouds} sur 10, pluie annoncée {forecast} : {clouds} × 1 + {forecast} × 5 = {total} points. {decision}",
       },
       try: { en: "Change the clouds and the forecast.", fr: "Change les nuages et la météo." },
       facts: [
@@ -50,8 +50,8 @@ export const neuronsLesson: LessonData = {
         fr: "Les points donnés à chaque indice s’appellent des poids. Ils disent ce qui compte le plus. Avec d’autres poids, le même ciel donne une autre décision.",
       },
       example: {
-        en: "If the forecast only counts 1 point: 8 × 1 + 1 × 1 = 9. That is not more than 10: no umbrella.",
-        fr: "Si la météo ne vaut plus que 1 point : 8 × 1 + 1 × 1 = 9. Ce n’est pas plus que 10 : pas de parapluie.",
+        en: "Same sky (8 clouds, rain forecast), but the forecast now counts {weight}: 8 × 1 + 1 × {weight} = {total}. {decision}",
+        fr: "Même ciel (8 nuages, pluie annoncée), mais la météo vaut maintenant {weight} : 8 × 1 + 1 × {weight} = {total}. {decision}",
       },
       try: { en: "Change the points of the forecast.", fr: "Change les points de la météo." },
       facts: [
@@ -69,8 +69,8 @@ export const neuronsLesson: LessonData = {
         fr: "Il a plu, mais le neurone a dit non : il s’est trompé ! Pour apprendre, on donne un peu plus de poids à l’indice qui aurait dû compter plus : la météo.",
       },
       example: {
-        en: "The forecast goes from 1 to 2 points: 8 + 2 = 10, still not more than 10. Once more: 3 points, 8 + 3 = 11. This time, yes!",
-        fr: "La météo passe de 1 à 2 points : 8 + 2 = 10, toujours pas plus que 10. Encore une fois : 3 points, 8 + 3 = 11. Cette fois, c’est oui !",
+        en: "Lessons learned: {lessons}. The forecast now counts {weight}: 8 + {weight} = {total}. {decision}",
+        fr: "Leçons apprises : {lessons}. La météo vaut maintenant {weight} : 8 + {weight} = {total}. {decision}",
       },
       try: { en: "Let the neuron learn from its mistakes.", fr: "Laisse le neurone apprendre de ses erreurs." },
       facts: [
@@ -88,8 +88,8 @@ export const neuronsLesson: LessonData = {
         fr: "En reliant beaucoup de neurones en couches, on obtient un réseau de neurones. La première couche regarde l’image, la dernière donne la réponse.",
       },
       example: {
-        en: "To recognise a handwritten digit, the network looks at each little square of the picture and lights up the output of the digit it recognises: here, 7.",
-        fr: "Pour reconnaître un chiffre écrit à la main, le réseau regarde chaque petit carré de l’image et allume la sortie du chiffre qu’il reconnaît : ici, le 7.",
+        en: "The network looks at each little square of the picture and lights up the output of the digit it recognises. Here it sees a {digit}: that output lights up to {score}.",
+        fr: "Le réseau regarde chaque petit carré de l’image et allume la sortie du chiffre qu’il reconnaît. Ici, il voit un {digit} : cette sortie s’allume à {score}.",
       },
       try: { en: "Show it another digit.", fr: "Montre-lui un autre chiffre." },
       facts: [

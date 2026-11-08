@@ -32,10 +32,10 @@ export const bitsLesson: LessonData = {
         fr: "Un bit, c’est la plus petite information qui existe. Il n’a que deux valeurs, 0 ou 1, comme une lampe éteinte ou allumée. Un ordinateur contient des milliards de ces minuscules interrupteurs.",
       },
       example: {
-        en: "“Is it raining?” Yes or no: one bit is enough to answer. 1 means yes, 0 means no.",
-        fr: "« Est-ce qu’il pleut ? » Oui ou non : un seul bit suffit pour répondre. 1 veut dire oui, 0 veut dire non.",
+        en: "“Is it raining?” One bit is enough to answer: 1 means yes, 0 means no. Right now the bit is {bit}, so the answer is {answer}.",
+        fr: "« Est-ce qu’il pleut ? » Un seul bit suffit pour répondre : 1 veut dire oui, 0 veut dire non. En ce moment, le bit vaut {bit}, donc la réponse est {answer}.",
       },
-      try: { en: "Flip the switch to change the bit.", fr: "Bascule l’interrupteur pour changer le bit." },
+      try: { en: "Flip the switch, here or in the picture.", fr: "Bascule l’interrupteur, ici ou dans l’image." },
       facts: [
         {
           en: "The word “bit” comes from binary digit: a digit that can only be 0 or 1.",
@@ -109,8 +109,8 @@ export const bitsLesson: LessonData = {
         fr: "En binaire, on compte seulement avec 0 et 1. Chaque case vaut le double de sa voisine de droite : 1, 2, 4, 8… Pour lire le nombre, on additionne les cases allumées.",
       },
       example: {
-        en: "Boxes 8, 4 and 1 are on: 8 + 4 + 1 = 13. So 1101 in binary is 13.",
-        fr: "Les cases 8, 4 et 1 sont allumées : 8 + 4 + 1 = 13. Donc 1101 en binaire, c’est 13.",
+        en: "Boxes on: {places}. Add them up: {sum}. So {binary} in binary is {value}.",
+        fr: "Cases allumées : {places}. On les additionne : {sum}. Donc {binary} en binaire, c’est {value}.",
       },
       try: {
         en: "Click the bits to turn them on or off, or add 1.",
@@ -135,8 +135,8 @@ export const bitsLesson: LessonData = {
         fr: "Pour écrire du texte, on a donné un numéro à chaque lettre. Le A majuscule porte le numéro 65. L’ordinateur range ce numéro en bits, puis l’écran dessine la lettre avec de petits carrés : les pixels.",
       },
       example: {
-        en: "A is number 65 and a is number 97. When you type “Hi”, the computer really stores 72 and 105.",
-        fr: "A porte le numéro 65 et a le numéro 97. Quand tu tapes « Ami », l’ordinateur range en fait 65, 109 et 105.",
+        en: "The letter {char} is number {number}. The computer stores it as bits: {bits}. Capital A is 65, small a is 97.",
+        fr: "La lettre {char} porte le numéro {number}. L’ordinateur la range en bits : {bits}. Le A majuscule, c’est 65 ; le a minuscule, 97.",
       },
       try: { en: "Type a letter to see its number and its bits.", fr: "Tape une lettre pour voir son numéro et ses bits." },
       facts: [
@@ -159,8 +159,8 @@ export const bitsLesson: LessonData = {
         fr: "Chaque pixel de ton écran est fait de trois petites lumières : rouge, verte et bleue. En les mélangeant plus ou moins fort, on obtient toutes les couleurs. Chaque lumière va de 0 (éteinte) à 255 (à fond).",
       },
       example: {
-        en: "Full red + full green + no blue makes yellow! And all three at full make white.",
-        fr: "Rouge à fond + vert à fond + bleu éteint, ça donne du jaune ! Et les trois à fond donnent du blanc.",
+        en: "Red {red} + green {green} + blue {blue} give the colour of the pixel. Tip: full red and full green with no blue make yellow!",
+        fr: "Rouge {red} + vert {green} + bleu {blue} donnent la couleur du pixel. Astuce : rouge et vert à fond, sans bleu, ça fait du jaune !",
       },
       try: {
         en: "Switch the bits of each light, or pick a colour, and watch the pixel.",

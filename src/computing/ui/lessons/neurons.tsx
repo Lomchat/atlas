@@ -6,7 +6,7 @@ import { LEARN, NEURON, NEURONS_START, SCORES, THRESHOLD, learnState, neuron } f
 import type { NeuronsState } from "../../logic/neurons";
 import { Store, useStore } from "../../store";
 import { useAnchors } from "../anchors";
-import type { ControlsProps, LessonUi, OverlayProps } from "./types";
+import type { ControlsProps, LessonUi, OverlayProps, Vars } from "./types";
 
 const useNeurons = (store: Store<object>) => {
   const typed = store as Store<NeuronsState>;
@@ -136,8 +136,29 @@ function Controls({ step, store }: ControlsProps) {
   return null;
 }
 
+/** Live values of the worked examples. */
+function vars(step: string, state: object): Vars {
+  const s = state as NeuronsState;
+  const decision = (fires: boolean) => (fires ? t("More than 10: take the umbrella!") : t("Not more than 10: no umbrella."));
+  if (step === "neuron") {
+    const { total, fires } = neuron(s.clouds, s.forecast, NEURON.cloudsWeight, NEURON.forecastWeight);
+    return { clouds: s.clouds, forecast: s.forecast, total, decision: decision(fires) };
+  }
+  if (step === "weights") {
+    const { total, fires } = neuron(LEARN.clouds, LEARN.forecast, NEURON.cloudsWeight, s.forecastWeight);
+    return { weight: s.forecastWeight, total, decision: decision(fires) };
+  }
+  if (step === "learn") {
+    const l = learnState(s.lessons);
+    return { lessons: s.lessons, weight: l.w2, total: l.total, decision: decision(l.fires) };
+  }
+  if (step === "network") return { digit: s.digit, score: t("{n}%", { n: Math.round(Math.max(...SCORES[s.digit]) * 100) }) };
+  return null;
+}
+
 export const neuronsUi: LessonUi = {
   createStore: () => new Store<NeuronsState>({ ...NEURONS_START }),
   Overlay,
   Controls,
+  vars,
 };

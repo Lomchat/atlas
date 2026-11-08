@@ -7,7 +7,6 @@ import {
   ExternalLink,
   LayoutGrid,
   Lightbulb,
-  MousePointerClick,
   Pause,
   Play,
 } from "lucide-react";
@@ -16,6 +15,7 @@ import { t, tr, useLocale } from "../../i18n";
 import { stepSource } from "../index";
 import type { LessonData } from "../types";
 import type { Store } from "../store";
+import { LiveText } from "./LiveText";
 import { LessonIcon } from "./icons";
 import type { LessonUi } from "./lessons/types";
 
@@ -40,13 +40,16 @@ export default function StepPanel({ lesson, index, next, compact, touring, ui, s
   const count = lesson.steps.length;
   const [fact, setFact] = useState(0);
   const [open, setOpen] = useState(false);
-  useEffect(() => setFact(0), [lesson.id, step.id]);
+  const [more, setMore] = useState(false);
+  useEffect(() => {
+    setFact(0);
+    setMore(false);
+  }, [lesson.id, step.id]);
   const facts = step.facts;
   const expanded = !compact || open;
   const source = stepSource(lesson, step);
   const previous = index > 0 ? lesson.steps[index - 1] : undefined;
   const following = index + 1 < count ? lesson.steps[index + 1] : undefined;
-  const Controls = ui?.Controls;
 
   return (
     <>
@@ -60,20 +63,20 @@ export default function StepPanel({ lesson, index, next, compact, touring, ui, s
             <LessonIcon icon={lesson.icon} size={compact ? 18 : 22} />
             <span>{tr(step.title)}</span>
           </h1>
-          <p className="card-hook">{tr(step.text)}</p>
+          <p className="card-hook" data-clamped={(compact && !more) || undefined}>
+            {tr(step.text)}
+          </p>
+          {compact && !more && (
+            <button type="button" className="cs-more" data-action="read-more" onClick={() => setMore(true)}>
+              {t("Read more")}
+            </button>
+          )}
           <div className="cs-example">
             <p className="cs-example-title">{t("Example")}</p>
-            <p className="cs-example-text">{tr(step.example)}</p>
+            <p className="cs-example-text">
+              <LiveText text={tr(step.example)} ui={ui} step={step.id} store={store} />
+            </p>
           </div>
-          {step.try && (
-            <div className="cs-try">
-              <p className="cs-try-text">
-                <MousePointerClick size={16} aria-hidden="true" />
-                {tr(step.try)}
-              </p>
-              {Controls && store && <Controls step={step.id} store={store} />}
-            </div>
-          )}
           {compact && facts.length > 0 && (
             <button type="button" className="card-toggle" aria-expanded={open} onClick={() => setOpen(!open)}>
               <Lightbulb size={16} aria-hidden="true" />

@@ -3,7 +3,7 @@ import { ADDER_PRESETS, GATES_START, add4, gate, isGate } from "../../logic/gate
 import type { GatesState } from "../../logic/gates";
 import { Store, useStore } from "../../store";
 import { useAnchors } from "../anchors";
-import type { ControlsProps, LessonUi, OverlayProps } from "./types";
+import type { ControlsProps, LessonUi, OverlayProps, Vars } from "./types";
 
 const useGates = (store: Store<object>) => {
   const typed = store as Store<GatesState>;
@@ -128,10 +128,30 @@ function Controls({ step, store }: ControlsProps) {
   useLocale();
   const [s, set] = useGates(store);
 
+  if (step === "transistor")
+    return (
+      <div className="cs-actions">
+        <button type="button" className="cs-action" data-action="gate-panel" aria-pressed={s.gate} onClick={() => set({ gate: !s.gate })}>
+          {t("Turn the gate on or off")}
+          <b className="cs-var">{bit(s.gate)}</b>
+        </button>
+      </div>
+    );
+
   if (isGate(step) || step === "half") {
     const two = step !== "not";
     const rows = two ? [[false, false], [false, true], [true, false], [true, true]] : [[false, false], [true, false]];
+    const toggle = (name: string, value: boolean, change: () => void) => (
+      <button key={name} type="button" className="cs-chip cs-chip-wide" data-toggle={name} aria-pressed={value} onClick={change}>
+        {name} = <b className="cs-var">{bit(value)}</b>
+      </button>
+    );
     return (
+      <div className="cs-gate-play">
+        <div className="cs-presets">
+          {toggle(A, s.a, () => set({ a: !s.a }))}
+          {two && toggle(B, s.b, () => set({ b: !s.b }))}
+        </div>
       <table className="cs-table" data-table={step}>
         <caption>{t("Truth table")}</caption>
         <thead>
@@ -165,6 +185,7 @@ function Controls({ step, store }: ControlsProps) {
           ))}
         </tbody>
       </table>
+      </div>
     );
   }
 
@@ -189,8 +210,26 @@ function Controls({ step, store }: ControlsProps) {
   return null;
 }
 
+/** Live values of the worked examples. */
+function vars(step: string, state: object): Vars {
+  const s = state as GatesState;
+  if (step === "transistor") return { gate: bit(s.gate), flows: s.gate ? t("flows") : t("is blocked") };
+  if (isGate(step)) return { a: bit(s.a), b: bit(s.b), out: bit(gate(step, s.a, s.b)), same: s.a === s.b ? t("the same") : t("different") };
+  if (step === "half") {
+    const value = Number(s.a) + Number(s.b);
+    return { a: bit(s.a), b: bit(s.b), sum: bit(s.a !== s.b), carry: bit(s.a && s.b), result: value.toString(2), value };
+  }
+  if (step === "adder") {
+    const { sum } = add4(s.x, s.y);
+    const four = (n: number) => n.toString(2).padStart(4, "0");
+    return { x: s.x, y: s.y, xb: four(s.x), yb: four(s.y), sb: sum > 15 ? sum.toString(2) : four(sum), s: sum };
+  }
+  return null;
+}
+
 export const gatesUi: LessonUi = {
   createStore: () => new Store<GatesState>({ ...GATES_START }),
   Overlay,
   Controls,
+  vars,
 };

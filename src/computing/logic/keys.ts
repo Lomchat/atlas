@@ -1,56 +1,72 @@
 /**
- * Clock arithmetic for the keys chapter, shared by its scene and overlay.
- * Pure TypeScript: no Three.js, no DOM. Numbers are tiny on purpose; the
- * real ones have hundreds of digits.
+ * The keys chapter, with tiny numbers: a message scrambled by shifting its
+ * letters, and a key agreed in public on an 11-hour clock (Diffie–Hellman
+ * with 11 and 2). Shared by the scene and the overlay. Pure TypeScript.
  */
+import type { Bilingual } from "../../levels/types.ts";
 
 /** Step ids of the keys chapter, in order (checked against its data). */
-export const KEYS_STEPS = ["problem", "clock", "exchange", "shared", "padlock", "signature", "https"] as const;
+export const KEYS_STEPS = ["problem", "shift", "clock", "exchange", "shared", "message", "https"] as const;
 export type KeysStep = (typeof KEYS_STEPS)[number];
 
-/** Diffie–Hellman: a 23-hour clock and the start 5 (a generator modulo 23). */
-export const DH = { p: 23, g: 5 } as const;
-/** RSA: n = 5 × 11 = 55, public exponent 3, private exponent 27 (3 × 27 = 81 = 2 × 40 + 1). */
-export const RSA = { n: 55, e: 3, d: 27 } as const;
+/** The public clock (11 hours, 0 to 10) and the public start (2). */
+export const CLOCK = 11;
+export const START = 2;
 
 export interface KeysState {
-  /** Step "clock": the exponent of 5 shown on the clock (1–22). */
+  /** Alice's message (capital letters); null: the example of the current language. */
+  message: string | null;
+  /** Step "shift": how many places each letter moves (1–25). */
+  shift: number;
+  /** Step "clock": how many times 2 has been multiplied (1–10). */
   power: number;
-  /** Alice's and Bob's secret numbers (1–22). */
+  /** Alice's and Bob's secret numbers, their private keys (1–9). */
   alice: number;
   bob: number;
-  /** The message locked with RSA (2–54). */
-  message: number;
 }
 
-/** The worked examples quoted in the lesson text. */
-export const KEYS_START: KeysState = { power: 6, alice: 6, bob: 15, message: 7 };
+export const KEYS_START: KeysState = { message: null, shift: 3, power: 3, alice: 3, bob: 2 };
+export const EXAMPLE_MESSAGE: Bilingual = { en: "HELLO", fr: "SALUT" };
+export const MAX_LETTERS = 8;
 
-/** base^exponent on a clock with `modulus` hours (exact, with BigInt). */
-export function powMod(base: number, exponent: number, modulus: number) {
-  let result = 1n;
-  let b = BigInt(base) % BigInt(modulus);
-  let e = BigInt(exponent);
-  const m = BigInt(modulus);
-  while (e > 0n) {
-    if (e & 1n) result = (result * b) % m;
-    b = (b * b) % m;
-    e >>= 1n;
-  }
-  return Number(result);
+const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+/** Keeps capital letters only (accents removed), at most 8. */
+export function cleanMessage(text: string) {
+  return text
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toUpperCase()
+    .replace(/[^A-Z]/g, "")
+    .slice(0, MAX_LETTERS);
 }
 
-/** Positions visited by 5, 5², 5³… up to 5^power on the 23-hour clock. */
-export const clockTrail = (power: number) => Array.from({ length: power }, (_, k) => powMod(DH.g, k + 1, DH.p));
+/** Moves every letter `by` places in the alphabet (Z wraps round to A). */
+export const shiftText = (text: string, by: number) =>
+  [...text].map((c) => {
+    const i = ALPHABET.indexOf(c);
+    return i < 0 ? c : ALPHABET[(((i + by) % 26) + 26) % 26];
+  }).join("");
+
+/** base multiplied by itself `times` times on the clock, step by step. */
+export function onClock(base: number, times: number, hours = CLOCK) {
+  let value = 1;
+  for (let k = 0; k < times; k++) value = (value * base) % hours;
+  return value;
+}
+
+/** The plain power (small enough to show), or null when it gets too big. */
+export const plainPower = (base: number, times: number) => {
+  const value = Math.pow(base, times);
+  return value <= 9999 ? value : null;
+};
+
+/** Hours visited by 1, 2, 2², 2³… on the clock. */
+export const clockTrail = (power: number) => Array.from({ length: power + 1 }, (_, k) => onClock(START, k));
 
 /** Everything Alice, Bob and Eve see in the exchange. */
 export function exchange(alice: number, bob: number) {
-  const fromAlice = powMod(DH.g, alice, DH.p);
-  const fromBob = powMod(DH.g, bob, DH.p);
-  return { fromAlice, fromBob, aliceKey: powMod(fromBob, alice, DH.p), bobKey: powMod(fromAlice, bob, DH.p) };
+  const fromAlice = onClock(START, alice);
+  const fromBob = onClock(START, bob);
+  return { fromAlice, fromBob, aliceKey: onClock(fromBob, alice), bobKey: onClock(fromAlice, bob) };
 }
-
-export const lock = (message: number) => powMod(message, RSA.e, RSA.n);
-export const unlock = (cipher: number) => powMod(cipher, RSA.d, RSA.n);
-export const sign = (message: number) => powMod(message, RSA.d, RSA.n);
-export const verify = (signature: number) => powMod(signature, RSA.e, RSA.n);
