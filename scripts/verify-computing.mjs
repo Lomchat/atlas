@@ -79,7 +79,7 @@ try {
   // Each kind of control of chapter 1 changes the scene's state.
   await pinned(page, '[data-action="flip"]');
   await page.getByRole("button", { name: text("Flip the switch") }).click();
-  assert.equal((await page.locator('[data-readout="bit"]').innerText()).trim(), "0");
+  assert.equal((await page.locator('[data-readout="bit"]').textContent()).trim(), "0");
   await page.locator('[data-action="next"]').click();
   await expectStep(bits, "where");
   await page.locator(".card-title").click();
@@ -89,29 +89,29 @@ try {
   await expectStep(bits, "count");
   const sum = page.locator('[data-readout="sum"]');
   await pinned(page, '[data-readout="sum"]');
-  assert.equal((await sum.innerText()).trim(), "00001101 = 8 + 4 + 1 = 13");
+  assert.equal((await sum.textContent()).trim(), "00001101 = 8 + 4 + 1 = 13");
   await pinned(page, '[data-bit="0"]');
   await page.getByRole("button", { name: text("Bit worth {value}", { value: 128 }) }).click();
   await page.getByRole("button", { name: text("Add 1") }).click();
-  assert.equal((await sum.innerText()).trim(), "10001110 = 128 + 8 + 4 + 2 = 142");
+  assert.equal((await sum.textContent()).trim(), "10001110 = 128 + 8 + 4 + 2 = 142");
   await page.locator('[data-step-stop="letter"]').click();
   await expectStep(bits, "letter");
   await page.getByLabel(text("Type a character")).fill("é");
   await pinned(page, '[data-byte="1"]');
-  assert.ok((await page.locator('[data-readout="code"]').innerText()).includes(text("Number {n}", { n: 233 })));
+  assert.ok((await page.locator('[data-readout="code"]').textContent()).includes(text("Number {n}", { n: 233 })));
   assert.deepEqual(await page.locator(".cs-byte").allTextContents(), ["11000011", "10101001"]);
   await page.locator('[data-step-stop="color"]').click();
   await expectStep(bits, "color");
   await page.getByRole("button", { name: text("Violet") }).click();
   await pinned(page, '[data-readout="blue"]');
-  assert.equal(await page.locator('[data-readout="blue"] b').innerText(), "255");
+  assert.equal(await page.locator('[data-readout="blue"] b').textContent(), "255");
 
   // Another language keeps the step, the visitor's changes and the renderer.
   await page.locator(`[data-language-switch="${other}"]`).click();
   await assertLocale(page, other);
   assert.equal(await title(), tr(bits.steps.at(-1).title, other));
   assert.equal(params().get("step"), "color");
-  assert.equal(await page.locator('[data-readout="blue"] b').innerText(), "255");
+  assert.equal(await page.locator('[data-readout="blue"] b').textContent(), "255");
   await page.locator(`[data-language-switch="${locale}"]`).click();
   assert.equal(await probe(), "same-renderer");
 
@@ -123,6 +123,24 @@ try {
   await toComputing.click();
   await expectStep(bits, "color");
   assert.equal(await probe(), "same-renderer");
+
+  // Chapter 2: a gate follows its inputs; the adder adds.
+  const gates = lessonById.get("gates");
+  await page.locator('[data-action="go-chapters"]').click();
+  await stageOn(page, "board");
+  await page.locator('.cs-chapter[data-lesson="gates"]').click();
+  await expectStep(gates, "transistor");
+  await page.locator('[data-step-stop="and"]').click();
+  await expectStep(gates, "and");
+  await pinned(page, '[data-readout="output"]');
+  assert.equal((await page.locator('[data-readout="output"]').textContent()).trim(), "= 1");
+  await page.getByRole("button", { name: text("Input {name}", { name: "B" }) }).click();
+  assert.equal((await page.locator('[data-readout="output"]').textContent()).trim(), "= 0");
+  await page.locator('[data-step-stop="adder"]').click();
+  await expectStep(gates, "adder");
+  await page.locator('[data-preset="15+15"]').click();
+  await pinned(page, '[data-readout="value-sum"]');
+  assert.equal((await page.locator('[data-readout="value-sum"]').textContent()).trim(), "= 30");
 
   // Links: unknown and unfinished chapters fall back to the map.
   for (const lesson of ["nope", ...LESSONS.filter((l) => !isReady(l)).map((l) => l.id).slice(0, 1)]) {

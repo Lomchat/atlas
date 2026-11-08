@@ -28,12 +28,15 @@ export class Pop {
       this.value = frame.snap ? target : approach(this.value, target, 12, frame);
       this.velocity = 0;
     } else {
-      // Under-damped spring: a little bounce when appearing.
-      const dt = Math.min(frame.dt, 1 / 30);
+      // Under-damped spring (a little bounce when appearing), integrated in
+      // small sub-steps so slow frames stay stable.
       const stiffness = 90;
       const damping = show ? 11 : 16;
-      this.velocity += (stiffness * (target - this.value) - damping * this.velocity) * dt;
-      this.value += this.velocity * dt;
+      for (let left = frame.dt; left > 1e-6; left -= 1 / 60) {
+        const h = Math.min(left, 1 / 60);
+        this.velocity += (stiffness * (target - this.value) - damping * this.velocity) * h;
+        this.value += this.velocity * h;
+      }
       if (!show && this.value < 0.002) (this.value = 0), (this.velocity = 0);
     }
     const s = Math.max(0, this.value) * this.base;
@@ -221,4 +224,117 @@ export function glyphPixels(char: string, cols: number, rows: number): boolean[]
       pixels.push(sum / (scale * scale * 255) > 0.5);
     }
   return pixels;
+}
+
+/* ------------------------------------------------------------------ */
+/* Wires carrying bits                                                  */
+/* ------------------------------------------------------------------ */
+
+type P = [number, number, number];
+
+/** A polyline with softly rounded corners (circuit-style wiring). */
+export function wirePath(points: readonly P[], radius = 0.22) {
+  const v = points.map(([x, y, z]) => new THREE.Vector3(x, y, z));
+  const path = new THREE.CurvePath<THREE.Vector3>();
+  let from = v[0].clone();
+  for (let k = 1; k < v.length; k++) {
+    const corner = v[k];
+    if (k === v.length - 1) {
+      path.add(new THREE.LineCurve3(from, corner.clone()));
+      break;
+    }
+    const next = v[k + 1];
+    const r = Math.min(radius, corner.distanceTo(from) / 2, corner.distanceTo(next) / 2);
+    const a = corner.clone().add(from.clone().sub(corner).normalize().multiplyScalar(r));
+    const b = corner.clone().add(next.clone().sub(corner).normalize().multiplyScalar(r));
+    if (a.distanceTo(from) > 1e-4) path.add(new THREE.LineCurve3(from, a));
+    path.add(new THREE.QuadraticBezierCurve3(a, corner.clone(), b));
+    from = b;
+  }
+  return path;
+}
+
+interface WireState {
+  curve: THREE.Curve<THREE.Vector3>;
+  material: THREE.ShaderMaterial | null;
+  value: number;
+  target: number;
+  first: number;
+  count: number;
+  speed: number;
+}
+
+/**
+ * A set of wires that light up and carry travelling sparks when they hold a
+ * 1. All sparks of the set share one draw call; build the set with `add`,
+ * then call `finish` once.
+ */
+export class WireSet {
+  readonly group = new THREE.Group();
+  private readonly wires: WireState[] = [];
+  private total = 0;
+  private sparks: THREE.Points | null = null;
+  private static readonly OFF = new THREE.Color("#4a3a9a");
+  private static readonly ON = new THREE.Color("#ffd23f");
+
+  constructor(private readonly kit: Kit) {}
+
+  /** Adds a wire; `tube: false` draws only its sparks (current inside a part). */
+  add(points: readonly P[], options: { radius?: number; tube?: boolean; sparks?: number; speed?: number } = {}) {
+    const curve = wirePath(points);
+    let material: THREE.ShaderMaterial | null = null;
+    if (options.tube !== false) {
+      material = this.kit.toon("#4a3a9a", { rim: 0.35, gloss: 0.3 }) as THREE.ShaderMaterial;
+      const mesh = new THREE.Mesh(this.kit.geometry(new THREE.TubeGeometry(curve, Math.max(8, Math.round(curve.getLength() * 10)), options.radius ?? 0.07, 10)), material);
+      this.group.add(mesh);
+    }
+    const count = options.sparks ?? Math.max(2, Math.round(curve.getLength() * 1.4));
+    this.wires.push({ curve, material, value: 0, target: 0, first: this.total, count, speed: options.speed ?? 0.9 });
+    this.total += count;
+    return this.wires.length - 1;
+  }
+
+  /** A small dot where wires join. */
+  junction(at: P, radius = 0.12) {
+    const dot = new THREE.Mesh(this.kit.geometry(new THREE.SphereGeometry(radius, 16, 12)), this.kit.toon("#4a3a9a"));
+    dot.position.set(...at);
+    this.group.add(dot);
+  }
+
+  finish() {
+    this.sparks = this.kit.points(new Float32Array(Math.max(1, this.total) * 3), {
+      sizes: new Float32Array(Math.max(1, this.total)),
+      color: "#fff3b8",
+      size: 1,
+      soft: 1,
+      additive: true,
+      maxPx: 48,
+    });
+    this.sparks.renderOrder = 3;
+    this.group.add(this.sparks);
+    return this;
+  }
+
+  set(index: number, value: boolean | number) {
+    this.wires[index].target = Number(value);
+  }
+
+  update(frame: Pick<StageFrame, "time" | "dt" | "snap" | "reducedMotion">) {
+    if (!this.sparks || !this.group.visible) return;
+    const positions = this.sparks.geometry.getAttribute("position") as THREE.BufferAttribute;
+    const sizes = this.sparks.geometry.getAttribute("aSize") as THREE.BufferAttribute;
+    const p = new THREE.Vector3();
+    for (const wire of this.wires) {
+      wire.value = approach(wire.value, wire.target, 12, frame);
+      wire.material?.uniforms.uColor.value.copy(WireSet.OFF).lerp(WireSet.ON, wire.value);
+      const length = wire.curve.getLength();
+      for (let k = 0; k < wire.count; k++) {
+        const u = (((frame.reducedMotion ? 0 : (frame.time * wire.speed) / length) + k / wire.count) % 1 + 1) % 1;
+        wire.curve.getPointAt(u, p);
+        positions.setXYZ(wire.first + k, p.x, p.y, p.z + 0.02);
+        sizes.setX(wire.first + k, 0.34 * wire.value);
+      }
+    }
+    positions.needsUpdate = sizes.needsUpdate = true;
+  }
 }

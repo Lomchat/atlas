@@ -13,8 +13,8 @@ export interface StepLabel {
   /** Anchor name exported by the lesson scene. */
   anchor: string;
   text: Bilingual;
-  /** Draw the label above the anchor (default) or below it, like a caption. */
-  place?: "above" | "below";
+  /** Draw the label above the anchor (default), below it like a caption, or to its left. */
+  place?: "above" | "below" | "left";
 }
 
 export interface StepData {

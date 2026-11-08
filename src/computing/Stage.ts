@@ -307,7 +307,9 @@ export class Stage {
   private frame = (now: number) => {
     if (this.disposed || !this.active) return;
     this.frameHandle = requestAnimationFrame(this.frame);
-    const dt = Math.min(0.05, this.lastTime ? (now - this.lastTime) / 1000 : 0);
+    // Transitions follow real time even when frames are slow (software
+    // rendering); every easing here is exponential, so large steps stay stable.
+    const dt = Math.min(0.25, this.lastTime ? (now - this.lastTime) / 1000 : 0);
     this.lastTime = now;
     const time = this.freezeTime ?? (now - this.startTime) / 1000;
     TIME.value = time;

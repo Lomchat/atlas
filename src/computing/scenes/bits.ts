@@ -211,7 +211,12 @@ const bits: StageBuilder = ({ kit, store }) => {
   const glyphGroup = new THREE.Group();
   glyphGroup.position.set(GLYPH.x, GLYPH.y, 0);
   const cellCount = GLYPH.cols * GLYPH.rows;
-  const cells = new THREE.InstancedMesh(rounded(0.88, 0.88, 0.5, 0.22), kit.toon("#ffffff", { rim: 0.35, gloss: 0.3 }), cellCount);
+  // Low-poly rounded cubes: there are 234 of them.
+  const cells = new THREE.InstancedMesh(
+    kit.geometry(new RoundedBoxGeometry(0.88, 0.88, 0.5, 1, 0.22)),
+    kit.toon("#ffffff", { rim: 0.35, gloss: 0.3 }),
+    cellCount,
+  );
   cells.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   cells.frustumCulled = false;
   const cellScale = new Float32Array(cellCount).fill(0.4);

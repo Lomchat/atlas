@@ -129,7 +129,10 @@ async function checkLevels() {
 /** The computing lessons: chapters, steps, scenes, interactive layers and bilingual content. */
 async function checkLessons() {
   const { LESSONS, lessonById, COMPUTING_HOME, isReady } = await import("../src/computing/index.ts");
-  const { BITS_STEPS } = await import("../src/computing/logic/bits.ts");
+  const ORDER = {
+    bits: (await import("../src/computing/logic/bits.ts")).BITS_STEPS,
+    gates: (await import("../src/computing/logic/gates.ts")).GATES_STEPS,
+  };
   const keysOf = (file) =>
     new Set(
       [...fs.readFileSync(new URL(file, import.meta.url), "utf8").matchAll(/^\s*(\w+):\s*(?:\(\)\s*=>\s*import\(|\w+Ui\b)/gm)].map(
@@ -171,8 +174,9 @@ async function checkLessons() {
       if (step.theme) for (const key of ["top", "bottom", "accent", "dust"]) assert.match(step.theme[key], HEX, `${where}: theme.${key}`);
     }
   });
-  // The bits scene lays its steps out in this order.
-  assert.deepEqual(lessonById.get("bits").steps.map((step) => step.id), [...BITS_STEPS], "bits: steps match BITS_STEPS");
+  // Each lesson scene lays its steps out in the order of its logic module.
+  for (const [id, order] of Object.entries(ORDER))
+    assert.deepEqual(lessonById.get(id).steps.map((step) => step.id), [...order], `${id}: steps match its logic module`);
   return LESSONS.length;
 }
 

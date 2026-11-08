@@ -3,21 +3,6 @@ import type { LessonData } from "../types.ts";
 /** Chapters shown on the map before they are written. */
 export const upcomingLessons: LessonData[] = [
   {
-    id: "gates",
-    number: 2,
-    status: "soon",
-    scene: "gates",
-    icon: "gate",
-    theme: { top: "#0b2a4a", bottom: "#1d5f8c", accent: "#3fd0ff", dust: "#8fe3ff" },
-    title: { en: "Logic gates", fr: "Les portes logiques" },
-    short: { en: "Logic gates", fr: "Portes logiques" },
-    teaser: {
-      en: "Switches that calculate: how a circuit works out 1 + 1 = 10.",
-      fr: "Des interrupteurs qui calculent : comment un circuit trouve 1 + 1 = 10.",
-    },
-    steps: [],
-  },
-  {
     id: "inside",
     number: 3,
     status: "soon",
