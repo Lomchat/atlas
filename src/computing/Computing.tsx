@@ -12,6 +12,7 @@ import { COMPUTING_HOME, isReady, lessonById, nextLesson, stepIndex, stepTheme }
 import type { LessonData } from "./types";
 import { Stage } from "./Stage";
 import type { Store } from "./store";
+import ChapterBanner from "./ui/ChapterBanner";
 import MapPanel from "./ui/MapPanel";
 import { StationLabels, StepLabels } from "./ui/SceneLabels";
 import StepPanel from "./ui/StepPanel";
@@ -61,6 +62,8 @@ export default function Computing({
   const [stage, setStage] = useState<Stage | null>(null);
   const [touring, setTouring] = useState(false);
   const [seen, setSeen] = useState(readSeen);
+  const [banner, setBanner] = useState<{ lesson: LessonData; previous: LessonData | null } | null>(null);
+  const shownLesson = useRef<string | null | undefined>(undefined);
   const dockRef = useRef<HTMLDivElement>(null);
   const stores = useRef(new Map<string, Store<object>>());
 
@@ -131,6 +134,18 @@ export default function Computing({
       return next;
     });
   }, [active, lesson, step]);
+
+  /* A title card whenever a new chapter opens, so it never looks like just another step. */
+  useEffect(() => {
+    if (!active) return setBanner(null);
+    const id = lesson?.id ?? null;
+    const before = shownLesson.current;
+    shownLesson.current = id;
+    if (!lesson || id === before || freeze !== undefined || bare) return;
+    const previous = before ? (lessonById.get(before) ?? null) : null;
+    setBanner({ lesson, previous: previous && previous.number < lesson.number ? previous : null });
+  }, [active, lesson, freeze, bare]);
+  const closeBanner = useCallback(() => setBanner(null), []);
 
   /* Keep the subject clear of the panels. */
   useLayoutEffect(() => {
@@ -249,6 +264,7 @@ export default function Computing({
       ) : (
         <StationLabels stage={stage} onOpen={openLesson} />
       )}
+      {banner && <ChapterBanner key={banner.lesson.id} lesson={banner.lesson} previous={banner.previous} onDone={closeBanner} />}
       <div className="dock cs-dock" ref={dockRef} data-view={lesson ? "lesson" : "map"}>
         {lesson ? (
           <StepPanel

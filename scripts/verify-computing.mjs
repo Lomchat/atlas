@@ -124,12 +124,16 @@ try {
   await expectStep(bits, "color");
   assert.equal(await probe(), "same-renderer");
 
-  // Chapter 2: a gate follows its inputs; the adder adds.
+  // The end of a chapter leads to the next one through a title card.
   const gates = lessonById.get("gates");
-  await page.locator('[data-action="go-chapters"]').click();
-  await stageOn(page, "board");
-  await page.locator('.cs-chapter[data-lesson="gates"]').click();
+  await page.locator('[data-action="next-lesson"]').click();
+  const banner = page.getByRole("status").filter({ hasText: tr(gates.title) });
+  await banner.waitFor();
+  assert.ok((await banner.innerText()).includes(text("Chapter {n} complete", { n: 1 })));
+  await banner.waitFor({ state: "detached" });
   await expectStep(gates, "transistor");
+
+  // Chapter 2: a gate follows its inputs; the adder adds.
   await page.locator('[data-step-stop="and"]').click();
   await expectStep(gates, "and");
   await pinned(page, '[data-readout="output"]');
