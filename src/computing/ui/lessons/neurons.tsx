@@ -2,7 +2,7 @@ import { CloudRain, GraduationCap, RotateCcw, Umbrella } from "lucide-react";
 import { useId } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { getLocale, t, useLocale } from "../../../i18n";
-import { NEURON, NEURONS_START, SCORES, learnState, neuron } from "../../logic/neurons";
+import { LEARN, NEURON, NEURONS_START, SCORES, THRESHOLD, learnState, neuron } from "../../logic/neurons";
 import type { NeuronsState } from "../../logic/neurons";
 import { Store, useStore } from "../../store";
 import { useAnchors } from "../anchors";
@@ -31,22 +31,21 @@ function Overlay({ stage, step, store }: OverlayProps) {
   if (step === "neuron" || step === "weights" || step === "learn") {
     let w1: number = NEURON.cloudsWeight;
     let w2: number = NEURON.forecastWeight;
-    let bias: number = NEURON.bias;
-    let [clouds, forecast] = [s.clouds, s.forecast];
-    if (step === "weights") (w2 = s.forecastWeight), (clouds = 0.8), (forecast = 1);
+    let [clouds, forecast]: number[] = [s.clouds, s.forecast];
+    if (step === "weights") (w2 = s.forecastWeight), (clouds = LEARN.clouds), (forecast = LEARN.forecast);
     if (step === "learn") {
-      const l = learnState(s.learned);
-      (w1 = l.w1), (w2 = l.w2), (bias = l.bias), (clouds = 0.8), (forecast = 1);
+      const l = learnState(s.lessons);
+      (w1 = l.w1), (w2 = l.w2), (clouds = LEARN.clouds), (forecast = LEARN.forecast);
     }
-    const { total, fires } = neuron(clouds, forecast, w1, w2, bias);
+    const { total, fires } = neuron(clouds, forecast, w1, w2);
     return (
       <>
         {chip("in-clouds", <>{t("Clouds")} <b>{num(clouds)}</b></>)}
         {chip("in-forecast", <>{t("Rain forecast")} <b>{num(forecast)}</b></>)}
         {chip("w-clouds", <>× {num(w1)}</>, { "data-readout": "w-clouds" })}
         {chip("w-forecast", <>× {num(w2)}</>, { "data-readout": "w-forecast" })}
-        {chip("bias", <>{num(bias)}</>, { "data-readout": "bias" })}
-        {chip("total", <>{num(clouds)} × {num(w1)} + {num(forecast)} × {num(w2)} {bias < 0 ? "−" : "+"} {num(Math.abs(bias))} = <b>{num(total)}</b></>, { "data-readout": "total" })}
+        {chip("threshold", <>{t("More than {n}?", { n: THRESHOLD })}</>, { "data-readout": "threshold" })}
+        {chip("total", <>{num(clouds)} × {num(w1)} + {num(forecast)} × {num(w2)} = <b>{num(total)}</b></>, { "data-readout": "total" })}
         {chip("umbrella", <><Umbrella size={16} strokeWidth={2.6} aria-hidden="true" />{fires ? t("Yes") : t("No")}</>, { "data-readout": "umbrella", "data-on": fires ? "" : undefined })}
       </>
     );
@@ -88,7 +87,7 @@ function Controls({ step, store }: ControlsProps) {
           <span>
             {t("Clouds")} <b>{num(s.clouds)}</b>
           </span>
-          <input id={clouds} type="range" min={0} max={1} step={0.1} value={s.clouds} data-input="clouds" onChange={(event) => set({ clouds: Number(event.target.value) })} />
+          <input id={clouds} type="range" min={0} max={10} step={1} value={s.clouds} data-input="clouds" onChange={(event) => set({ clouds: Number(event.target.value) })} />
         </label>
         <button type="button" className="cs-action" data-action="forecast" aria-pressed={s.forecast === 1} onClick={() => set({ forecast: s.forecast ? 0 : 1 })}>
           <CloudRain size={16} strokeWidth={2.6} aria-hidden="true" />
@@ -102,9 +101,9 @@ function Controls({ step, store }: ControlsProps) {
       <div className="cs-sliders">
         <label className="cs-slider" htmlFor={weight}>
           <span>
-            {t("Weight of the forecast")} <b>{num(s.forecastWeight)}</b>
+            {t("Points for the forecast")} <b>{num(s.forecastWeight)}</b>
           </span>
-          <input id={weight} type="range" min={0} max={2} step={0.1} value={s.forecastWeight} data-input="forecast-weight" onChange={(event) => set({ forecastWeight: Number(event.target.value) })} />
+          <input id={weight} type="range" min={0} max={10} step={1} value={s.forecastWeight} data-input="forecast-weight" onChange={(event) => set({ forecastWeight: Number(event.target.value) })} />
         </label>
       </div>
     );
@@ -112,11 +111,11 @@ function Controls({ step, store }: ControlsProps) {
   if (step === "learn")
     return (
       <div className="cs-actions">
-        <button type="button" className="cs-action" data-action="learn" disabled={s.learned} onClick={() => set({ learned: true })}>
+        <button type="button" className="cs-action" data-action="learn" disabled={learnState(s.lessons).fires} onClick={() => set({ lessons: s.lessons + 1 })}>
           <GraduationCap size={16} strokeWidth={2.6} aria-hidden="true" />
           {t("Learn from the mistake")}
         </button>
-        <button type="button" className="cs-action" data-action="restart" onClick={() => set({ learned: false })}>
+        <button type="button" className="cs-action" data-action="restart" onClick={() => set({ lessons: 0 })}>
           <RotateCcw size={15} strokeWidth={2.6} aria-hidden="true" />
           {t("Start again")}
         </button>

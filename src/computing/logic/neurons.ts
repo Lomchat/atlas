@@ -1,7 +1,8 @@
 /**
  * The neural-network chapter's arithmetic, shared by its scene and overlay:
- * one neuron deciding whether to take an umbrella, a perceptron learning
- * step, and a small digit reader with illustrative scores. Pure TypeScript.
+ * one neuron counting points to decide whether to take an umbrella, learning
+ * from its mistake, and a small digit reader with illustrative scores.
+ * Whole numbers on purpose, for young readers. Pure TypeScript.
  */
 
 /** Step ids of the neurons chapter, in order (checked against its data). */
@@ -9,44 +10,40 @@ export const NEURONS_STEPS = ["neuron", "weights", "learn", "network", "training
 export type NeuronsStep = (typeof NEURONS_STEPS)[number];
 
 export interface NeuronsState {
-  /** Step "neuron": how cloudy it is (0–1) and whether rain is forecast (0 or 1). */
+  /** Step "neuron": how cloudy the sky is (0–10) and whether rain is forecast (0 or 1). */
   clouds: number;
   forecast: number;
-  /** Step "weights": the weight given to the forecast. */
+  /** Step "weights": the points given to the forecast. */
   forecastWeight: number;
-  /** Step "learn": the neuron has learned from its mistake. */
-  learned: boolean;
+  /** Step "learn": how many times the neuron has learned from its mistake. */
+  lessons: number;
   /** Step "network": the digit shown to the network. */
   digit: 1 | 4 | 7;
 }
 
-export const NEURONS_START: NeuronsState = { clouds: 0.8, forecast: 1, forecastWeight: 0.3, learned: false, digit: 7 };
+export const NEURONS_START: NeuronsState = { clouds: 8, forecast: 1, forecastWeight: 1, lessons: 0, digit: 7 };
 
-/** The neuron of the first step. */
-export const NEURON = { cloudsWeight: 0.6, forecastWeight: 1.5, bias: -1 } as const;
+/** The neuron of the first step: clouds give 1 point each, a rain forecast 5 points. */
+export const NEURON = { cloudsWeight: 1, forecastWeight: 5 } as const;
+/** It says yes (takes the umbrella) when the total is more than 10 points. */
+export const THRESHOLD = 10;
 
-/** total = clouds × w1 + forecast × w2 + bias; the neuron fires when total > 0. */
-export function neuron(clouds: number, forecast: number, w1: number, w2: number, bias: number) {
-  const total = clouds * w1 + forecast * w2 + bias;
-  return { total, fires: total > 0 };
+/** total = clouds × w1 + forecast × w2; the neuron fires when total > THRESHOLD. */
+export function neuron(clouds: number, forecast: number, w1: number, w2: number) {
+  const total = clouds * w1 + forecast * w2;
+  return { total, fires: total > THRESHOLD };
 }
 
-/** One perceptron step: weight += rate × error × input, bias += rate × error. */
-export const RATE = 0.1;
-export function learnStep(w1: number, w2: number, bias: number, clouds: number, forecast: number, target: number) {
-  const output = neuron(clouds, forecast, w1, w2, bias).fires ? 1 : 0;
-  const error = target - output;
-  return { error, w1: w1 + RATE * error * clouds, w2: w2 + RATE * error * forecast, bias: bias + RATE * error };
-}
+/**
+ * Learning: it rained (clouds 8, forecast 1) but the neuron said no. After
+ * each mistake the forecast, the clue that should have counted more, gains
+ * one point: 1 → 2 (total 10, still no) → 3 (total 11, yes).
+ */
+export const LEARN = { clouds: 8, forecast: 1, w1: 1, w2: 1 } as const;
 
-/** The learning example: it rained (target 1), clouds 0.8, forecast 1, weights 0.6 and 0.3, bias −1. */
-export const LEARN = { clouds: 0.8, forecast: 1, w1: 0.6, w2: 0.3, bias: -1, target: 1 } as const;
-
-export function learnState(learned: boolean) {
-  const { clouds, forecast, w1, w2, bias, target } = LEARN;
-  const after = learnStep(w1, w2, bias, clouds, forecast, target);
-  const weights = learned ? after : { error: after.error, w1, w2, bias };
-  return { ...weights, error: after.error, ...neuron(clouds, forecast, weights.w1, weights.w2, weights.bias) };
+export function learnState(lessons: number) {
+  const w2 = LEARN.w2 + lessons;
+  return { w1: LEARN.w1, w2, ...neuron(LEARN.clouds, LEARN.forecast, LEARN.w1, w2) };
 }
 
 /** Digits drawn on a 7 × 7 grid (the real images have 28 × 28 pixels). */

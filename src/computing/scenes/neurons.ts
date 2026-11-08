@@ -11,7 +11,7 @@ import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js
 import { rng } from "../../engine/kit";
 import type { Kit } from "../../engine/kit";
 import { cloud } from "../../levels/scenes/common/props";
-import { DIGITS, ERROR_CURVE, NEURON, NEURONS_START, NEURONS_STEPS, SCORES, learnState, neuron } from "../logic/neurons";
+import { DIGITS, ERROR_CURVE, LEARN, NEURON, NEURONS_START, NEURONS_STEPS, SCORES, learnState, neuron } from "../logic/neurons";
 import type { NeuronsState, NeuronsStep } from "../logic/neurons";
 import type { Store } from "../store";
 import { Pop, approach } from "./fx";
@@ -30,7 +30,6 @@ const SHOTS: Record<NeuronsStep, Shot> = {
 const BODY = new THREE.Vector3(0, 0, 0);
 const IN_CLOUDS = new THREE.Vector3(-4.1, 1.15, 0);
 const IN_FORECAST = new THREE.Vector3(-4.1, -1.15, 0);
-const IN_BIAS = new THREE.Vector3(-1.5, -2.3, 0);
 const UMBRELLA = new THREE.Vector3(4, -0.2, 0);
 
 /** Links between two point sets, merged into one mesh. */
@@ -84,9 +83,6 @@ const neurons: StageBuilder = ({ kit, store }) => {
     drop.add(ball, tip);
   }
   single.add(drop);
-  const biasBall = new THREE.Mesh(kit.geometry(new THREE.SphereGeometry(0.28, 20, 14)), kit.toon("#6a5bb5", { rim: 0.4 }));
-  biasBall.position.copy(IN_BIAS);
-  single.add(biasBall);
 
   const wire = (from: THREE.Vector3, to: THREE.Vector3, colour: string) => {
     const dir = to.clone().sub(from);
@@ -98,7 +94,6 @@ const neurons: StageBuilder = ({ kit, store }) => {
   };
   const wClouds = wire(IN_CLOUDS.clone().add(new THREE.Vector3(0.9, 0, 0)), BODY, "#ffd23f");
   const wForecast = wire(IN_FORECAST.clone().add(new THREE.Vector3(0.6, 0, 0)), BODY, "#ffd23f");
-  const wBias = wire(IN_BIAS, BODY, "#ff6fb1");
   const wOut = wire(BODY, UMBRELLA.clone().add(new THREE.Vector3(-0.8, 0.2, 0)), "#ffd23f");
   const bodyMaterial = kit.toon("#ff8a3d", { rim: 0.5, gloss: 0.4 });
   const body = new THREE.Mesh(kit.geometry(new THREE.SphereGeometry(0.95, 40, 28)), bodyMaterial);
@@ -139,7 +134,7 @@ const neurons: StageBuilder = ({ kit, store }) => {
   anchor("in-forecast", single, [IN_FORECAST.x + 0.6, IN_FORECAST.y - 0.85, 0.4]);
   anchor("w-clouds", single, [-2.05, 0.75, 0.5]);
   anchor("w-forecast", single, [-2.05, -0.75, 0.5]);
-  anchor("bias", single, [IN_BIAS.x + 0.7, IN_BIAS.y - 0.2, 0.4]);
+  anchor("threshold", single, [0, 1.35, 0.6]);
   anchor("total", single, [1.7, -1.5, 0.6]);
   anchor("umbrella", single, [UMBRELLA.x, UMBRELLA.y + 2.2, 0.4]);
   let fire = 1;
@@ -277,16 +272,15 @@ const neurons: StageBuilder = ({ kit, store }) => {
       singlePop.update(one, frame);
       let w1: number = NEURON.cloudsWeight;
       let w2: number = NEURON.forecastWeight;
-      let bias: number = NEURON.bias;
       let inputs = [s.clouds, s.forecast];
-      if (step === "weights") (w2 = s.forecastWeight), (inputs = [0.8, 1]);
+      if (step === "weights") (w2 = s.forecastWeight), (inputs = [LEARN.clouds, LEARN.forecast]);
       if (step === "learn") {
-        const l = learnState(s.learned);
-        (w1 = l.w1), (w2 = l.w2), (bias = l.bias), (inputs = [0.8, 1]);
+        const l = learnState(s.lessons);
+        (w1 = l.w1), (w2 = l.w2), (inputs = [LEARN.clouds, LEARN.forecast]);
       }
-      const result = neuron(inputs[0], inputs[1], w1, w2, bias);
-      const thick = (weight: number) => 0.03 + 0.07 * Math.abs(weight);
-      for (const [mesh, weight] of [[wClouds, w1], [wForecast, w2], [wBias, bias], [wOut, result.fires ? 1 : 0.3]] as const) {
+      const result = neuron(inputs[0], inputs[1], w1, w2);
+      const thick = (weight: number) => 0.035 + 0.015 * weight;
+      for (const [mesh, weight] of [[wClouds, w1], [wForecast, w2], [wOut, result.fires ? 4 : 1]] as const) {
         const t = approach(mesh.scale.x, thick(weight), 8, frame);
         mesh.scale.set(t, 1, t);
       }
@@ -295,7 +289,7 @@ const neurons: StageBuilder = ({ kit, store }) => {
       color(bodyMaterial).set("#ff8a3d").lerp(ON, fire);
       bodyGlow.material.opacity = 0.75 * fire;
       canopy.scale.set(0.25 + 0.75 * open, 1.5 - 0.5 * open, 0.25 + 0.75 * open);
-      sky.scale.setScalar(0.9 * (0.55 + 0.6 * inputs[0]));
+      sky.scale.setScalar(0.9 * (0.55 + 0.06 * inputs[0]));
       drop.scale.setScalar(0.45 + 0.6 * inputs[1]);
       sky.position.x = IN_CLOUDS.x + (calm ? 0 : Math.sin(time * 0.6) * 0.08);
       const rainPositions = rain.geometry.getAttribute("position") as THREE.BufferAttribute;
@@ -305,7 +299,7 @@ const neurons: StageBuilder = ({ kit, store }) => {
         rainPositions.setXYZ(i, UMBRELLA.x + x, raining ? UMBRELLA.y + 3.1 - u * 3.6 : -50, z);
       });
       rainPositions.needsUpdate = true;
-      for (const name of ["in-clouds", "in-forecast", "w-clouds", "w-forecast", "bias", "total", "umbrella"])
+      for (const name of ["in-clouds", "in-forecast", "w-clouds", "w-forecast", "threshold", "total", "umbrella"])
         anchors[name].visible = single.visible && singlePop.value > 0.8;
 
       // The network: pixels of the digit, then outputs with their scores.

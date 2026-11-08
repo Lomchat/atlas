@@ -2,7 +2,7 @@
 
 Atlas is a "Powers of Ten" journey: one continuous zoom from quarks to the observable Universe, drawn as vivid, playful 3D illustrations (think Kurzgesagt). The visitor starts in a small park diorama and dives into a person, a tree or a pond, or zooms out to Earth, the Solar System and the galaxies. Every inward journey ends in an atom, its nucleus, a proton and a quark. It is built for curiosity: short, accurate texts, "Did you know?" facts, hotspots, a guided tour and a scale ruler that always shows where you are.
 
-A second section, **Computing** ("Informatique"), reached with the switch at the top left, explains fundamental ideas of computing in the same style: step-by-step animated chapters (the bit, logic gates, inside a computer, public and private keys, neural networks, language models). Its rule: concrete worked examples with real numbers, not just metaphors.
+A second section, **Computing** ("Informatique"), reached with the switch at the top left, explains fundamental ideas of computing in the same style: step-by-step animated chapters (the bit, logic gates, inside a computer, public and private keys, neural networks, language models). Its rules: concrete worked examples with real numbers, not just metaphors, written so that a child of about 10 understands them (short sentences, everyday comparisons, small whole numbers, no jargon such as UTF-8, CMOS or TLS; precise references go in the data file's comment or a source).
 
 ## Architecture
 

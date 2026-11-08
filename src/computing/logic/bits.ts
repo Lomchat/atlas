@@ -23,7 +23,7 @@ export const BITS_START: BitsState = {
   single: true,
   value: 13,
   char: "A",
-  rgb: [255, 138, 61],
+  rgb: [255, 255, 0],
 };
 
 /** Place values of an 8-bit byte, most significant first. */

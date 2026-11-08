@@ -145,7 +145,7 @@ function Controls({ step, store }: ControlsProps) {
       <div className="cs-actions">
         <button type="button" className="cs-action" data-action="next-token" disabled={s.generated >= GENERATED.length} onClick={() => set({ generated: s.generated + 1 })}>
           <Plus size={16} strokeWidth={2.8} aria-hidden="true" />
-          {t("Next token")}
+          {t("Next word")}
         </button>
         <button type="button" className="cs-action" data-action="restart" onClick={() => set({ generated: 0 })}>
           <RotateCcw size={15} strokeWidth={2.6} aria-hidden="true" />

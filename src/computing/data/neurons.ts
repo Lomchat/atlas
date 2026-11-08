@@ -1,12 +1,12 @@
 import type { LessonData } from "../types.ts";
 
 /**
- * Chapter 5: neural networks. Checked: 0.8 × 0.6 + 1 × 1.5 − 1 = 0.98;
- * 0.8 × 0.6 + 1 × 0.3 − 1 = −0.22; one perceptron step with rate 0.1 gives
- * 0.68, 0.4, −0.9 and a total of 0.044; a 784 → 128 → 10 network has
- * 101,770 weights and biases; GPT-3 has 175 billion (≈ 1.7 million times
- * more); MNIST has 60,000 training and 10,000 test images; the perceptron
- * dates from 1958 (Rosenblatt).
+ * Chapter 5: neural networks, for young readers, with whole numbers.
+ * Checked (see logic/neurons.ts): 8 × 1 + 1 × 5 = 13 > 10; 8 × 1 + 1 × 1 = 9;
+ * learning 1 → 2 → 3 points gives 9, 10, 11; a 784 → 128 → 10 network has
+ * 101,770 weights; GPT-3 has 175 billion (≈ 1.7 million times more);
+ * MNIST has 60,000 training images and simple networks get ≈ 98 % right;
+ * the perceptron dates from 1958.
  */
 export const neuronsLesson: LessonData = {
   id: "neurons",
@@ -18,8 +18,8 @@ export const neuronsLesson: LessonData = {
   title: { en: "Neural networks", fr: "Les réseaux de neurones" },
   short: { en: "Neurons", fr: "Neurones" },
   teaser: {
-    en: "A machine that learns from its mistakes, one weight at a time.",
-    fr: "Une machine qui apprend de ses erreurs, un poids à la fois.",
+    en: "A machine that learns from its mistakes, little by little.",
+    fr: "Une machine qui apprend de ses erreurs, petit à petit.",
   },
   source: { label: "Wikipedia — Perceptron", url: "https://en.wikipedia.org/wiki/Perceptron" },
   steps: [
@@ -27,18 +27,18 @@ export const neuronsLesson: LessonData = {
       id: "neuron",
       title: { en: "An artificial neuron", fr: "Un neurone artificiel" },
       text: {
-        en: "An artificial neuron multiplies each input by a weight, adds everything up with a bias, and fires (1) if the total is above 0. Otherwise it stays at 0.",
-        fr: "Un neurone artificiel multiplie chaque entrée par un poids, additionne le tout avec un biais, et s’active (1) si le total dépasse 0. Sinon, il reste à 0.",
+        en: "An artificial neuron is a tiny decision machine. It gives points to clues, adds them up, and says yes if the total is more than a threshold.",
+        fr: "Un neurone artificiel est une toute petite machine à décider. Il donne des points à des indices, les additionne, et répond oui si le total dépasse un seuil.",
       },
       example: {
-        en: "Take an umbrella? Clouds 0.8 × 0.6 + rain forecast 1 × 1.5 − 1 = 0.98. That is above 0: yes.",
-        fr: "Prendre son parapluie ? Nuages 0,8 × 0,6 + pluie annoncée 1 × 1,5 − 1 = 0,98. C’est plus que 0 : oui.",
+        en: "Take an umbrella? Each cloud counts 1 point, a rain forecast counts 5. Sky 8 out of 10 cloudy and rain forecast: 8 × 1 + 1 × 5 = 13 points. More than 10: take the umbrella!",
+        fr: "Prendre son parapluie ? Chaque nuage vaut 1 point, la pluie annoncée vaut 5 points. Ciel couvert à 8 sur 10 et pluie annoncée : 8 × 1 + 1 × 5 = 13 points. C’est plus que 10 : on prend le parapluie !",
       },
       try: { en: "Change the clouds and the forecast.", fr: "Change les nuages et la météo." },
       facts: [
         {
-          en: "This model, the perceptron, was built by Frank Rosenblatt in 1958.",
-          fr: "Ce modèle, le perceptron, a été construit par Frank Rosenblatt en 1958.",
+          en: "One of the first artificial neurons, the perceptron, was built in 1958.",
+          fr: "L’un des premiers neurones artificiels, le perceptron, a été construit en 1958.",
         },
       ],
     },
@@ -46,18 +46,18 @@ export const neuronsLesson: LessonData = {
       id: "weights",
       title: { en: "Weights are importance", fr: "Les poids, c’est l’importance" },
       text: {
-        en: "The weights say how much each input counts. Same sky, same forecast: other weights give another decision.",
-        fr: "Les poids disent combien compte chaque entrée. Même ciel, même météo : d’autres poids donnent une autre décision.",
+        en: "The points given to each clue are called weights. They say what matters most. With other weights, the same sky leads to another decision.",
+        fr: "Les points donnés à chaque indice s’appellent des poids. Ils disent ce qui compte le plus. Avec d’autres poids, le même ciel donne une autre décision.",
       },
       example: {
-        en: "If the forecast only weighs 0.3: 0.8 × 0.6 + 1 × 0.3 − 1 = −0.22. Below 0: no umbrella.",
-        fr: "Si la météo ne pèse que 0,3 : 0,8 × 0,6 + 1 × 0,3 − 1 = −0,22. En dessous de 0 : pas de parapluie.",
+        en: "If the forecast only counts 1 point: 8 × 1 + 1 × 1 = 9. That is not more than 10: no umbrella.",
+        fr: "Si la météo ne vaut plus que 1 point : 8 × 1 + 1 × 1 = 9. Ce n’est pas plus que 10 : pas de parapluie.",
       },
-      try: { en: "Change the weight of the forecast.", fr: "Change le poids de la météo." },
+      try: { en: "Change the points of the forecast.", fr: "Change les points de la météo." },
       facts: [
         {
-          en: "Nobody sets these weights by hand: the network finds them by itself, as the next step shows.",
-          fr: "Personne ne règle ces poids à la main : le réseau les trouve tout seul, comme le montre l’étape suivante.",
+          en: "Nobody sets these weights by hand: the network finds them by itself, by practising.",
+          fr: "Personne ne règle ces poids à la main : le réseau les trouve tout seul, en s’entraînant.",
         },
       ],
     },
@@ -65,18 +65,18 @@ export const neuronsLesson: LessonData = {
       id: "learn",
       title: { en: "Learning from a mistake", fr: "Apprendre d’une erreur" },
       text: {
-        en: "It rained, but the neuron said no: the error is 1 − 0 = 1. Each weight then moves a little, in proportion to the error and to its input: weight + 0.1 × error × input.",
-        fr: "Il a plu, mais le neurone a dit non : l’erreur vaut 1 − 0 = 1. Chaque poids bouge alors un peu, en proportion de l’erreur et de son entrée : poids + 0,1 × erreur × entrée.",
+        en: "It rained, but the neuron said no: it got it wrong! To learn, we give a little more weight to the clue that should have counted more: the forecast.",
+        fr: "Il a plu, mais le neurone a dit non : il s’est trompé ! Pour apprendre, on donne un peu plus de poids à l’indice qui aurait dû compter plus : la météo.",
       },
       example: {
-        en: "Clouds: 0.6 + 0.1 × 1 × 0.8 = 0.68. Forecast: 0.3 + 0.1 × 1 × 1 = 0.4. Bias: −1 + 0.1 = −0.9. New total: 0.044, above 0: this time, yes.",
-        fr: "Nuages : 0,6 + 0,1 × 1 × 0,8 = 0,68. Météo : 0,3 + 0,1 × 1 × 1 = 0,4. Biais : −1 + 0,1 = −0,9. Nouveau total : 0,044, plus que 0 : cette fois, oui.",
+        en: "The forecast goes from 1 to 2 points: 8 + 2 = 10, still not more than 10. Once more: 3 points, 8 + 3 = 11. This time, yes!",
+        fr: "La météo passe de 1 à 2 points : 8 + 2 = 10, toujours pas plus que 10. Encore une fois : 3 points, 8 + 3 = 11. Cette fois, c’est oui !",
       },
-      try: { en: "Let the neuron learn.", fr: "Laisse le neurone apprendre." },
+      try: { en: "Let the neuron learn from its mistakes.", fr: "Laisse le neurone apprendre de ses erreurs." },
       facts: [
         {
-          en: "Today’s networks use a smoother version of this rule, gradient descent, repeated over millions of examples.",
-          fr: "Les réseaux actuels utilisent une version plus fine de cette règle, la descente de gradient, répétée sur des millions d’exemples.",
+          en: "Real networks learn like this, but they adjust millions of weights, a tiny bit each time.",
+          fr: "Les vrais réseaux apprennent comme ça, mais ils ajustent des millions de poids, un tout petit peu à chaque fois.",
         },
       ],
     },
@@ -84,41 +84,41 @@ export const neuronsLesson: LessonData = {
       id: "network",
       title: { en: "Neurons in layers", fr: "Des neurones en couches" },
       text: {
-        en: "Put neurons in layers, each layer connected to the next: this is a neural network. The first layer reads the input; the last one gives the answer.",
-        fr: "Place des neurones en couches, chaque couche reliée à la suivante : c’est un réseau de neurones. La première couche lit l’entrée ; la dernière donne la réponse.",
+        en: "Connect lots of neurons in layers and you get a neural network. The first layer looks at the picture; the last one gives the answer.",
+        fr: "En reliant beaucoup de neurones en couches, on obtient un réseau de neurones. La première couche regarde l’image, la dernière donne la réponse.",
       },
       example: {
-        en: "To read handwritten digits: 784 inputs, one per pixel of a 28 × 28 image, and 10 outputs, one per digit. The strongest output is the answer.",
-        fr: "Pour lire des chiffres écrits à la main : 784 entrées, une par pixel d’une image de 28 × 28, et 10 sorties, une par chiffre. La sortie la plus forte donne la réponse.",
+        en: "To recognise a handwritten digit, the network looks at each little square of the picture and lights up the output of the digit it recognises: here, 7.",
+        fr: "Pour reconnaître un chiffre écrit à la main, le réseau regarde chaque petit carré de l’image et allume la sortie du chiffre qu’il reconnaît : ici, le 7.",
       },
       try: { en: "Show it another digit.", fr: "Montre-lui un autre chiffre." },
       facts: [
         {
-          en: "The picture uses a 7 × 7 grid to stay readable, and its scores are illustrative.",
-          fr: "L’image utilise une grille de 7 × 7 pour rester lisible, et ses scores sont une illustration.",
+          en: "Here the picture has 7 × 7 squares to stay readable; real ones have 28 × 28, that is 784 squares.",
+          fr: "Ici, l’image fait 7 × 7 carrés pour rester lisible ; les vraies en font 28 × 28, soit 784 carrés.",
         },
       ],
-      labels: [{ anchor: "pixels", place: "below", text: { en: "Pixels in", fr: "Pixels en entrée" } }],
+      labels: [{ anchor: "pixels", place: "below", text: { en: "The picture", fr: "L’image" } }],
     },
     {
       id: "training",
       title: { en: "Thousands of examples", fr: "Des milliers d’exemples" },
       text: {
-        en: "At first the weights are random and the network answers at random. After each example, every weight moves a little to reduce the error. Little by little, mistakes become rare.",
-        fr: "Au départ, les poids sont tirés au hasard et le réseau répond n’importe quoi. Après chaque exemple, chaque poids bouge un peu pour réduire l’erreur. Peu à peu, les erreurs deviennent rares.",
+        en: "At first the network answers at random. We show it thousands of examples, and after each mistake its weights move a little. Little by little, it gets it wrong less and less.",
+        fr: "Au début, le réseau répond au hasard. On lui montre des milliers d’exemples, et à chaque erreur ses poids bougent un peu. Petit à petit, il se trompe de moins en moins.",
       },
       example: {
-        en: "The classic MNIST collection has 60,000 handwritten digits for training. A simple network trained on it reads about 98 out of 100 new digits correctly.",
-        fr: "La collection classique MNIST compte 60 000 chiffres écrits à la main pour l’entraînement. Un réseau simple entraîné dessus lit correctement environ 98 chiffres nouveaux sur 100.",
+        en: "After seeing 60,000 handwritten digits, a small network recognises about 98 out of 100 digits it has never seen before.",
+        fr: "Après avoir vu 60 000 chiffres écrits à la main, un petit réseau en reconnaît environ 98 sur 100 qu’il n’avait jamais vus.",
       },
       facts: [
         {
-          en: "MNIST keeps 10,000 other digits apart: the network never sees them while learning, so the score is honest.",
-          fr: "MNIST garde 10 000 autres chiffres à part : le réseau ne les voit jamais pendant l’apprentissage, le score est donc honnête.",
+          en: "It is a bit like learning to read: at first you make lots of mistakes, then fewer and fewer.",
+          fr: "C’est un peu comme apprendre à lire : au début on se trompe souvent, puis de moins en moins.",
         },
       ],
       labels: [
-        { anchor: "axis-error", place: "left", text: { en: "Errors", fr: "Erreurs" } },
+        { anchor: "axis-error", place: "left", text: { en: "Mistakes", fr: "Erreurs" } },
         { anchor: "axis-examples", place: "below", text: { en: "Examples seen", fr: "Exemples vus" } },
       ],
       source: { label: "Wikipedia — MNIST database", url: "https://en.wikipedia.org/wiki/MNIST_database" },
@@ -127,17 +127,17 @@ export const neuronsLesson: LessonData = {
       id: "scale",
       title: { en: "From a hundred thousand to billions", fr: "De cent mille à des milliards" },
       text: {
-        en: "The digit reader has about a hundred thousand weights. Language models work the same way, on a gigantic scale: billions of weights, adjusted on billions of sentences.",
-        fr: "Le lecteur de chiffres a environ cent mille poids. Les modèles de langage fonctionnent pareil, à une échelle gigantesque : des milliards de poids, ajustés sur des milliards de phrases.",
+        en: "Our digit reader has about 100,000 weights. The AIs that write text work the same way, but with billions of weights!",
+        fr: "Notre lecteur de chiffres a environ 100 000 poids. Les intelligences artificielles qui écrivent du texte fonctionnent pareil, mais avec des milliards de poids !",
       },
       example: {
-        en: "784 × 128 + 128 × 10 weights, plus the biases: 101,770 numbers. GPT-3 has 175 billion, about 1.7 million times more.",
-        fr: "784 × 128 + 128 × 10 poids, plus les biais : 101 770 nombres. GPT-3 en a 175 milliards, environ 1,7 million de fois plus.",
+        en: "100,000 weights to read digits; 175 billion for GPT-3, an AI that writes: almost 2 million times more.",
+        fr: "100 000 poids pour lire des chiffres ; 175 milliards pour GPT-3, une IA qui écrit : presque 2 millions de fois plus.",
       },
       facts: [
         {
-          en: "Training a model of that size takes weeks on thousands of specialised chips.",
-          fr: "Entraîner un modèle de cette taille demande des semaines sur des milliers de puces spécialisées.",
+          en: "Training such a big AI takes thousands of computers working for weeks.",
+          fr: "Pour entraîner une IA aussi grande, il faut des milliers d’ordinateurs pendant des semaines.",
         },
       ],
       labels: [

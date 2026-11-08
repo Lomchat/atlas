@@ -1,10 +1,10 @@
 import type { LessonData } from "../types.ts";
 
 /**
- * Chapter 1: the bit. From one switch to letters and colours. Every number
- * quoted here is exact: A = 65 (ASCII/Unicode), é = U+00E9 = C3 A9 in UTF-8,
- * the grinning face = U+1F600 = 128 512, 2^32 = 4 294 967 296,
- * 2^64 ≈ 1.8 × 10^19, 2^24 = 16 777 216, 12 Mpx × 3 bytes = 36 MB.
+ * Chapter 1: the bit, for young readers. Checked: A = 65, a = 97, m = 109,
+ * i = 105, H = 72 (Unicode); 2^10 = 1 024; 8 bits count from 0 to 255;
+ * red 255 + green 255 + blue 0 is yellow on a screen; a hard-disk bit is a
+ * few tens of nanometres long (thousands across a 70 µm hair).
  */
 export const bitsLesson: LessonData = {
   id: "bits",
@@ -28,22 +28,22 @@ export const bitsLesson: LessonData = {
       id: "switch",
       title: { en: "A bit: yes or no", fr: "Un bit : oui ou non" },
       text: {
-        en: "A bit is the smallest possible piece of information: just two states, written 0 and 1. Off or on, no or yes. Inside a computer, a bit is a voltage on a tiny wire: high means 1, low means 0.",
-        fr: "Un bit, c’est la plus petite information possible : deux états seulement, notés 0 et 1. Éteint ou allumé, non ou oui. Dans un ordinateur, un bit est une tension sur un minuscule fil : haute pour 1, basse pour 0.",
+        en: "A bit is the smallest piece of information there is. It has only two values, 0 or 1, like a lamp that is off or on. A computer holds billions of these tiny switches.",
+        fr: "Un bit, c’est la plus petite information qui existe. Il n’a que deux valeurs, 0 ou 1, comme une lampe éteinte ou allumée. Un ordinateur contient des milliards de ces minuscules interrupteurs.",
       },
       example: {
-        en: "“Is it raining?” fits in one bit: 1 for yes, 0 for no.",
-        fr: "« Est-ce qu’il pleut ? » tient dans un bit : 1 pour oui, 0 pour non.",
+        en: "“Is it raining?” Yes or no: one bit is enough to answer. 1 means yes, 0 means no.",
+        fr: "« Est-ce qu’il pleut ? » Oui ou non : un seul bit suffit pour répondre. 1 veut dire oui, 0 veut dire non.",
       },
       try: { en: "Flip the switch to change the bit.", fr: "Bascule l’interrupteur pour changer le bit." },
       facts: [
         {
-          en: "“Bit” is short for binary digit. Claude Shannon made the word famous in 1948, in the paper that founded information theory.",
-          fr: "« Bit » est la contraction de l’anglais binary digit, « chiffre binaire ». Claude Shannon a rendu le mot célèbre en 1948, dans l’article qui a fondé la théorie de l’information.",
+          en: "The word “bit” comes from binary digit: a digit that can only be 0 or 1.",
+          fr: "Le mot « bit » vient de l’anglais binary digit, « chiffre binaire » : un chiffre qui ne peut valoir que 0 ou 1.",
         },
         {
-          en: "The power symbol on your devices merges a 1 and a 0: a line inside a circle, on and off.",
-          fr: "Le symbole marche/arrêt de tes appareils mélange un 1 et un 0 : un trait dans un cercle, allumé et éteint.",
+          en: "Look at the power button of your devices: its drawing mixes a 1 (a line) and a 0 (a circle).",
+          fr: "Regarde le bouton marche/arrêt de tes appareils : son dessin mélange un 1 (un trait) et un 0 (un rond).",
         },
       ],
     },
@@ -51,48 +51,48 @@ export const bitsLesson: LessonData = {
       id: "where",
       title: { en: "Where bits live", fr: "Où vivent les bits ?" },
       text: {
-        en: "A bit is not a thing but a state. It can be stored wherever two states are easy to tell apart: a voltage in a chip, a tiny magnet pointing up or down on a hard disk, a flash of light in an optical fibre.",
-        fr: "Un bit n’est pas un objet, c’est un état. On peut le ranger partout où deux états se distinguent bien : une tension dans une puce, un minuscule aimant tourné vers le haut ou vers le bas sur un disque dur, un éclair de lumière dans une fibre optique.",
+        en: "A bit can be stored anywhere you can tell two states apart: current or no current in a chip, a tiny magnet pointing up or down, a flash of light or darkness.",
+        fr: "On peut ranger un bit partout où l’on distingue deux états : du courant ou pas de courant dans une puce, un minuscule aimant tourné vers le haut ou vers le bas, un éclair de lumière ou le noir.",
       },
       example: {
-        en: "In an optical fibre, a flash means 1 and darkness means 0. Billions of flashes go through every second.",
-        fr: "Dans une fibre optique, un éclair vaut 1 et le noir vaut 0. Des milliards d’éclairs y passent chaque seconde.",
+        en: "In a fibre-optic Internet cable, a flash means 1 and darkness means 0. Billions of flashes go through it every second.",
+        fr: "Dans le câble de la fibre optique, un éclair veut dire 1 et le noir veut dire 0. Il y passe des milliards d’éclairs chaque seconde.",
       },
       facts: [
         {
-          en: "On a modern hard disk, one bit is a magnetised patch a few tens of nanometres wide, far smaller than a bacterium.",
-          fr: "Sur un disque dur récent, un bit est une zone aimantée de quelques dizaines de nanomètres de large, bien plus petite qu’une bactérie.",
+          en: "The very first computers read cards punched with holes: a hole meant 1, no hole meant 0.",
+          fr: "Les tout premiers ordinateurs lisaient des cartes percées de trous : un trou, c’était 1 ; pas de trou, c’était 0.",
         },
         {
-          en: "Early computers read their programs from punched cards: at each position, a hole or no hole.",
-          fr: "Les premiers ordinateurs lisaient leurs programmes sur des cartes perforées : à chaque position, un trou ou pas de trou.",
+          en: "On a hard disk, each bit is a magnet so small that thousands of them would fit across a hair.",
+          fr: "Sur un disque dur, chaque bit est un aimant si petit qu’il en tiendrait des milliers sur l’épaisseur d’un cheveu.",
         },
       ],
       labels: [
-        { anchor: "chip", place: "below", text: { en: "Chip: a voltage", fr: "Puce : une tension" } },
+        { anchor: "chip", place: "below", text: { en: "Chip: current", fr: "Puce : du courant" } },
         { anchor: "disk", place: "below", text: { en: "Hard disk: a magnet", fr: "Disque dur : un aimant" } },
-        { anchor: "fibre", place: "below", text: { en: "Optical fibre: light", fr: "Fibre optique : la lumière" } },
+        { anchor: "fibre", place: "below", text: { en: "Fibre: light", fr: "Fibre : la lumière" } },
       ],
     },
     {
       id: "double",
-      title: { en: "Each bit doubles the choices", fr: "Chaque bit double les possibilités" },
+      title: { en: "More bits, more choices", fr: "Plus de bits, plus de choix" },
       text: {
-        en: "With 1 bit there are 2 possibilities. With 2 bits, 00, 01, 10 and 11: that makes 4. Each extra bit doubles the count: 3 bits give 8 possibilities, and 8 bits give 256.",
-        fr: "Avec 1 bit, il y a 2 possibilités. Avec 2 bits, 00, 01, 10 et 11 : ça fait 4. Chaque bit en plus double le compte : 3 bits donnent 8 possibilités, et 8 bits en donnent 256.",
+        en: "With 1 bit you have 2 choices: 0 or 1. With 2 bits you have 4: 00, 01, 10 and 11. Every time you add a bit, the number of choices doubles.",
+        fr: "Avec 1 bit, on a 2 choix : 0 ou 1. Avec 2 bits, on en a 4 : 00, 01, 10 et 11. Chaque fois qu’on ajoute un bit, le nombre de choix double.",
       },
       example: {
-        en: "To name one square of a chessboard, 6 bits are enough: 2 × 2 × 2 × 2 × 2 × 2 = 64 squares.",
-        fr: "Pour désigner une case d’un échiquier, 6 bits suffisent : 2 × 2 × 2 × 2 × 2 × 2 = 64 cases.",
+        en: "To pick a traffic-light colour (green, amber or red), 2 bits are enough: they give 4 choices, so one is even left over.",
+        fr: "Pour choisir la couleur d’un feu (vert, orange ou rouge), 2 bits suffisent : ils offrent 4 choix, il en reste même un.",
       },
       facts: [
         {
-          en: "With 32 bits you can count past 4 billion. That is why the old Internet addresses (IPv4), 32 bits long, have nearly all been handed out.",
-          fr: "Avec 32 bits, on dépasse les 4 milliards de possibilités. C’est pour ça que les anciennes adresses Internet (IPv4), longues de 32 bits, sont presque toutes attribuées.",
+          en: "With 10 bits you already have 1,024 choices: 2 × 2 × 2 × 2 × 2 × 2 × 2 × 2 × 2 × 2.",
+          fr: "Avec 10 bits, on a déjà 1 024 choix : 2 × 2 × 2 × 2 × 2 × 2 × 2 × 2 × 2 × 2.",
         },
         {
-          en: "Since each bit doubles the possibilities, 64 bits offer more than 18 billion billion.",
-          fr: "Comme chaque bit double les possibilités, 64 bits en offrent plus de 18 milliards de milliards.",
+          en: "It is like folding a sheet of paper again and again: each fold doubles the number of layers.",
+          fr: "C’est comme plier une feuille en deux encore et encore : à chaque pli, le nombre de couches double.",
         },
       ],
       labels: [
@@ -105,25 +105,25 @@ export const bitsLesson: LessonData = {
       id: "count",
       title: { en: "Counting with 0 and 1", fr: "Compter avec des 0 et des 1" },
       text: {
-        en: "In binary, each position is worth twice the one on its right: 1, 2, 4, 8, 16… To read a number, add up the values of the bits that are on.",
-        fr: "En binaire, chaque position vaut le double de sa voisine de droite : 1, 2, 4, 8, 16… Pour lire un nombre, on additionne les valeurs des bits allumés.",
+        en: "In binary you count with only 0 and 1. Each box is worth twice its neighbour on the right: 1, 2, 4, 8… To read the number, add up the boxes that are on.",
+        fr: "En binaire, on compte seulement avec 0 et 1. Chaque case vaut le double de sa voisine de droite : 1, 2, 4, 8… Pour lire le nombre, on additionne les cases allumées.",
       },
       example: {
-        en: "Bits on at 8, 4 and 1: 00001101 = 8 + 4 + 1 = 13.",
-        fr: "Bits allumés en 8, 4 et 1 : 00001101 = 8 + 4 + 1 = 13.",
+        en: "Boxes 8, 4 and 1 are on: 8 + 4 + 1 = 13. So 1101 in binary is 13.",
+        fr: "Les cases 8, 4 et 1 sont allumées : 8 + 4 + 1 = 13. Donc 1101 en binaire, c’est 13.",
       },
       try: {
-        en: "Click the bits to turn them on or off, or add 1 and watch the carries.",
-        fr: "Clique sur les bits pour les allumer ou les éteindre, ou ajoute 1 et observe les retenues.",
+        en: "Click the bits to turn them on or off, or add 1.",
+        fr: "Clique sur les bits pour les allumer ou les éteindre, ou ajoute 1.",
       },
       facts: [
         {
-          en: "The largest number on 8 bits is 11111111, or 255. Add 1 and everything falls back to 0, like a car's odometer rolling over.",
-          fr: "Le plus grand nombre sur 8 bits est 11111111, soit 255. Ajoute 1 et tout retombe à 0, comme un compteur kilométrique qui fait le tour.",
+          en: "With 8 bits you can count from 0 to 255. Add 1 to 255 and everything goes back to 0, like a counter going round.",
+          fr: "Avec 8 bits, on compte de 0 jusqu’à 255. Ajoute 1 à 255 et tout repasse à 0, comme un compteur qui fait le tour.",
         },
         {
-          en: "We count in tens because we have ten fingers. Computers count in twos because a circuit easily tells two states apart.",
-          fr: "On compte par dizaines parce qu’on a dix doigts. Un ordinateur compte par deux parce qu’un circuit distingue facilement deux états.",
+          en: "We count in tens because we have ten fingers. A computer counts in twos because a switch has only two positions.",
+          fr: "On compte par dix parce qu’on a dix doigts. Un ordinateur compte par deux parce qu’un interrupteur n’a que deux positions.",
         },
       ],
     },
@@ -131,36 +131,36 @@ export const bitsLesson: LessonData = {
       id: "letter",
       title: { en: "A letter is a number", fr: "Une lettre, c’est un nombre" },
       text: {
-        en: "To store text, every character was given a number. Capital A is number 65, written 01000001 in 8 bits: one byte. The screen then draws the letter with pixels.",
-        fr: "Pour écrire du texte, on a donné un numéro à chaque caractère. Le A majuscule porte le numéro 65, qui s’écrit 01000001 sur 8 bits : un octet. L’écran dessine ensuite la lettre avec des pixels.",
+        en: "To write text, every letter was given a number. Capital A is number 65. The computer stores this number as bits, then the screen draws the letter with tiny squares: pixels.",
+        fr: "Pour écrire du texte, on a donné un numéro à chaque lettre. Le A majuscule porte le numéro 65. L’ordinateur range ce numéro en bits, puis l’écran dessine la lettre avec de petits carrés : les pixels.",
       },
       example: {
-        en: "A = 65 = 01000001 and a = 97 = 01100001: between the capital and the small letter, a single bit changes.",
-        fr: "A = 65 = 01000001 et a = 97 = 01100001 : entre la majuscule et la minuscule, un seul bit change.",
+        en: "A is number 65 and a is number 97. When you type “Hi”, the computer really stores 72 and 105.",
+        fr: "A porte le numéro 65 et a le numéro 97. Quand tu tapes « Ami », l’ordinateur range en fait 65, 109 et 105.",
       },
-      try: { en: "Type a character to see its number and its bits.", fr: "Tape un caractère pour voir son numéro et ses bits." },
+      try: { en: "Type a letter to see its number and its bits.", fr: "Tape une lettre pour voir son numéro et ses bits." },
       facts: [
         {
-          en: "The é was not in ASCII, the original code designed for English. In UTF-8, the most common encoding on the Web, it takes 2 bytes: 11000011 10101001.",
-          fr: "Le é ne faisait pas partie de l’ASCII, le code d’origine pensé pour l’anglais. En UTF-8, le codage le plus courant du Web, il prend 2 octets : 11000011 10101001.",
+          en: "Emoji have numbers too, just like letters.",
+          fr: "Les émojis aussi ont un numéro, comme les lettres.",
         },
         {
-          en: "Emoji have numbers too. The grinning face is number 128,512 and takes 4 bytes in UTF-8.",
-          fr: "Les émojis aussi ont un numéro. Le visage souriant porte le numéro 128 512 et prend 4 octets en UTF-8.",
+          en: "Letters with accents, like é, take a few more bits than the others.",
+          fr: "Les lettres avec un accent, comme é, prennent un peu plus de bits que les autres.",
         },
       ],
       source: { label: "Unicode Consortium", url: "https://www.unicode.org/charts/PDF/U0000.pdf" },
     },
     {
       id: "color",
-      title: { en: "A colour is three bytes", fr: "Une couleur, c’est trois octets" },
+      title: { en: "A colour is three numbers", fr: "Une couleur, c’est trois nombres" },
       text: {
-        en: "Each pixel of a screen mixes three lights: red, green and blue. Each one gets a byte, from 0 (off) to 255 (full power). Three bytes, 24 bits, describe one colour.",
-        fr: "Chaque pixel d’un écran mélange trois lumières : rouge, vert et bleu. Chacune reçoit un octet, de 0 (éteinte) à 255 (à fond). Trois octets, soit 24 bits, décrivent une couleur.",
+        en: "Each pixel of your screen is made of three tiny lights: red, green and blue. Mixing them more or less brightly gives every colour. Each light goes from 0 (off) to 255 (full).",
+        fr: "Chaque pixel de ton écran est fait de trois petites lumières : rouge, verte et bleue. En les mélangeant plus ou moins fort, on obtient toutes les couleurs. Chaque lumière va de 0 (éteinte) à 255 (à fond).",
       },
       example: {
-        en: "This orange is red 255, green 138, blue 61. A 12-megapixel photo therefore holds 36 million bytes before compression.",
-        fr: "Cet orange, c’est rouge 255, vert 138, bleu 61. Une photo de 12 millions de pixels contient donc 36 millions d’octets avant compression.",
+        en: "Full red + full green + no blue makes yellow! And all three at full make white.",
+        fr: "Rouge à fond + vert à fond + bleu éteint, ça donne du jaune ! Et les trois à fond donnent du blanc.",
       },
       try: {
         en: "Switch the bits of each light, or pick a colour, and watch the pixel.",
@@ -168,12 +168,12 @@ export const bitsLesson: LessonData = {
       },
       facts: [
         {
-          en: "With 24 bits you can describe 16,777,216 different colours.",
-          fr: "Avec 24 bits, on peut décrire 16 777 216 couleurs différentes.",
-        },
-        {
           en: "Look at a screen through a magnifying glass: you will see its tiny red, green and blue lights.",
           fr: "Regarde un écran à la loupe : tu verras ses minuscules lumières rouges, vertes et bleues.",
+        },
+        {
+          en: "A phone screen has millions of pixels, which change colour dozens of times per second.",
+          fr: "Un écran de téléphone compte des millions de pixels, qui changent de couleur des dizaines de fois par seconde.",
         },
       ],
       theme: { top: "#170a3f", bottom: "#4a1d78", accent: "#ff8a3d", dust: "#ffb3d9" },
