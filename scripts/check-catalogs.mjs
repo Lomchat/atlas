@@ -30,7 +30,7 @@ function checkSources(en) {
       true,
     );
     const visit = (node) => {
-      if (ts.isJsxText(node) && /[A-Za-zÀ-ÿ]/.test(node.text))
+      if (ts.isJsxText(node) && /\p{L}/u.test(node.text))
         assert.ok(literalText.has(node.text.trim()), `${file}: user-facing JSX text must use t(): ${node.text.trim()}`);
       if (
         ts.isJsxAttribute(node) &&
@@ -134,6 +134,7 @@ async function checkLessons() {
     gates: (await import("../src/computing/logic/gates.ts")).GATES_STEPS,
     keys: (await import("../src/computing/logic/keys.ts")).KEYS_STEPS,
     llm: (await import("../src/computing/logic/llm.ts")).LLM_STEPS,
+    neurons: (await import("../src/computing/logic/neurons.ts")).NEURONS_STEPS,
   };
   const keysOf = (file) =>
     new Set(

@@ -17,19 +17,4 @@ export const upcomingLessons: LessonData[] = [
     },
     steps: [],
   },
-  {
-    id: "neurons",
-    number: 5,
-    status: "soon",
-    scene: "neurons",
-    icon: "neuron",
-    theme: { top: "#2a1206", bottom: "#8c3d12", accent: "#ff8a3d", dust: "#ffc08f" },
-    title: { en: "Neural networks", fr: "Les réseaux de neurones" },
-    short: { en: "Neurons", fr: "Neurones" },
-    teaser: {
-      en: "A machine that learns from its mistakes, one weight at a time.",
-      fr: "Une machine qui apprend de ses erreurs, un poids à la fois.",
-    },
-    steps: [],
-  },
 ];

@@ -9,4 +9,5 @@ export const STAGE_SCENES: Record<string, Loader> = {
   gates: () => import("./gates"),
   keys: () => import("./keys"),
   llm: () => import("./llm"),
+  neurons: () => import("./neurons"),
 };

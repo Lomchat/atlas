@@ -1296,3 +1296,44 @@ button.cs-station:focus-visible {
     transform: scaleX(0);
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* Neural networks                                                      */
+/* ------------------------------------------------------------------ */
+
+.cs-chip-readout[data-on] {
+  background: #3ff2b5;
+  color: var(--dark);
+}
+
+.cs-digit {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: translate(-100%, -50%);
+  font-family: var(--display);
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--ink-soft);
+}
+
+.cs-digit[data-best] {
+  color: #ffd23f;
+  font-size: 17px;
+}
+
+.cs-score {
+  position: absolute;
+  left: calc(var(--px) * (0.7 + var(--length) * 2.6));
+  top: 0;
+  transform: translate(8px, -50%);
+  font-family: var(--display);
+  font-size: 13px;
+  font-weight: 650;
+  color: #ffd23f;
+  white-space: nowrap;
+}
+
+.app[data-compact] .cs-chip-readout[data-readout="total"] {
+  max-width: 250px;
+}

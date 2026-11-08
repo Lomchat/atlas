@@ -7,9 +7,10 @@ import { bitsLesson } from "./data/bits.ts";
 import { gatesLesson } from "./data/gates.ts";
 import { keysLesson } from "./data/keys.ts";
 import { llmLesson } from "./data/llm.ts";
+import { neuronsLesson } from "./data/neurons.ts";
 import { upcomingLessons } from "./data/upcoming.ts";
 
-export const LESSONS: readonly LessonData[] = [bitsLesson, gatesLesson, keysLesson, llmLesson, ...upcomingLessons].sort(
+export const LESSONS: readonly LessonData[] = [bitsLesson, gatesLesson, keysLesson, neuronsLesson, llmLesson, ...upcomingLessons].sort(
   (a, b) => a.number - b.number,
 );
 

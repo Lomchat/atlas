@@ -165,6 +165,22 @@ try {
   await page.getByLabel(text("Message")).fill("12");
   assert.equal(await page.locator('[data-readout="unlock"] b').textContent(), "12", "Bob gets the message back");
 
+  // Chapter 5: one neuron decides, then learns from its mistake.
+  const neuronsLesson = lessonById.get("neurons");
+  await page.goto(`${base}/?lang=${locale}&section=computing&lesson=neurons&step=neuron`);
+  await expectStep(neuronsLesson, "neuron");
+  const umbrella = page.locator('[data-readout="umbrella"]');
+  await pinned(page, '[data-readout="umbrella"]');
+  assert.equal((await umbrella.textContent()).trim(), text("Yes"));
+  await page.locator('[data-action="forecast"]').click();
+  assert.equal((await umbrella.textContent()).trim(), text("No"));
+  await page.locator('[data-step-stop="learn"]').click();
+  await expectStep(neuronsLesson, "learn");
+  assert.equal((await umbrella.textContent()).trim(), text("No"));
+  await page.locator('[data-action="learn"]').click();
+  assert.ok((await page.locator('[data-readout="total"]').textContent()).includes((0.044).toLocaleString(locale)), "new total 0.044");
+  assert.equal((await umbrella.textContent()).trim(), text("Yes"));
+
   // Chapter 6: the toy tokenizer, attention and generation.
   const llm = lessonById.get("llm");
   await page.goto(`${base}/?lang=${locale}&section=computing&lesson=llm&step=tokens`);
